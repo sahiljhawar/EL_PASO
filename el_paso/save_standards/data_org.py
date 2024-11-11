@@ -25,8 +25,8 @@ class DataorgPMF(SaveStandard):
         """
         super().__init__(mission, source, instrument, model, mfm, version, save_text_segments,
                          default_db, default_format, varnames)
-        self.outputs = ["flux", "alpha_and_energy", "mlt", "lstar", "lm", "psd", "xGEO", "invmu_and_invk", "bfield"]
-        self.files = ["flux", "alpha_and_energy", "mlt", "lstar", "lm", "psd", "xGEO", "invmu_and_invk", "bfield"]
+        self.outputs = ["flux", "alpha_and_energy", "mlt", "lstar", "lm", "psd", "xGEO", "invmu_and_invk", "bfield", "R_eq"]
+        self.files = ["flux", "alpha_and_energy", "mlt", "lstar", "lm", "psd", "xGEO", "invmu_and_invk", "bfield", "R_eq"]
         self.file_variables = {"flux": [f"{varnames['time']}", f"{varnames['Flux']}"],
                                "alpha_and_energy": [f"{varnames['time']}", f"{varnames['PA_local']}", f"{varnames['PA_eq']}", f"{varnames['Energy']}"],
                                "mlt": [f"{varnames['time']}", f"{varnames['MLT']}"],
@@ -34,6 +34,7 @@ class DataorgPMF(SaveStandard):
                                "lm": [f"{varnames['time']}", f"{varnames['Lm']}"],
                                "psd": [f"{varnames['time']}", f"{varnames['PSD']}"],
                                "xGEO": [f"{varnames['time']}", f"{varnames['xGEO']}"],
+                               "R_eq": [f"{varnames['time']}", f"{varnames['R_eq']}"],
                                "bfield": [f"{varnames['time']}", f"{varnames['B_eq']}", f"{varnames['B_local']}"],
                                "invmu_and_invk": [f"{varnames['time']}", f"{varnames['InvMu']}", f"{varnames['InvK']}"]
                                }
@@ -72,7 +73,7 @@ class DataorgPMF(SaveStandard):
             file_name = (f"{file_folder_name}"
                          f"{self.save_text_segments[1]}_{self.instrument}_{year_month_day}to{year_month_day2}_{output_type}_"
                          f"{self.save_text_segments[5]}.mat")
-        elif output_type in ["alpha_and_energy", "lstar", "lm", "invmu_and_invk", "bfield"]:
+        elif output_type in ["alpha_and_energy", "lstar", "lm", "invmu_and_invk", "bfield", "R_eq"]:
             os.makedirs(file_folder_name, exist_ok=True)
             file_name = (f"{file_folder_name}"
                          f"{self.save_text_segments[1]}_{self.instrument}_{year_month_day}to{year_month_day2}_"
@@ -101,6 +102,8 @@ class DataorgPMF(SaveStandard):
             out_var_name = "alpha_local"
         elif "PA_eq" in in_variable.standard_name:
             out_var_name = "alpha_eq_model"
+        elif "R_eq" in in_variable.standard_name:
+            out_var_name = "R_eq"
         elif "Lstar" in in_variable.standard_name:
             out_var_name = "Lstar"
         elif "Lm" in in_variable.standard_name:

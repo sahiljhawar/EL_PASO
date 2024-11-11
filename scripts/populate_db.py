@@ -104,8 +104,8 @@ def main():
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
                                       dependency_names)
                 add_standard_variable(session, [
-                    f"PA_local_{mag_field.standard_tag}",
-                    f"Local pitch angle(s) from {mag_field.short_name} magnetic field model.",
+                    f"PA_local",
+                    f"Local pitch angle(s).",
                     "PitchAngle",
                     "degrees",
                     ""
@@ -215,7 +215,7 @@ def main():
                                       dependency_names)
 
                 add_standard_variable(session, [
-                    f"Lm_{mag_field.standard_tag}_irbem",
+                    f"Lm_{mag_field.standard_tag}",
                     f"McIlwain's L parameter from {mag_field.short_name}, computed with IRBEM at GFZ.",
                     "InvariantL",
                     "unitless",
@@ -246,7 +246,7 @@ def main():
                                       dependency_names)
 
                 add_standard_variable(session, [
-                    f"Lstar_{mag_field.standard_tag}_irbem",
+                    f"Lstar_{mag_field.standard_tag}",
                     f"Roederer's Lstar parameter from {mag_field.short_name}, computed with IRBEM at GFZ.",
                     "InvariantL",
                     "unitless",
@@ -266,8 +266,8 @@ def main():
                                       dependency_names)
 
                 add_standard_variable(session, [
-                    f"Lbasic_{mag_field.standard_tag}_irbem",
-                    f"Bernhard Haas' just L parameter from {mag_field.short_name}, computed with IRBEM at GFZ.",
+                    f"R_eq_{mag_field.standard_tag}",
+                    f"Radial distance of the point where the field line intersects the magnetic equator from {mag_field.short_name}, computed with IRBEM at GFZ.",
                     "InvariantL",
                     "Re",
                     ""
@@ -276,8 +276,8 @@ def main():
                                       dependency_names)
 
                 add_standard_variable(session, [
-                    f"Lbasic_{mag_field.standard_tag}_files.",
-                    f"Bernhard Haas' just L parameter from {mag_field.short_name}, from files from the data provider.",
+                    f"R_eq_{mag_field.standard_tag}_files",
+                    f"Radial distance of the point where the field line intersects the magnetic equator from {mag_field.short_name}, from files from the data provider.",
                     "InvariantL",
                     "Re",
                     ""

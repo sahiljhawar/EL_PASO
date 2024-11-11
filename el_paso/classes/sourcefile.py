@@ -2,6 +2,7 @@ import os
 from datetime import datetime, timedelta
 from datetime import timezone as tz
 from pathlib import Path
+import warnings
 
 import numpy as np
 import cdflib
@@ -40,9 +41,9 @@ class SourceFile():
                 end_time = end_time.replace(hour=23, minute=59, second=59, tzinfo=tz.UTC)
 
             # Replace "yyyymmdd" or "YYYYMMDD" in url, prefix, and suffix with the parsed string
-            url = fill_str_template_with_time(self.download_url)
-            prefix = fill_str_template_with_time(self.download_arguments_prefixes)
-            suffix = fill_str_template_with_time(self.download_arguments_suffixes)
+            url = fill_str_template_with_time(self.download_url, start_time)
+            prefix = fill_str_template_with_time(self.download_arguments_prefixes, start_time)
+            suffix = fill_str_template_with_time(self.download_arguments_suffixes, start_time)
             download_command = f'wget {prefix} {url} {suffix}'
             print(download_command)
 
@@ -71,8 +72,6 @@ class SourceFile():
             end_time = end_time.replace(hour=23, minute=59, second=59, tzinfo=tz.UTC)
         
         files_list, _ = self._construct_downloaded_file_list(start_time, end_time, self.file_cadence)
-
-        print(files_list)
 
         for file_path in files_list:
 
@@ -110,10 +109,12 @@ class SourceFile():
         variable_data = {}
 
         # Extract data for each variable in self.variables
-        for var in self.variables_to_extract.values():
+        for key, var in self.variables_to_extract.items():
             if var.name_or_column_in_file in cdfinfo.zVariables:
                 # Retrieve data corresponding to the variable name from the CDF file
                 variable_data[var.name_or_column_in_file] = cdf_file.varget(var.name_or_column_in_file)
+            else:
+                warnings.warn(f'Variable {key} with name_or_column_in_file: {var.name_or_column_in_file} was not found in file {file_path}!')
 
         # Update the data content of variables
         for var in self.variables_to_extract.values():
@@ -128,9 +129,15 @@ class SourceFile():
     def _get_downloaded_file_name(self, time:datetime):
 
         file_path = Path(fill_str_template_with_time(self.download_path, time))
-        file_names_all_versions = file_path.parent.glob(file_path.stem)
 
-        return get_file_by_version(file_names_all_versions, version='latest')
+        file_names_all_versions = file_path.parent.glob(file_path.name)
+
+        file_path_latest = get_file_by_version(file_names_all_versions, version='latest')
+
+        if file_path_latest is None:
+            warnings.warn(f'No file found under path: {file_path.parent}! Have you called download()? Check your download_path argument.')
+
+        return file_path_latest
 
 
     def _construct_downloaded_file_list(self, start_time: datetime, end_time: datetime, file_cadence: str):

@@ -1,6 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 import re
+import warnings
 
 from packaging import version as version_pkg
 import numpy as np
@@ -73,16 +74,15 @@ def get_file_by_version(file_paths:Path, version:str):
         # Check if the current file matches the target version if specified
         if target_version:
             if ver_obj == target_version:
-                if latest_file is None:
-                    return file
+                return file
 
         # If no specific version is targeted, find the highest version
-        if latest_file is not None:
+        if latest_file is None:
+            latest_file = file
+        else:
             # Compare versions and keep the file with the highest version
             if ver_obj > extract_version(latest_file)[1]:
                 latest_file = file
-        else:
-            latest_file = file
 
     # Extract the file names from the dictionary
     return latest_file
@@ -142,6 +142,9 @@ def save_into_file(in_file_name, target_list):
                 data_dict[variable.metadata.save_name] = (variable.data_content * variable.metadata.unit).to_value(u.epoch_datenum)
             else:
                 data_content = variable.data_content
+                if data_content is None:
+                    warnings.warn(f"Variable {variable.standard_name} does not hold any content! Skipping ...")
+                    continue
                 if data_content.ndim == 1:
                     data_content = data_content.reshape(-1, 1)
                 data_dict[variable.metadata.save_name] = data_content

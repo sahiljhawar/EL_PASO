@@ -106,6 +106,7 @@ class Variable:
 
         standard_variable_info = self._get_standard_info_from_db(db_path, table_name, "standard_name",
                                                                     self.standard_name)
+        
         # If database reading is successful, construct and store the relevant StandardVariable
         if standard_variable_info:
             # Constructing the StandardVariable object
@@ -119,7 +120,7 @@ class Variable:
                 standard_unit=standard_variable_info.get('standard_unit')
             )
         else:
-            self.standard = None
+            raise ValueError(f'Standard info could not be loaded for variable: {self.standard_name}')
 
     def convert_to_target_unit(self):
         if self.metadata.unit != self.target_unit:
@@ -212,6 +213,7 @@ class TimeVariable(Variable):
     def __init__(
             self,
             original_unit: u.UnitBase,
+            standard_name: str,
             name_or_column_in_file: str = ''
             ):
         
@@ -221,7 +223,7 @@ class TimeVariable(Variable):
             target_unit=u.epoch_timestamp,
             time_bin_method=TimeBinMethod.NoBinning,
             name_or_column_in_file=name_or_column_in_file,
-            standard_name='Epoch',
+            standard_name=standard_name,
             dependent_variables=None)
         
 class DerivedVariable(Variable):

@@ -29,7 +29,7 @@ def rest_energy(species='e'):
     return mc2
 
 
-def pfunc(energy, species='e'):
+def en2pc(energy, species='e'):
     """
     Calculate the relativistic energy for a given kinetic energy.
 

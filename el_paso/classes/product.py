@@ -7,7 +7,7 @@ import warnings
 from pathlib import Path
 
 import numpy as np
-import scipy.io as sio
+from astropy import units as u
 
 from typing import TYPE_CHECKING
 if TYPE_CHECKING:
@@ -16,12 +16,12 @@ if TYPE_CHECKING:
 
 from el_paso.save_standards.data_org import DataorgPMF
 from el_paso.utils import save_into_file
-from el_paso.derived_variables import compute_PSD, get_local_B_field, construct_maginput
+from el_paso.derived_variables import compute_PSD, get_local_B_field, construct_maginput, get_MLT, get_magequator, get_Lstar, compute_invariant_mu, compute_invariant_K, get_mirror_point
 
 class Product(ABC):
     def __init__(
             self,
-            name: str,
+            irbem_lib_path:str,
             source_files: list = [],
             derived_variables: dict = {},
             save_cadence: str='daily',
@@ -29,6 +29,7 @@ class Product(ABC):
             time_binning_cadence:timedelta=None,
             default_save_standard: SaveStandard = DataorgPMF,
             saved_filename_extra_text: str = '',
+            irbem_options = [1, 0, 0, 0, 0]
             ):
         """
         Initializes a Product object.
@@ -58,13 +59,14 @@ class Product(ABC):
             download_command (str, optional): The command used for downloading the product, if different from default.
                                                 Defaults to None.
         """
-        self.name = name
+        self.irbem_lib_path = irbem_lib_path
         self.source_files = source_files
         self.derived_variables = derived_variables
         self.default_save_standard = default_save_standard
         self.save_cadence = save_cadence
         self.perform_time_binning = perform_time_binning
         self.saved_filename_extra_text = saved_filename_extra_text
+        self.irbem_options = irbem_options
 
         if self.perform_time_binning:
             if time_binning_cadence is None:
@@ -126,7 +128,7 @@ class Product(ABC):
         # Build index sets for every time variable
         index_sets = {}
 
-        for var in self.extracted_variables.values():
+        for key, var in self.extracted_variables.items():
 
             # do not update time variables, since we still need the data for binning the other variables
             if isinstance(var, TimeVariable):
@@ -147,6 +149,11 @@ class Product(ABC):
                 var.data_content = np.repeat(var.data_content[np.newaxis, ...], len(time_array), axis=0)
                 continue
 
+            # check if time variable and data content sizes match
+            if var.data_content.shape[0] != len(var.time_variable.data_content):
+                raise ValueError(f'Variable {key}: size of dimension 0 does not match length of time variable!')
+
+            # calculate bin indices for given time array if it has not been calculated before
             if var.time_variable not in index_sets.keys():
                 index_sets[var.time_variable] = np.digitize(var.time_variable.data_content, time_array)
 
@@ -192,18 +199,43 @@ class Product(ABC):
         
         # collect magnetic_field results in this dictionary
         magnetic_field_results = {}
-        maginput = construct_maginput(self.get_standard_variable('Epoch'))
+        maginput = construct_maginput(self.get_standard_variable('Epoch_posixtime').data_content)
 
         for var in self.derived_variables.values():
 
-            if var.standard.variable_type == 'PhaseSpaceDensity':
-                compute_PSD(self, var)
-            elif 'B_local' in var.standard_name:
-                # check if the value has been calculated already
-                if var.standard_name in irbem_results.keys():
-                    var.data_content = irbem_results[var.standard_name]
-                else:
-                    get_local_B_field(self, var.standard_name[-3:])
+            # check if the value has been calculated already in the case of magnetic field calculations
+            if var.standard_name in magnetic_field_results.keys():
+                var.data_content, var.metadata.unit = magnetic_field_results[var.standard_name]
+            else:
+                magnetic_field_str = var.standard_name.split('_')[-1]
+
+                if var.standard.variable_type == 'PhaseSpaceDensity':
+                    print('\tCalculating phase space density ...')
+                    var.data_content, var.metadata.unit = compute_PSD(self)
+                    continue
+
+                elif 'B_local' in var.standard_name:
+                    magnetic_field_results |= self._get_B_local(var, magnetic_field_str, maginput)
+
+                elif 'MLT' in var.standard_name:
+                    magnetic_field_results |= self._get_MLT(var, magnetic_field_str, maginput)
+
+                elif 'R_eq' in var.standard_name or 'B_eq' in var.standard_name:
+                    magnetic_field_results |= self._get_B_eq_and_R_eq(var, magnetic_field_str, maginput)
+
+                elif 'Lstar_' in var.standard_name:
+                    magnetic_field_results |= self._get_L_star(var, magnetic_field_str, maginput)
+
+                elif 'PA_eq' in var.standard_name:
+                    magnetic_field_results |= self._get_pa_eq(var, magnetic_field_str, maginput, magnetic_field_results)
+
+                elif 'invMu' in var.standard_name:
+                    magnetic_field_results |= self._get_invariant_mu(var, magnetic_field_str, maginput, magnetic_field_results)
+                    
+                elif 'invK' in var.standard_name:
+                    magnetic_field_results |= self._get_invariant_K(var, magnetic_field_str, maginput, magnetic_field_results)
+
+            var.data_content, var.metadata.unit = magnetic_field_results[var.standard_name]
 
 
     def process(self,
@@ -228,9 +260,11 @@ class Product(ABC):
 
             self._extract_variables(time_interval[0], time_interval[1])
 
+            self._convert_units()
+
             self.process_original_file()
 
-            self._convert_units()
+            # self.check_dimensions()
 
             if self.perform_time_binning:
                 print("Starting time binning...")
@@ -243,7 +277,10 @@ class Product(ABC):
 
             self.process_after_binning()
 
-            self.compute_derived_variables()
+            if len(self.derived_variables) > 0:
+                print("Starting calculation of derived variables...")
+                self.compute_derived_variables()
+                print("Calculation of derived variables done.")
 
             # if os.getenv('COMPUTE_INVARIANTS') and (hasattr(self, 'uses_invariants') and self.uses_invariants):
             #     print("Starting invariant calculation...")
@@ -293,6 +330,7 @@ class Product(ABC):
         Returns:
             list: A list of variables that match the specified type.
         """
+
         return [variable for variable in (self.extracted_variables | self.derived_variables).values()
                 if variable.standard is not None and variable.standard.variable_type == type_name]
 
@@ -436,15 +474,131 @@ class Product(ABC):
             print([x.metadata.save_name for x in target_variables])
             print(save_standard.file_variables[output_type])
 
-            if len(target_variables) == len(save_standard.file_variables[output_type]):
+            if len(target_variables) == len(save_standard.file_variables[output_type]):                
                 save_into_file(file_name, target_variables)
             else:
-                warnings.warn(f"Saving attempted, but product {self.name} is missing some required "
+                warnings.warn(f"Saving attempted, but product is missing some required "
                                 f"variables for output {output_type}! "
                                 f"IGNORE if processing a product that saves multiple output files")
 
     def get_standard_variable(self, standard_name: str) -> Variable:
 
-        for var in itertools.chain(self.extracted_variables, self.derived_variables):
+        for var in (self.extracted_variables | self.derived_variables).values():
             if var.standard_name == standard_name:
                 return var
+            
+    def _get_L_star(self, var, magnetic_field_str, maginput):
+        print('\tCalculating Lstar ...')
+        assert self.get_standard_variable('PA_local').metadata.unit == ''
+        pa_local = self.get_standard_variable('PA_local').data_content
+
+        assert self.get_standard_variable('xGEO').metadata.unit == u.RE
+        xGEO = self.get_standard_variable('xGEO').data_content
+
+        results = get_Lstar(xGEO, var.time_variable.data_content, pa_local, self.irbem_lib_path, self.irbem_options, magnetic_field_str, maginput)
+
+        return results
+    
+    def _get_B_local(self, var, magnetic_field_str, maginput):
+        print('\tCalculating local magnetic field ...')
+
+        assert self.get_standard_variable('xGEO').metadata.unit == u.RE
+        xGEO = self.get_standard_variable('xGEO').data_content
+
+        results = get_local_B_field(xGEO, var.time_variable.data_content, self.irbem_lib_path, self.irbem_options, magnetic_field_str, maginput)
+
+        return results
+
+    def _get_MLT(self, var, magnetic_field_str, maginput):
+        print('\tCalculating magnetic local time ...')
+
+        assert self.get_standard_variable('xGEO').metadata.unit == u.RE
+        xGEO = self.get_standard_variable('xGEO').data_content
+
+        results = get_MLT(xGEO, var.time_variable.data_content, self.irbem_lib_path, self.irbem_options, magnetic_field_str)
+
+        return results
+
+    def _get_B_eq_and_R_eq(self, var, magnetic_field_str, maginput):
+        print('\tCalculating magnetic field and radial distance at the equator ...')
+
+        assert self.get_standard_variable('xGEO').metadata.unit == u.RE
+        xGEO = self.get_standard_variable('xGEO').data_content
+
+        results = get_magequator(xGEO, var.time_variable.data_content, self.irbem_lib_path, self.irbem_options, magnetic_field_str, maginput)
+
+        return results
+
+    def _get_pa_eq(self, var, magnetic_field_str, maginput, magnetic_field_results):
+        print('\tCalculating equatorial pitch angle ...')
+
+        assert self.get_standard_variable('PA_local').metadata.unit == ''
+        pa_local = self.get_standard_variable('PA_local').data_content
+
+        results = magnetic_field_results
+
+        if not ('B_eq_' + magnetic_field_str) in results.keys():
+            results |= self._get_B_eq_and_R_eq(var, magnetic_field_str, maginput)
+        if not ('B_local_' + magnetic_field_str) in results.keys():
+            results |= self._get_B_local(var, magnetic_field_str, maginput)
+
+        B_eq = results['B_eq_' + magnetic_field_str][0]
+        B_local = results['B_local_' + magnetic_field_str][0]
+
+        results[var.standard_name] = (np.asin(np.sin(pa_local) * np.sqrt(B_eq / B_local)[:,np.newaxis]), '')
+
+        return results
+    
+    def _get_invariant_mu(self, var, magnetic_field_str, maginput, magnetic_field_results):
+        print('\tCalculating invariant mu ...')
+        assert self.get_standard_variable('PA_local').metadata.unit == ''
+        pa_local = self.get_standard_variable('PA_local').data_content
+
+        energy_vars = self.get_variables_by_type('Energy')
+        assert len(energy_vars) == 1, f'We assume that there is exactly ONE energy variable available for calculating invariant mu. Found: {len(energy_vars)}!'
+        energy_var = energy_vars[0]
+
+        assert energy_var.metadata.unit == u.MeV
+        energy = energy_var.data_content
+
+        species_char = energy_var.standard.standard_name[-3]
+
+        results = magnetic_field_results
+        if not ('B_local_' + magnetic_field_str) in results.keys():
+            results |= self._get_B_local(var, magnetic_field_str, maginput)
+
+        B_local = results['B_local_' + magnetic_field_str][0]
+
+        results[var.standard_name] = (compute_invariant_mu(energy, pa_local, B_local, species_char), u.MeV/u.G)
+
+        return results
+
+    def _get_invariant_K(self, var, magnetic_field_str, maginput, magnetic_field_results):
+        print('\tCalculating invariant K ...')
+
+        results = magnetic_field_results
+
+        if not ('B_mirr_' + magnetic_field_str) in results.keys():
+            results |= self._get_B_mirr(var, magnetic_field_str, maginput)
+        if not ('XJ_' + magnetic_field_str) in results.keys():
+            results |= self._get_L_star(var, magnetic_field_str, maginput)
+
+        B_mirr = results['B_mirr_' + magnetic_field_str][0]
+        XJ = results['XJ_' + magnetic_field_str][0]
+
+        results['invK_' + magnetic_field_str] = (compute_invariant_K(B_mirr, XJ), u.RE*u.G**0.5)
+        
+        return results
+
+    def _get_B_mirr(self, var, magnetic_field_str, maginput):
+        print('\tCalculating magnetic field of mirror points ...')
+
+        assert self.get_standard_variable('PA_local').metadata.unit == ''
+        pa_local = self.get_standard_variable('PA_local').data_content
+
+        assert self.get_standard_variable('xGEO').metadata.unit == u.RE
+        xGEO = self.get_standard_variable('xGEO').data_content
+
+        results = get_mirror_point(xGEO, var.time_variable.data_content, pa_local, self.irbem_lib_path, self.irbem_options, magnetic_field_str, maginput)
+
+        return results
