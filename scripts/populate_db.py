@@ -72,18 +72,18 @@ def main():
                        default_options='0, 0, 9, 9, 0', standard_tag='IGRF', description='IGRF'),
         MagFieldModels(name='OP77Q', short_name='OP77Q', long_name='Olson-Pfitzer quiet time', irbem_internal=0,
                        irbem_external=5, default_options='0, 0, 9, 9, 0', standard_tag='OP77Q',
-                       description='Olson & Pfitzer quiet [1977] (default - Valid for rGEO≤15. Re)'),
+                       description='Olson & Pfitzer quiet [1977] (default - Valid for rGEO≤15. RE)'),
         MagFieldModels(name='T89', short_name='T89', long_name='T89', irbem_internal=0, irbem_external=4,
                        default_options='0, 0, 9, 9, 0', standard_tag='T89',
-                       description='Tsyganenko [1989c] (uses 0≤Kp≤9 - Valid for rGEO≤70. Re)'),
+                       description='Tsyganenko [1989c] (uses 0≤Kp≤9 - Valid for rGEO≤70. RE)'),
         MagFieldModels(name='T01s', short_name='T01s', long_name='T01s', irbem_internal=0, irbem_external=10,
                        default_options='0, 0, 9, 9, 0', standard_tag='T01S',
                        description='Tsyganenko [2001] storm (uses Dst, Pdyn, ByIMF, BzIMF, G2, G3 - '
-                                   'there is no upper or lower limit for those inputs - Valid for xGSM≥-15. Re)'),
+                                   'there is no upper or lower limit for those inputs - Valid for xGSM≥-15. RE)'),
         MagFieldModels(name='T04s', short_name='T04s', long_name='T04s', irbem_internal=0, irbem_external=11,
                        default_options='0, 0, 9, 9, 0', standard_tag='T04S',
                        description='Tsyganenko [2004] storm (uses Dst, Pdyn, ByIMF, BzIMF, W1, W2, W3, W4, W5, W6 - '
-                                   'there is no upper or lower limit for those inputs - Valid for xGSM≥-15. Re)')
+                                   'there is no upper or lower limit for those inputs - Valid for xGSM≥-15. RE)')
     ]
     for mag_field in mag_fields:
         exists = session.query(MagFieldModels).filter_by(name=mag_field.name, short_name=mag_field.short_name).first()
@@ -97,8 +97,8 @@ def main():
                 add_standard_variable(session, [
                     f"MLT_{mag_field.standard_tag}",
                     f"Magnetic local time from the {mag_field.short_name} magnetic field model.",
-                    "Position",
-                    "hours",
+                    "MLT",
+                    "hour",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -107,7 +107,7 @@ def main():
                     f"PA_local",
                     f"Local pitch angle(s).",
                     "PitchAngle",
-                    "degrees",
+                    "deg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -117,7 +117,7 @@ def main():
                     f"PA_eq_{mag_field.standard_tag}",
                     f"Equatorial pitch angle(s) from {mag_field.short_name} magnetic field model.",
                     "PitchAngle",
-                    "degrees",
+                    "deg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -127,7 +127,7 @@ def main():
                     f"PA_eq_real_{mag_field.standard_tag}",
                     f"Equatorial pitch angle(s) from B field measurements and {mag_field.short_name}.",
                     "PitchAngle",
-                    "degrees",
+                    "deg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -137,7 +137,7 @@ def main():
                     f"PA_oa_local_{mag_field.standard_tag}",
                     f"Local pitch angle(s) for opening angles from {mag_field.short_name}.",
                     "PitchAngle",
-                    "degrees",
+                    "deg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -147,7 +147,7 @@ def main():
                     f"PA_oa_eq_{mag_field.standard_tag}",
                     f"Equatorial pitch angle(s) for opening angles from {mag_field.short_name}.",
                     "PitchAngle",
-                    "degrees",
+                    "deg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -158,7 +158,7 @@ def main():
                     f"Equatorial pitch angle(s) for opening angles from B field measurements and "
                     f"{mag_field.short_name}.",
                     "PitchAngle",
-                    "degrees",
+                    "deg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -198,7 +198,7 @@ def main():
                     f"L_{mag_field.standard_tag}_irbem",
                     f"local L from {mag_field.short_name}, computed with IRBEM at GFZ.",
                     "InvariantL",
-                    "Re",
+                    "RE",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -208,7 +208,7 @@ def main():
                     f"L_{mag_field.standard_tag}_files",
                     f"local L from {mag_field.short_name}, from files from the data provider.",
                     "InvariantL",
-                    "Re",
+                    "RE",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -218,7 +218,7 @@ def main():
                     f"Lm_{mag_field.standard_tag}",
                     f"McIlwain's L parameter from {mag_field.short_name}, computed with IRBEM at GFZ.",
                     "InvariantL",
-                    "unitless",
+                    "deg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -228,7 +228,7 @@ def main():
                     f"Lm_{mag_field.standard_tag}_files",
                     f"McIlwain's L parameter from {mag_field.short_name}, from files from the data provider.",
                     "InvariantL",
-                    "unitless",
+                    "deg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -239,7 +239,7 @@ def main():
                     f"McIlwain's L parameter from {mag_field.short_name}, computed with IRBEM and "
                     f"Ksenia Orlova's modification at GFZ.",
                     "InvariantL",
-                    "unitless",
+                    "deg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -249,7 +249,7 @@ def main():
                     f"Lstar_{mag_field.standard_tag}",
                     f"Roederer's Lstar parameter from {mag_field.short_name}, computed with IRBEM at GFZ.",
                     "InvariantL",
-                    "unitless",
+                    "",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -259,7 +259,7 @@ def main():
                     f"Lstar_{mag_field.standard_tag}_files",
                     f"Roederer's Lstar parameter from {mag_field.short_name}, from files from the data provider.",
                     "InvariantL",
-                    "unitless",
+                    "dg",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -269,7 +269,7 @@ def main():
                     f"R_eq_{mag_field.standard_tag}",
                     f"Radial distance of the point where the field line intersects the magnetic equator from {mag_field.short_name}, computed with IRBEM at GFZ.",
                     "InvariantL",
-                    "Re",
+                    "RE",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -279,7 +279,7 @@ def main():
                     f"R_eq_{mag_field.standard_tag}_files",
                     f"Radial distance of the point where the field line intersects the magnetic equator from {mag_field.short_name}, from files from the data provider.",
                     "InvariantL",
-                    "Re",
+                    "RE",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -289,7 +289,7 @@ def main():
                     f"invMu_{mag_field.standard_tag}",
                     f"Invariant mu from {mag_field.short_name}, computed with IRBEM at GFZ.",
                     "InvariantMuKI",
-                    "kg m^2/(s^2 nT)",
+                    "MeV / G",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -299,7 +299,7 @@ def main():
                     f"invMu_files_{mag_field.standard_tag}",
                     f"Invariant mu from {mag_field.short_name}, from files from the data provider.",
                     "InvariantMuKI",
-                    "kg m^2/(s^2 nT)",
+                    "MeV / G",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -310,7 +310,7 @@ def main():
                     f"Invariant mu from {mag_field.short_name}, computed with IRBEM and "
                     f"real magnetic field measurements at GFZ.",
                     "InvariantMuKI",
-                    "kg m^2/(s^2 nT)",
+                    "MeV / G",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -320,7 +320,7 @@ def main():
                     f"invK_{mag_field.standard_tag}",
                     f"Invariant K from {mag_field.short_name}, computed with IRBEM at GFZ.",
                     "InvariantMuKI",
-                    "m^2/s",
+                    "RE * G^(1/2)",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -330,7 +330,7 @@ def main():
                     f"invK_files_{mag_field.standard_tag}",
                     f"Invariant K from {mag_field.short_name}, from files from the data provider.",
                     "InvariantMuKI",
-                    "m^2/s",
+                    "RE * G^(1/2)",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -341,7 +341,7 @@ def main():
                     f"Invariant K from {mag_field.short_name}, computed with IRBEM and "
                     f"real magnetic field measurements at GFZ.",
                     "InvariantMuKI",
-                    "m^2/s",
+                    "RE * G^(1/2)",
                     ""
                 ],
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
@@ -395,75 +395,75 @@ def main():
                                      'Defined using a reference ellipsoid. '
                                      'Geodetic longitude is identical to GEO longitude. Both the altitude and latitude '
                                      'depend on the ellipsoid used. IRBEM uses the WGS84 reference ellipsoid. ',
-                          abbreviation='GDZ', standard_unit='Re, deg, deg'),
+                          abbreviation='GDZ', standard_unit='RE, deg, deg'),
         CoordinateSystems(name='GEO', description='Position in geocentric geographic coordinates',
                           definition='(geocentric geographic; Cartesian) , '
                                      'Earth-Centered and Earth-Fixed. X lies in the '
                                      'Earth''s equatorial plane (zero latitude) and intersects the Prime Meridian '
                                      '(zero longitude; Greenwich, UK). Z points to True North '
                                      '(roughly aligned with the instantaneous rotation axis). ',
-                          abbreviation='GEO', standard_unit='Re'),
+                          abbreviation='GEO', standard_unit='RE'),
         CoordinateSystems(name='GSM', description='Position in geocentric solar magnetospheric coordinates',
                           definition='(geocentric solar magnetospheric; Cartesian), '
                                      'X points sunward from Earth''s center. '
                                      'The X-Z plane is defined to contain '
                                      'Earth''s dipole axis (positive North). ',
-                          abbreviation='GSM', standard_unit='Re'),
+                          abbreviation='GSM', standard_unit='RE'),
         CoordinateSystems(name='GSE', description='Position in geocentric solar ecliptic coordinates',
                           definition='(geocentric solar ecliptic; Cartesian), X points sunward from Earth''s center. '
                                      'Y lies in the ecliptic plane of date, pointing in the anti-orbit direction. '
                                      'Z is parallel to the ecliptic pole of date.  ',
-                          abbreviation='GSE', standard_unit='Re'),
+                          abbreviation='GSE', standard_unit='RE'),
         CoordinateSystems(name='SM', description='Position in solar magnetic coordinates',
                           definition='(solar magnetic; Cartesian), Z is aligned with the centered dipole axis of date '
                                      '(positive North), '
                                      'and Y is perpendicular to both the Sun-Earth line and the dipole '
                                      'axis. X is therefore is not aligned with the Sun-Earth line and '
                                      'SM is a rotation about Y from GSM.',
-                          abbreviation='SM', standard_unit='Re'),
+                          abbreviation='SM', standard_unit='RE'),
         CoordinateSystems(name='GEI', description='Position in geocentric equatorial inertial coordinates',
                           definition='(geocentric equatorial inertial, of Date; '
                                      'Cartesian), X points from Earth toward the '
                                      'equinox of date (first point of Aries; '
                                      'position of the Sun at the vernal equinox). '
                                      'Z is parallel to the instantaneous rotation axis of the Earth. ',
-                          abbreviation='GEI', standard_unit='Re'),
+                          abbreviation='GEI', standard_unit='RE'),
         CoordinateSystems(name='MAG', description='Position in geomagnetic coordinates',
                           definition='(geomagnetic; Cartesian), Z is parallel to Earth''s centered dipole axis '
                                      '(positive North). Y is the intersection between Earth''s equator and the '
-                                     'geographic meridian 90 degrees east of the meridian containing the dipole axis.',
-                          abbreviation='MAG', standard_unit='Re'),
+                                     'geographic meridian 90 deg east of the meridian containing the dipole axis.',
+                          abbreviation='MAG', standard_unit='RE'),
         CoordinateSystems(name='SPH', description='Position in spherical geocentric geographic coordinates',
                           definition='(GEO in spherical; radial distance, latitude, East longitude), '
                                      'Geocentric geographic coordinates (GEO system) expressed in spherical '
                                      'instead of Cartesian.',
-                          abbreviation='SPH', standard_unit='Re, deg, deg'),
+                          abbreviation='SPH', standard_unit='RE, deg, deg'),
         CoordinateSystems(name='RLL', description='Position in spherical geodetic coordinates',
                           definition='(geodetic; radial distance, geodetic latitude, East longitude), '
                                      'A re-expression of geodetic (GDZ) coordinates using radial distance instead of '
                                      'altitude above the reference ellipsoid. Note that the latitude is still geodetic '
                                      'latitude and is therefore not interchangeable with SPH. ',
-                          abbreviation='RLL', standard_unit='Re, deg, deg'),
+                          abbreviation='RLL', standard_unit='RE, deg, deg'),
         CoordinateSystems(name='HEE', description='Position in heliocentric Earth ecliptic coordinates',
                           definition='(heliocentric Earth ecliptic; Cartesian), '
                                      'Origin is solar center; '
                                      'X points towards the Earth, and Z is perpendicular to the '
                                      'plane of Earth''s orbit (positive North). This system is fixed with respect '
                                      'to the Earth-Sun line. ',
-                          abbreviation='HEE', standard_unit='Re'),
+                          abbreviation='HEE', standard_unit='RE'),
         CoordinateSystems(name='HAE', description='Position in heliocentric Aries ecliptic coordinates',
                           definition='(heliocentric Aries ecliptic; Cartesian), '
                                      'Origin is solar center. Z is perpendicular to the plane of Earth''s orbit '
                                      '(positive North) and '
                                      'X points towards the equinox of date (first point of Aries). ',
-                          abbreviation='HAE', standard_unit='Re'),
+                          abbreviation='HAE', standard_unit='RE'),
         CoordinateSystems(name='HEEQ', description='Position in heliocentric Earth equatorial coordinates',
                           definition='(heliocentric Earth equatorial; Cartesian), '
                                      'Origin is solar center. '
                                      'Z is parallel to the Sun''s rotation axis (positive North) '
                                      'and X points towards the intersection of the solar equator and '
                                      'solar central meridian as seen from Earth. ',
-                          abbreviation='HEEQ', standard_unit='Re'),
+                          abbreviation='HEEQ', standard_unit='RE'),
 
     ]
     for coordinate_system in coordinate_systems:
@@ -500,7 +500,7 @@ def main():
                     f"Epoch_{epoch.epoch_name}",
                     f"{epoch.name}",
                     "Epoch",
-                    f"{epoch.description}",
+                    f"{epoch.epoch_name}",
                     ""
                 ],
                                       standard.id, '', '', '', '',
@@ -537,18 +537,18 @@ def main():
                               '')
         add_standard_variable(session, [
             f"Average_field_vector_lat_angle",
-            f"Lat.Angle of Aver. Field Vector, Degrees (GSE coords)",
+            f"Lat.Angle of Aver. Field Vector, deg (GSE coords)",
             "SolarWindParameters",
-            "degrees",
+            "deg",
             ""
         ],
                               standard.id, '', '', '', '',
                               '')
         add_standard_variable(session, [
             f"Average_field_vector_long_angle",
-            f"Long.Angle of Aver. Field Vector, Degrees (GSE coords)",
+            f"Long.Angle of Aver. Field Vector, deg (GSE coords)",
             "SolarWindParameters",
-            "degrees",
+            "deg",
             ""
         ],
                               standard.id, '', '', '', '',
@@ -656,7 +656,7 @@ def main():
             f"Dens_proton",
             f"Proton density",
             "SolarWindParameters",
-            "1/cm^3",
+            "1/cm3",
             ""
         ],
                               standard.id, '', '', '', '',
@@ -699,18 +699,18 @@ def main():
                               '')
         add_standard_variable(session, [
             f"Flow_long_angle",
-            f"Plasma Flow Long. Angle, Degrees, quasi-GSE*",
+            f"Plasma Flow Long. Angle, deg, quasi-GSE*",
             "SolarWindParameters",
-            "degrees",
+            "deg",
             ""
         ],
                               standard.id, '', '', '', '',
                               '')
         add_standard_variable(session, [
             f"Flow_lat_angle",
-            f"Plasma  Flow Lat. Angle, Degrees, GSE*",
+            f"Plasma  Flow Lat. Angle, deg, GSE*",
             "SolarWindParameters",
-            "degrees",
+            "deg",
             ""
         ],
                               standard.id, '', '', '', '',
@@ -746,7 +746,7 @@ def main():
             f"sigma_N",
             f"Standard deviation for proton density",
             "SolarWindParameters",
-            "1/cm^3",
+            "1/cm3",
             ""
         ],
                               standard.id, '', '', '', '',
@@ -764,7 +764,7 @@ def main():
             f"sigma_phi",
             f"Standard deviation for flow longitudinal angle",
             "SolarWindParameters",
-            "degrees",
+            "deg",
             ""
         ],
                               standard.id, '', '', '', '',
@@ -773,7 +773,7 @@ def main():
             f"sigma_theta",
             f"Standard deviation for flow latitudinal angle",
             "SolarWindParameters",
-            "degrees",
+            "deg",
             ""
         ],
                               standard.id, '', '', '', '',

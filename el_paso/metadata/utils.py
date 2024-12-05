@@ -251,7 +251,7 @@ def create_standard_variables_for_base_string(in_session, base_string, species_n
         base_string,
         description,
         "Flux",
-        "1/(cm^2 s sr keV)",
+        "1/(cm2 s sr keV)",
         ""
     ],
     standard_id, '', species_id, related_flux, dependency_ids, dependency_names)
@@ -263,7 +263,7 @@ def create_standard_variables_for_base_string(in_session, base_string, species_n
         base_string_err,
         description,
         "Flux",
-        "1/(cm^2 s sr keV)",
+        "1/(cm2 s sr keV)",
         ""
     ],
                           standard_id, '', species_id, related_flux, dependency_ids, dependency_names)
@@ -294,7 +294,7 @@ def create_standard_variables_for_base_string(in_session, base_string, species_n
             f"FLAG_{index_str}_{base_string}",
             f"Flag {index} for {base_string}, see the FLAG_{index_str}_{base_string}_definition for details.",
             "FlagsModes",
-            "unitless",
+            "",
             f"See FLAG_{index_str}_{base_string}_definition for details."
         ],
                               standard_id, '', species_id, related_flux, dependency_ids, dependency_names)
@@ -303,7 +303,7 @@ def create_standard_variables_for_base_string(in_session, base_string, species_n
             f"FLAG_{index_str}_{base_string}_definition",
             f"Definitions for Flag {index} for {base_string}.",
             "FlagsModes",
-            "unitless",
+            "",
             f"See FLAG_{index_str}_{base_string} for flag values."
         ],
                               standard_id, '', species_id, related_flux, dependency_ids, dependency_names)
@@ -312,7 +312,7 @@ def create_standard_variables_for_base_string(in_session, base_string, species_n
         f"PSD_{base_string}",
         f"Adiabatic phase space density for {base_string}.",
         "PhaseSpaceDensity",
-        "1/(m^3 (kg m/s)^3)",
+        "s3 / (m6 kg3)",
         ""
     ],
                           standard_id, '', species_id, related_flux, dependency_ids, dependency_names)

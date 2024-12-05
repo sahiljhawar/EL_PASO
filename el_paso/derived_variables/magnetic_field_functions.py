@@ -1,19 +1,35 @@
+import logging
 import os
+import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
+from functools import partial
 from multiprocessing import Pool
+from pathlib import Path
 
 import numpy as np
-from scipy.interpolate import interp1d
-from data_management.io.kp import KpOMNI
-from IRBEM import IRBEM
 from astropy import units as u
+from scipy.interpolate import interp1d
+from tqdm import tqdm
 
-#from el_paso.classes import Product, DerivedVariable
+from data_management.io.kp import read_kp_with_backups
+from el_paso import *
+from el_paso.classes import TimeVariable, Variable
+from el_paso.utils import timed_function
+from IRBEM import IRBEM
+
+
+@dataclass
+class IrbemInput:
+    irbem_lib_path: str
+    magnetic_field_str: str
+    maginput: dict[str, np.ndarray]
+    irbem_options: list
+    num_cores: int = 4
+
 
 def construct_maginput(time: np.ndarray):
-    """
-    Constructs the basic magnetospheric input parameters array.
+    """Construct the basic magnetospheric input parameters array.
 
     This function retrieves all solar wind data from the ACE dataset on CDAWeb, as well as the Kp and Dst indices,
     interpolates them to the cadence of `newtime`, and returns an array with the columns as follows:
@@ -41,17 +57,20 @@ def construct_maginput(time: np.ndarray):
     Returns:
         np.ndarray: Array of interpolated magnetospheric input parameters.
     """
-
     start_time = datetime.fromtimestamp(time[0], tz=timezone.utc)
-    end_time   = datetime.fromtimestamp(time[-1], tz=timezone.utc)
+    end_time = datetime.fromtimestamp(time[-1], tz=timezone.utc)
 
-    kp_df = KpOMNI(data_dir=Path(os.getenv('HOME')) / '.el_paso' / 'Kp').read(start_time, end_time, download=True)
+    os.environ["OMNI_LOW_RES_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso" / "KpOmni")
+    os.environ["RT_KP_NIEMEGK_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso" / "KpNiemegk")
+    os.environ["KP_ENSEMBLE_OUTPUT_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso")
+    os.environ["RT_KP_SWPC_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso")
+
+    kp_df = read_kp_with_backups(start_time, end_time)
 
     kp_time = [dt.timestamp() for dt in kp_df.index.to_pydatetime()]
-    kp_value = kp_df['kp'].values
+    kp_value = kp_df["kp"].values
 
-    interpolation_function = interp1d(kp_time, kp_value, kind='previous',
-                                      bounds_error=False, fill_value="extrapolate")
+    interpolation_function = interp1d(kp_time, kp_value, kind="previous", bounds_error=False, fill_value="extrapolate")
 
     # Interpolate the data
     interpolated_data = interpolation_function(time)
@@ -68,8 +87,9 @@ def construct_maginput(time: np.ndarray):
 
     # Construct the output array
     maginput = np.full((len(time), 25), np.nan)
-    maginput[:, 0] = kp_data*10 # IRBEM takes Kp10 as an input
-    '''
+    maginput[:, 0] = np.asarray(kp_data * 10, dtype=np.float64)
+    # IRBEM takes Kp10 as an input
+    """
     1 Kp value of Kp as in OMNI2 files but has to be double instead of integer type. (NOTE, consistent with OMNI2, this is Kp*10, and it is in the range 0 to 90)
     2 Dst Dst index (nT)
     3 Dsw solar wind density (cm-3)
@@ -83,378 +103,354 @@ def construct_maginput(time: np.ndarray):
     11-16 W1 W2 W3 W4 W5 W6 see definitions in (Tsyganenko et al., 2005)
     17 AL auroral index
     18-25 reserved for future use (leave as NaN)
-    '''
+    """
 
-    maginput_dict = {"Kp": maginput[:, 0],
-                     "Dst": maginput[:, 1],
-                     "dens": maginput[:, 2],
-                     "velo": maginput[:, 3],
-                     "Pdyn": maginput[:, 4],
-                     "ByIMF": maginput[:, 5],
-                     "BzIMF": maginput[:, 6],
-                     "G1": maginput[:, 7],
-                     "G2": maginput[:, 8],
-                     "G3": maginput[:, 9],
-                     "W1": maginput[:, 10],
-                     "W2": maginput[:, 11],
-                     "W3": maginput[:, 12],
-                     "W4": maginput[:, 13],
-                     "W5": maginput[:, 14],
-                     "W6": maginput[:, 15],
-                     "AL": maginput[:, 16]
+    maginput_dict = {
+        "Kp": maginput[:, 0],
+        "Dst": maginput[:, 1],
+        "dens": maginput[:, 2],
+        "velo": maginput[:, 3],
+        "Pdyn": maginput[:, 4],
+        "ByIMF": maginput[:, 5],
+        "BzIMF": maginput[:, 6],
+        "G1": maginput[:, 7],
+        "G2": maginput[:, 8],
+        "G3": maginput[:, 9],
+        "W1": maginput[:, 10],
+        "W2": maginput[:, 11],
+        "W3": maginput[:, 12],
+        "W4": maginput[:, 13],
+        "W5": maginput[:, 14],
+        "W6": maginput[:, 15],
+        "AL": maginput[:, 16],
     }
 
     return maginput_dict
 
+
 def _magnetic_field_str_to_kext(magnetic_field_str):
     match magnetic_field_str:
-        case 'T89':
+        case "T89":
             kext = 4
-        case 'T04s':
+        case "T04s":
             kext = 11
-        case 'OP77Q':
+        case "OP77Q":
             kext = 5
-    
+
     return kext
 
-def get_magequator(xGEO, timestamps, irbem_lib_path, irbem_options, magnetic_field_str, maginput):
-    
-    datetimes   = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
-    sysaxes = 1
-    
+
+def _get_magequator_parallel(irbem_args: list, xGEO: np.ndarray, datetimes: np.ndarray, maginput: dict, it: int):
+    model = IRBEM.MagFields(
+        path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
+    )
+
+    x_dict_single = {"dateTime": datetimes[it], "x1": xGEO[it, 0], "x2": xGEO[it, 1], "x3": xGEO[it, 2]}
+    maginput_single = {key: maginput[key][it] for key in maginput.keys()}
+
+    magequator_output = model.find_magequator(x_dict_single, maginput_single)
+
+    return magequator_output["bmin"], magequator_output["XGEO"]
+
+
+@timed_function()
+def get_magequator(xgeo_var: Variable, time_var: TimeVariable, irbem_input: IrbemInput):
+    logging.info("\tCalculating magnetic field and radial distance at the equator ...")
+
+    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+
+    datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
+    sysaxes = IRBEM_SYSAXIS_GEO
+
     # Define Fortran bad value as a float
     fortran_bad_value = np.float64(-1.0e31)
     # Ensure xGEO and maginput are floating-point arrays
     xGEO = np.array(xGEO, dtype=np.float64)
-    
+
     assert len(datetimes) == len(xGEO)
 
-    kext = _magnetic_field_str_to_kext(magnetic_field_str)
+    kext = _magnetic_field_str_to_kext(irbem_input.magnetic_field_str)
 
-    model = IRBEM.MagFields(path=irbem_lib_path, options=irbem_options, kext=kext, sysaxes=sysaxes, verbose=False)
+    irbem_args = [irbem_input.irbem_lib_path, irbem_input.irbem_options, kext, sysaxes]
 
-    magequator_output = {'bmin': np.empty_like(datetimes), 'XGEO': np.empty((len(datetimes), 3))}
+    parallel_func = partial(_get_magequator_parallel, irbem_args, xGEO, datetimes, irbem_input.maginput)
 
+    with Pool(processes=irbem_input.num_cores) as pool:
+        rs = pool.map_async(parallel_func, range(len(datetimes)), chunksize=1)
+        init = rs._number_left
+        with tqdm(total=init) as t:
+            while True:
+                if rs.ready():
+                    break
+                t.n = init - rs._number_left
+                t.refresh()
+                time.sleep(1)
+
+    # write async results into one array
+    B_eq = np.empty_like(datetimes)
+    xGEO_min = np.empty_like(xGEO)
     for i in range(len(datetimes)):
-        x_dict_single = {"dateTime": datetimes[i], "x1": xGEO[i,0], "x2": xGEO[i,1], "x3": xGEO[i,2]}
-        maginput_single = {key: maginput[key][i] for key in maginput.keys()}
-        magequator_output_single = model.find_magequator(x_dict_single, maginput_single)
-        
-        for key in magequator_output_single.keys():
-            magequator_output[key][i,...] = magequator_output_single[key]
+        if isinstance(rs._value, Exception):
+            print(rs._value)
+            continue
 
-    # replace bad values with nan
-    for key in magequator_output.keys():
-        magequator_output[key][magequator_output[key] == fortran_bad_value] = np.nan
+        B_eq[i] = rs._value[i][0]
+        xGEO_min[i, :] = rs._value[i][1]
 
-    # map irbem output names to standard names and add unit information
-    irbem_name_map = {
-        'bmin': 'B_eq_' + magnetic_field_str
-    }
-    magequator_output_mapped = {}
-    for key in irbem_name_map.keys():
-        magequator_output_mapped[irbem_name_map[key]] = (magequator_output[key].astype(np.float64), u.nT)
+    B_eq[B_eq == fortran_bad_value] = np.nan
+    xGEO_min[xGEO_min == fortran_bad_value] = np.nan
 
-    # add total radial distance field 
-    magequator_output_mapped['R_eq_' + magnetic_field_str] = (np.linalg.norm(magequator_output['XGEO'], ord=2, axis=1), u.RE)
+    magequator_output = {}
+    magequator_output["B_eq_" + irbem_input.magnetic_field_str] = (B_eq.astype(np.float64), u.nT)
 
-    return magequator_output_mapped
+    # add total radial distance field in SM coordinates
+    xSM = IRBEM.Coords(path=irbem_input.irbem_lib_path).transform(
+        datetimes, xGEO_min, IRBEM_SYSAXIS_GEO, IRBEM_SYSAXIS_SM
+    )
+    magequator_output["R_eq_" + irbem_input.magnetic_field_str] = (
+        np.linalg.norm(xSM, ord=2, axis=1).astype(np.float64),
+        u.RE,
+    )
+
+    return magequator_output
 
 
-def get_MLT(xGEO, timestamps, irbem_lib_path, irbem_options, magnetic_field_str):
-    
-    datetimes   = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
-    sysaxes = 1
-    
+@timed_function()
+def get_MLT(
+    xgeo_var: Variable, time_var: TimeVariable, irbem_input: IrbemInput
+) -> dict[str, tuple[np.ndarray, u.UnitBase]]:
+    logging.info("\tCalculating magnetic local time ...")
+
+    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+
+    datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
+    sysaxes = IRBEM_SYSAXIS_GEO
+
     # Define Fortran bad value as a float
     fortran_bad_value = np.float64(-1.0e31)
     # Ensure xGEO and maginput are floating-point arrays
     xGEO = np.array(xGEO, dtype=np.float64)
-    
+
     assert len(datetimes) == len(xGEO)
 
-    kext = _magnetic_field_str_to_kext(magnetic_field_str)
+    kext = _magnetic_field_str_to_kext(irbem_input.magnetic_field_str)
 
-    model = IRBEM.MagFields(path=irbem_lib_path, options=irbem_options, kext=kext, sysaxes=sysaxes, verbose=False)
+    model = IRBEM.MagFields(
+        path=irbem_input.irbem_lib_path, options=irbem_input.irbem_options, kext=kext, sysaxes=sysaxes, verbose=False
+    )
 
     mlt_output = np.empty_like(datetimes)
 
     for i in range(len(datetimes)):
-        x_dict = {"dateTime": datetimes[i], "x1": xGEO[i,0], "x2": xGEO[i,1], "x3": xGEO[i,2]}
+        x_dict = {"dateTime": datetimes[i], "x1": xGEO[i, 0], "x2": xGEO[i, 1], "x3": xGEO[i, 2]}
         mlt_output[i] = model.get_mlt(x_dict)
 
-    unit = u.hour    
+    mlt_output = mlt_output.astype(np.float64)
+
+    unit = u.hour
     # convert to dict to match other functions
-    mlt_output = {'MLT_' + magnetic_field_str: (mlt_output, unit)}
+    mlt_output = {"MLT_" + irbem_input.magnetic_field_str: (mlt_output, unit)}
 
     return mlt_output
 
-def get_local_B_field(xGEO, timestamps, irbem_lib_path, irbem_options, magnetic_field_str, maginput):
-    
-    datetimes   = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
-    sysaxes = 1
-    
+
+@timed_function()
+def get_local_B_field(xgeo_var: Variable, time_var: Variable, irbem_input: IrbemInput):
+    logging.info("\tCalculating local magnetic field values ...")
+
+    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+
+    datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
+    sysaxes = IRBEM_SYSAXIS_GEO
+
     # Define Fortran bad value as a float
     fortran_bad_value = np.float64(-1.0e31)
     # Ensure xGEO and maginput are floating-point arrays
     xGEO = np.array(xGEO, dtype=np.float64)
-    for key in maginput.keys(): maginput[key] = np.array(maginput[key], dtype=np.float64)
+    for key in irbem_input.maginput.keys():
+        irbem_input.maginput[key] = np.array(irbem_input.maginput[key], dtype=np.float64)
 
-    assert len(datetimes) == len(maginput['Kp'])
+    assert len(datetimes) == len(irbem_input.maginput["Kp"])
     assert len(datetimes) == len(xGEO)
 
-    x_dict = {"dateTime": datetimes, "x1": xGEO[:,0], "x2": xGEO[:,1], "x3": xGEO[:,2]}
-    kext = _magnetic_field_str_to_kext(magnetic_field_str)
+    x_dict = {"dateTime": datetimes, "x1": xGEO[:, 0], "x2": xGEO[:, 1], "x3": xGEO[:, 2]}
+    kext = _magnetic_field_str_to_kext(irbem_input.magnetic_field_str)
 
-    model = IRBEM.MagFields(path=irbem_lib_path, options=irbem_options, kext=kext, sysaxes=sysaxes, verbose=False)
+    model = IRBEM.MagFields(
+        path=irbem_input.irbem_lib_path, options=irbem_input.irbem_options, kext=kext, sysaxes=sysaxes, verbose=False
+    )
 
-    field_multi_output = model.get_field_multi(x_dict, maginput)
-    
+    field_multi_output = model.get_field_multi(x_dict, irbem_input.maginput)
+
     # replace bad values with nan
     for key in field_multi_output.keys():
         field_multi_output[key][field_multi_output[key] == fortran_bad_value] = np.nan
 
     # map irbem output names to standard names and add unit information
-    irbem_name_map = {
-        'Bl': 'B_local_' + magnetic_field_str
-    }
+    irbem_name_map = {"Bl": "B_local_" + irbem_input.magnetic_field_str}
     field_multi_output_mapped = {}
     for key in irbem_name_map.keys():
         field_multi_output_mapped[irbem_name_map[key]] = (field_multi_output[key], u.nT)
 
-    return field_multi_output_mapped    
+    return field_multi_output_mapped
 
-def get_mirror_point(xGEO, timestamps, pa_local, irbem_lib_path, irbem_options, magnetic_field_str, maginput):
-    
-    datetimes   = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
-    sysaxes = 1
-    
-    # Define Fortran bad value as a float
-    fortran_bad_value = np.float64(-1.0e31)
+
+def _get_mirror_point_parallel(irbem_args, xGEO, datetimes, maginput, pa_local, it):
+    model = IRBEM.MagFields(
+        path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
+    )
+
+    x_dict_single = {"dateTime": datetimes[it], "x1": xGEO[it, 0], "x2": xGEO[it, 1], "x3": xGEO[it, 2]}
+    maginput_single = {key: maginput[key][it] for key in maginput.keys()}
+
+    mirror_point_output = np.empty_like(pa_local[it, :])
+
+    for i, pa in enumerate(pa_local[it, :]):
+        mirror_point_output[i] = model.find_mirror_point(x_dict_single, maginput_single, pa)["bmin"]
+
+    return mirror_point_output.astype(np.float64)
+
+
+@timed_function()
+def get_mirror_point(xgeo_var: Variable, time_var: Variable, pa_local_var: Variable, irbem_input: IrbemInput):
+    logging.info("\tCalculating mirror points ...")
+
+    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+    pa_local = (pa_local_var.data * pa_local_var.metadata.unit).to_value(u.deg)
+
+    datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
+    sysaxes = IRBEM_SYSAXIS_GEO
+
     # Ensure xGEO and maginput are floating-point arrays
     xGEO = np.array(xGEO, dtype=np.float64)
-    for key in maginput.keys(): maginput[key] = np.array(maginput[key], dtype=np.float64)
+    for key in irbem_input.maginput.keys():
+        irbem_input.maginput[key] = np.array(irbem_input.maginput[key], dtype=np.float64)
 
-    assert len(datetimes) == len(maginput['Kp'])
+    assert len(datetimes) == len(irbem_input.maginput["Kp"])
     assert len(datetimes) == len(xGEO)
+    assert len(datetimes) == len(pa_local)
 
-    # make sure pa_local does not change in time
-    assert np.all(np.repeat(pa_local[0,:][np.newaxis,:], len(datetimes), axis=0) == pa_local)
+    kext = _magnetic_field_str_to_kext(irbem_input.magnetic_field_str)
 
-    kext = _magnetic_field_str_to_kext(magnetic_field_str)
+    irbem_args = [irbem_input.irbem_lib_path, irbem_input.irbem_options, kext, sysaxes]
 
-    model = IRBEM.MagFields(path=irbem_lib_path, options=irbem_options, kext=kext, sysaxes=sysaxes, verbose=False)
+    parallel_func = partial(_get_mirror_point_parallel, irbem_args, xGEO, datetimes, irbem_input.maginput, pa_local)
 
-    for i, pa in enumerate(pa_local[0,:]):
+    with Pool(processes=irbem_input.num_cores) as pool:
+        rs = pool.map_async(parallel_func, range(len(datetimes)), chunksize=1)
+        init = rs._number_left
+        with tqdm(total=init) as t:
+            while True:
+                if rs.ready():
+                    break
+                t.n = init - rs._number_left
+                t.refresh()
+                time.sleep(1)
 
-        mirror_point_output = np.empty_like(pa_local)
+    # write async results into one array
+    mirror_point_output = np.empty_like(pa_local)
+    for i in range(len(datetimes)):
+        if isinstance(rs._value, Exception):
+            print(rs._value)
+            continue
 
-        for it in range(len(datetimes)):
-            x_dict = {"dateTime": datetimes[it], "x1": xGEO[it,0], "x2": xGEO[it,1], "x3": xGEO[it,2]}
-            mirror_point_output[it,i] = model.find_mirror_point(x_dict, maginput, pa)['bmin']
+        mirror_point_output[i, :] = rs._value[i]
 
     # replace bad values with nan
     mirror_point_output[mirror_point_output < 0] = np.nan
 
-    return {'B_mirr_' + magnetic_field_str: (mirror_point_output, 'nT')}   
+    return {"B_mirr_" + irbem_input.magnetic_field_str: (mirror_point_output, u.nT)}
 
-def get_Lstar(xGEO, timestamps, pa_local, irbem_lib_path, irbem_options, magnetic_field_str, maginput):
-    
-    datetimes   = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
-    sysaxes = 1
-    
+
+def _make_lstar_shell_splitting_parallel(
+    irbem_args: list, xGEO: np.ndarray, datetimes: list[datetime], maginput: dict, pa_local: np.ndarray, it: int,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    model = IRBEM.MagFields(
+        path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
+    )
+
+    x_dict_single = {"dateTime": datetimes[it], "x1": xGEO[it, 0], "x2": xGEO[it, 1], "x3": xGEO[it, 2]}
+    maginput_single = {key: maginput[key][it] for key in maginput}
+
+    Lm = np.empty_like(pa_local[it, :])
+    Lstar = np.empty_like(pa_local[it, :])
+    xj = np.empty_like(pa_local[it, :])
+
+    for i, pa in enumerate(pa_local[it, :]):
+        Lstar_output_single = model.make_lstar_shell_splitting(x_dict_single, maginput_single, pa)
+
+        Lm[i] = Lstar_output_single["Lm"][0]
+        Lstar[i] = Lstar_output_single["Lstar"][0]
+        xj[i] = Lstar_output_single["xj"][0]
+
+    return (Lm.astype(np.float64), Lstar.astype(np.float64), xj.astype(np.float64))
+
+
+@timed_function()
+def get_Lstar(xgeo_var: Variable, time_var: Variable, pa_local_var: Variable, irbem_input: IrbemInput):
+    logging.info("\tCalculating Lstar and J ...")
+
+    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+    pa_local = (pa_local_var.data * pa_local_var.metadata.unit).to_value(u.deg)
+
+    datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
+    sysaxes = IRBEM_SYSAXIS_GEO
+
     # Ensure xGEO and maginput are floating-point arrays
     xGEO = np.array(xGEO, dtype=np.float64)
-    for key in maginput.keys(): maginput[key] = np.array(maginput[key], dtype=np.float64)
+    for key in irbem_input.maginput:
+        irbem_input.maginput[key] = np.array(irbem_input.maginput[key], dtype=np.float64)
 
-    assert len(datetimes) == len(maginput['Kp'])
+    assert len(datetimes) == len(irbem_input.maginput["Kp"])
     assert len(datetimes) == len(xGEO)
+    assert len(datetimes) == len(pa_local)
 
-    # make sure pa_local does not change in time
-    assert np.all(np.repeat(pa_local[0,:][np.newaxis,:], len(datetimes), axis=0) == pa_local)
+    kext = _magnetic_field_str_to_kext(irbem_input.magnetic_field_str)
 
-    x_dict = {"dateTime": datetimes, "x1": xGEO[:,0], "x2": xGEO[:,1], "x3": xGEO[:,2]}
-    kext = _magnetic_field_str_to_kext(magnetic_field_str)
+    irbem_args = [irbem_input.irbem_lib_path, irbem_input.irbem_options, kext, sysaxes]
 
-    model = IRBEM.MagFields(path=irbem_lib_path, options=irbem_options, kext=kext, sysaxes=sysaxes, verbose=False)
+    parallel_func = partial(
+        _make_lstar_shell_splitting_parallel, irbem_args, xGEO, datetimes, irbem_input.maginput, pa_local
+    )
 
-    Lstar_output = {
-        'Lm': np.empty_like(pa_local),
-        'Lstar': np.empty_like(pa_local),
-        'xj': np.empty_like(pa_local)
-    }
+    with Pool(processes=irbem_input.num_cores) as pool:
+        rs = pool.map_async(parallel_func, range(len(datetimes)), chunksize=1)
+        init = rs._number_left
+        with tqdm(total=init) as t:
+            while True:
+                if rs.ready():
+                    break
+                t.n = init - rs._number_left
+                t.refresh()
+                time.sleep(1)
 
-    for i, pa in enumerate(pa_local[0,:]):
-        Lstar_output_single = model.make_lstar_shell_splitting(x_dict, maginput, pa)
+    # write async results into one array
+    Lm = np.empty_like(pa_local)
+    Lstar = np.empty_like(pa_local)
+    xj = np.empty_like(pa_local)
+    for i in range(len(datetimes)):
+        if isinstance(rs._value, Exception):
+            print(rs._value)
+            continue
 
-        for key in Lstar_output.keys():
-            Lstar_output[key][:,i] = Lstar_output_single[key]
+        Lm[i, :] = rs._value[i][0]
+        Lstar[i, :] = rs._value[i][1]
+        xj[i, :] = rs._value[i][2]
 
     # replace bad values with nan
-    for key in Lstar_output.keys():
-        Lstar_output[key][Lstar_output[key] < 0] = np.nan
+    for arr in [Lm, Lstar, xj]:
+        arr[arr < 0] = np.nan
+        if not np.any(np.isfinite(arr)):
+            raise ValueError("Lstar calculation failed! All NaNs!")
 
-    # map irbem output names to standard names and add unit information
-    irbem_name_map = {
-        'Lm': 'Lm_' + magnetic_field_str,
-        'Lstar': 'Lstar_' + magnetic_field_str,
-        'xj': 'XJ_' + magnetic_field_str
-    }
     Lstar_output_mapped = {}
-    Lstar_output_mapped[irbem_name_map['Lm']] = (Lstar_output['Lm'], '')
-    Lstar_output_mapped[irbem_name_map['Lstar']] = (Lstar_output['Lstar'], '')
-    Lstar_output_mapped[irbem_name_map['xj']] = (Lstar_output['xj'], '')
+    Lstar_output_mapped["Lm_" + irbem_input.magnetic_field_str] = (Lm, "")
+    Lstar_output_mapped["Lstar_" + irbem_input.magnetic_field_str] = (Lstar, "")
+    Lstar_output_mapped["XJ_" + irbem_input.magnetic_field_str] = (xj, "")
 
-    return Lstar_output_mapped    
-
-
-def lstar_shell_splitting_parallel(args):
-    onera_lib_file, options, kext, sysaxes, single_x_dict, single_maginput_dict, alpha_value, r_zero, debug = args
-    model = IRBEM.MagFields(path=onera_lib_file, options=options, kext=kext, sysaxes=sysaxes, verbose=True)
-
-    if debug:
-        lstar_shell_splitting_output = model.make_lstar_shell_splitting(single_x_dict, single_maginput_dict, alpha_value)
-    else:
-        # Suppress stdout and stderr
-        with open(os.devnull, "w") as fnull:
-            with contextlib.redirect_stdout(fnull), contextlib.redirect_stderr(fnull):
-                lstar_shell_splitting_output = model.make_lstar_shell_splitting(single_x_dict, single_maginput_dict, alpha_value)
-
-    return lstar_shell_splitting_output
-
-
-def compute_adiabatic_invariants(
-    xGEO,
-    datetimes,
-    maginput,
-    alpha_local,
-    onera_lib_file,
-    options=[1, 0, 0, 0, 0],
-    kext=4,
-    sysaxes=1,
-    r_zero=1,
-    num_cores=4,
-    verbose=True,
-    debug=False,
-):
-    # Define Fortran bad value as a float
-    fortran_bad_value = np.float64(-1.0e30)
-
-    # Ensure xGEO and kp are floating-point arrays
-    xGEO = np.array(xGEO, dtype=np.float64)
-    maginput = np.array(maginput, dtype=np.float64)
-
-    # Replace any nan values with Fortran bad value
-    xGEO[np.isnan(xGEO)] = fortran_bad_value
-    maginput[np.isnan(maginput)] = fortran_bad_value
-
-    # Initialize arrays to collect results
-    n_time = len(datetimes)
-    n_alpha = len(alpha_local[0])
-
-    results = {
-        "Lm": np.full((n_time, n_alpha), np.nan),
-        "lstar": np.full((n_time, n_alpha), np.nan),
-        "bmin": np.full((n_time, n_alpha), np.nan),
-        "bmirr": np.full((n_time, n_alpha), np.nan),
-        "XJ": np.full((n_time, n_alpha), np.nan),
-        "blocal": np.full((n_time, 1), np.nan),
-        "MLT": np.full((n_time, 1), np.nan),
-    }
-
-    # Prepare inputs for parallel processing
-    inputs = []
-    bfield_inputs = []
-    mlt_inputs = []
-    for i in range(n_time):
-        single_x_dict = {"dateTime": datetimes[i], "x1": xGEO[i, 0], "x2": xGEO[i, 1], "x3": xGEO[i, 2]}
-        single_maginput_dict = {"Kp": maginput[0, i],
-                                "Dst": maginput[1, i],
-                                "dens": maginput[2, i],
-                                "velo": maginput[3, i],
-                                "Pdyn": maginput[4, i],
-                                "ByIMF": maginput[5, i],
-                                "BzIMF": maginput[6, i],
-                                "G1": maginput[7, i],
-                                "G2": maginput[8, i],
-                                "G3": maginput[9, i],
-                                "W1": maginput[10, i],
-                                "W2": maginput[11, i],
-                                "W3": maginput[12, i],
-                                "W4": maginput[13, i],
-                                "W5": maginput[14, i],
-                                "W6": maginput[15, i],
-                                "AL": maginput[16, i]
-                                }
-        bfield_inputs.append((onera_lib_file, options, kext, sysaxes, single_x_dict, single_maginput_dict, debug))
-        mlt_inputs.append((onera_lib_file, options, kext, sysaxes, single_x_dict, debug))
-        for j in range(n_alpha):
-            alpha_value = float(alpha_local[i, j])
-            inputs.append(
-                (onera_lib_file, options, kext, sysaxes, single_x_dict, single_maginput_dict, alpha_value, r_zero, debug)
-            )
-
-    # Execute in parallel
-    # If not in verbose mode, do a straightforward parallel computing call
-    # In verbose mode, do a more complicated call for continuous progress indication
-    if not verbose:
-        with Pool(processes=num_cores) as pool:
-            lstar_results_parallel = pool.map(lstar_shell_splitting_parallel, inputs)
-        with Pool(processes=num_cores) as pool:
-            bfield_results_parallel = pool.map(get_field_multi_parallel, bfield_inputs)
-        with Pool(processes=num_cores) as pool:
-            mlt_results_parallel = pool.map(get_mlt_parallel, mlt_inputs)
-        with Pool(processes=num_cores) as pool:
-            bmirr_results_parallel = pool.map(get_bmirr_parallel, inputs)
-    else:
-
-        def update_progress(index, total, interval):
-            if index % interval == 0:
-                print(f"Progress is at {index}/{total}")
-
-        # Use Manager to keep track of progress
-        manager = Manager()
-        progress = manager.Value("i", 0)
-        lock = manager.Lock()
-
-        def update_progress_callback(total, interval):
-            with lock:
-                progress.value += 1
-            update_progress(progress.value, total, interval)
-
-        with Pool(processes=num_cores) as pool:
-            lstar_results_parallel = pool.map_async(
-                lstar_shell_splitting_parallel, inputs, callback=update_progress_callback(n_time * n_alpha, 100)
-            ).get()
-        with Pool(processes=num_cores) as pool:
-            bfield_results_parallel = pool.map_async(
-                get_field_multi_parallel, bfield_inputs, callback=update_progress_callback(n_time, 10)
-            ).get()
-        with Pool(processes=num_cores) as pool:
-            mlt_results_parallel = pool.map_async(
-                get_mlt_parallel, mlt_inputs, callback=update_progress_callback(n_time, 10)
-            ).get()
-        with Pool(processes=num_cores) as pool:
-            bmirr_results_parallel = pool.map_async(
-                get_bmirr_parallel, inputs, callback=update_progress_callback(n_time * n_alpha, 100)
-            ).get()
-
-    # Collect results from parallel execution
-    index = 0
-    for i in range(n_time):
-        field_multi_output = bfield_results_parallel[i]
-        results["blocal"][i] = field_multi_output["Bl"]
-        mlt_output = mlt_results_parallel[i]
-        results["MLT"][i] = mlt_output
-        for j in range(n_alpha):
-            lstar_output = lstar_results_parallel[index]
-            bmirr_output = bmirr_results_parallel[index]
-            results["Lm"][i, j] = lstar_output["Lm"][0]
-            results["lstar"][i, j] = lstar_output["Lstar"][0]
-            results["bmin"][i, j] = lstar_output["bmin"][0]
-            results["bmirr"][i, j] = bmirr_output["bmin"]
-            results["XJ"][i, j] = lstar_output["xj"][0]
-            index += 1
-
-    return results
-
+    return Lstar_output_mapped

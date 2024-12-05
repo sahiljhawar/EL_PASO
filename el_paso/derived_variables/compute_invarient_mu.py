@@ -1,8 +1,9 @@
 import numpy as np
+from astropy import units as u
 
 from el_paso.physics import en2pc, rest_energy
 
-def compute_invariant_mu(energy, alpha, b, species_char):
+def compute_invariant_mu(energy, alpha, magnetic_field, species_char):
     """
     Calculate the relativistic energy for a given kinetic energy.
 
@@ -23,7 +24,7 @@ def compute_invariant_mu(energy, alpha, b, species_char):
     sin_alpha_eq = np.sin(alpha)
 
     InvMu = (pct[:, :, np.newaxis] * sin_alpha_eq[:, np.newaxis, :]) ** 2 / (
-            b[:, np.newaxis, np.newaxis] * 2 * mc2)  # MeV/G
+            magnetic_field[:, np.newaxis, np.newaxis] * 2 * mc2)  # MeV/G
 
     InvMu[InvMu <= 0] = np.nan
-    return InvMu
+    return InvMu, u.MeV/u.G

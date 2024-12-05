@@ -1,6 +1,6 @@
 from datetime import datetime
 from el_paso.classes.variable import Variable
-from el_paso.classes.save_standard import SaveStandard
+from el_paso.classes.save_standard import SaveStandard, OutputFile
 from typing import List, Optional, Dict
 
 class BasicStandard(SaveStandard):
@@ -24,11 +24,12 @@ class BasicStandard(SaveStandard):
         """
         super().__init__(mission, source, instrument, model, mfm, version, save_text_segments,
                          default_db, default_format)
-        self.outputs = ["output_file"]
-        self.files = ["output_file"]
-        self.file_variables = {"output_file": []}
+        
+        self.output_files = [
+            OutputFile("everything", [], [])
+        ]
 
-    def get_saved_file_name(self, time_string: str, output_type: str, external_text: Optional[str] = None) -> str:
+    def get_saved_file_name(self, start_time:datetime, end_time:datetime, output_file: OutputFile, external_text: Optional[str] = None) -> str:
         """
         Get the saved file name based on a time string, output type, and optional external text.
 
@@ -40,42 +41,14 @@ class BasicStandard(SaveStandard):
         Returns:
             str: The generated file name.
         """
-        # Split time_string around the word "to"
-        time_part = time_string.split("to")[0].strip()
-        if 'to' in time_string:
-            time_part2 = time_string.split("to")[1].strip()
-            time_obj2 = datetime.strptime(time_part2, "%Y%m%d")
-            year_month2 = time_obj2.strftime("%Y%m")
-            year_month_day2 = time_obj2.strftime("%Y%m%d")
-        # Convert the first part from YYYYMMDD to datetime.datetime
-        time_obj = datetime.strptime(time_part, "%Y%m%d")
-        year_month = time_obj.strftime("%Y%m")
-        year_month_day = time_obj.strftime("%Y%m%d")
 
-        if "YYYYMMDD" in external_text or "yyyymmdd" in external_text:
-            yyyymmdd_str = year_month_day
-            # Replace "yyyymmdd" or "YYYYMMDD" in external_text with the appropriate value
-            file_name = external_text.replace("yyyymmdd", yyyymmdd_str).replace("YYYYMMDD", yyyymmdd_str).replace("YYYYMM", year_month)
-        elif "YYYYMMD1" in external_text and "YYYYMMD2" in external_text and 'to' in time_string:
-            file_name = external_text.replace("YYYYMMD1", year_month_day).replace("YYYYMMD2", year_month_day2).replace("YYYYMM", year_month2)
-        else:
-            raise ValueError(f"The externally provided file name does not have the appropriate placeholders in it!")
+        start_year_month_day = start_time.strftime("%Y%m%d")
+        end_year_month_day = end_time.strftime("%Y%m%d")
+
+        file_name = ''
+        for text_segment in self.save_text_segments:
+            file_name += text_segment + '_'
+
+        file_name += start_year_month_day + 'to' + end_year_month_day + '.mat'
 
         return file_name
-
-    def variable_mapping(self, in_variable: Variable) -> str:
-        """
-        Maps a variable to a specific database.
-
-        Args:
-            in_variable (Variable): The input variable name.
-
-        Returns:
-            str: The mapped variable name.
-        """
-
-        if in_variable.standard_name is not None and in_variable.standard_name and in_variable.product.use_standard:
-            out_var_name = in_variable.standard_name
-        else:
-            out_var_name = in_variable.workspace_name
-        return out_var_name

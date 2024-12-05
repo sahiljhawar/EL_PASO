@@ -1,14 +1,13 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 import re
-import warnings
+import timeit
+import logging
+from functools import wraps
 
 from packaging import version as version_pkg
 import numpy as np
 from astropy import units as u
-from scipy import io as sio
-
-from el_paso.classes import TimeVariable
 
 def fill_str_template_with_time(input:str, time:datetime):
 
@@ -87,162 +86,26 @@ def get_file_by_version(file_paths:Path, version:str):
     # Extract the file names from the dictionary
     return latest_file
 
-def sanitize_metadata_dict(metadata_dict):
-    """
-    Sanitize the metadata dictionary by replacing None type objects with empty arrays.
+def get_key_by_value(dict, value):
+    return list(dict.keys())[list(dict.values()).index(value)]
 
-    Args:
-        metadata_dict (dict): The dictionary of dictionaries to be sanitized.
-
-    Returns:
-        dict: The sanitized dictionary.
-    """
-    sanitized_dict = {}
-
-    for key, value in metadata_dict.items():
-        if isinstance(value, dict):
-            # Recursively sanitize nested dictionaries
-            sanitized_dict[key] = sanitize_metadata_dict(value)
-        elif value is None:
-            # Replace None with an empty numpy array
-            sanitized_dict[key] = np.array([])
-        else:
-            # Retain other values as they are
-            sanitized_dict[key] = value
-
-    return sanitized_dict
-
-
-def save_into_file(in_file_name, target_list):
-    """
-    Saves specified variables into the specified file name.
-
-    Args:
-        in_file_name (str): The name of the file to save data into.
-        target_list (list): A list of Variable objects to be saved.
-
-    Raises:
-        UnsupportedFormatError: If the file format is not supported.
-    """
-
-    in_file_name = Path(in_file_name)
-
-    format_name = in_file_name.suffix.lower()
-
-    if format_name == ".mat":
-        # Create a dictionary to store data and metadata
-        data_dict = {}
-        metadata_dict = {}
-
-        for variable in target_list:
-            # Save the data_content into a field named by save_name
-
-            # Check if the data_content consists of datetime.datetime objects
-            if isinstance(variable, TimeVariable):
-                data_dict[variable.metadata.save_name] = (variable.data_content * variable.metadata.unit).to_value(u.epoch_datenum)
+def timed_function(func_name=None):
+    def timed_function_(f):
+        @wraps(f)
+        def wrap(*args, **kw):
+            tic = timeit.default_timer()
+            result = f(*args, **kw)
+            toc = timeit.default_timer()
+            if func_name:
+                logging.info(f"\t\t{func_name} finished in {toc-tic:0.3f} seconds")
             else:
-                data_content = variable.data_content
-                if data_content is None:
-                    warnings.warn(f"Variable {variable.standard_name} does not hold any content! Skipping ...")
-                    continue
-                if data_content.ndim == 1:
-                    data_content = data_content.reshape(-1, 1)
-                data_dict[variable.metadata.save_name] = data_content
-                # Create metadata for each variable
-                metadata_dict[variable.metadata.save_name] = {
-                    'unit': variable.metadata.unit,
-                    'cadence_seconds': variable.metadata.cadence_seconds,
-                    'source_files': variable.metadata.source_files,
-                    'description': variable.metadata.description,
-                    'processing_notes': variable.metadata.processing_notes,
-                    'time_bin_method': variable.metadata.time_bin_method,
-                    'time_bin_interval': variable.metadata.time_bin_interval,
-                }
+                logging.info(f"\t\tFinished in {toc-tic:0.3f} seconds")
 
-        # Add metadata to the dictionary
-        data_dict['metadata'] = sanitize_metadata_dict(metadata_dict)
+            return result
+        return wrap
+    return timed_function_
 
-        # Save the dictionary into a .mat file
-        sio.savemat(str(in_file_name), data_dict)
-
-
-    elif format_name == ".csv":
-
-        data_arr = []
-
-        column_names = []  # To store column names for variables
-
-        for variable in target_list:
-
-            # Check if variable.data_content is 1D
-
-            if variable.data_content.ndim == 1:
-
-                # Add the 1D array as a column
-
-                data_arr.append(variable.data_content)
-
-                # Check if variable has save_name, else use workspace_name
-
-                if hasattr(variable, 'save_name') and variable.save_name:
-
-                    column_names.append(variable.save_name)
-
-                else:
-
-                    column_names.append(variable.workspace_name)
-
-        # Convert data_arr to a 2D NumPy array where each column is from the 1D arrays
-
-        # Convert data_arr to a structured NumPy array where each column retains its original dtype
-        if data_arr:
-            # Identify the dtypes of each column
-            dtypes = []
-            for col_data in data_arr:
-                if np.issubdtype(col_data.dtype, np.number):
-                    dtypes.append((column_names[len(dtypes)], col_data.dtype))  # e.g., float or int dtype
-                else:
-                    max_str_len = max([len(str(item)) for item in col_data])
-                    dtypes.append(
-                        (column_names[len(dtypes)], f'U{max_str_len}'))  # Unicode string with max length
-
-            # Create the structured array
-            structured_data = np.empty(len(data_arr[0]), dtype=dtypes)
-
-            # Populate the structured array with the actual data
-            for i, col_data in enumerate(data_arr):
-                structured_data[column_names[i]] = col_data
-
-            # Create the format string for savetxt
-            fmt = ['%s' if np.issubdtype(dtype[1], np.str_) else '%.16f' for dtype in dtypes]
-        else:
-            raise ValueError("Attempting to save an empty data file!")
-
-        # Prepare the header string
-
-        header_str = ""
-
-        # Check if self.save_header is True, append the main header
-
-        if self.save_header:
-            header_str += self.header  # Assume self.header is already a string
-
-            header_str += "\n"  # Add a newline after the header
-
-        # Check if self.save_columns is True, append the column names
-
-        if self.save_columns:
-            header_str += self.save_separator.join(column_names)  # Join column names with the delimiter
-
-            header_str += "\n"  # Add a newline after the column names
-
-        # Save the data using np.savetxt
-
-        np.savetxt(in_file_name, structured_data, delimiter=self.save_separator,
-                    fmt=fmt, header=header_str, comments='')
-    elif format_name == ".txt" or format_name == ".asc":
-        raise UnsupportedFormatError(f"The '{format_name}' format is not supported yet.")
-    elif format_name == ".h5":
-        raise UnsupportedFormatError(f"The '{format_name}' format is not supported yet.")
-    else:
-        raise UnsupportedFormatError(f"The '{format_name}' format is not implemented.")
+def enforce_utc_timezone(time:datetime) -> datetime:
+    if time.tzinfo is None:
+        time = time.replace(tzinfo=timezone.utc)
+    return time
