@@ -4,7 +4,7 @@ import os
 import typing
 from collections.abc import Iterable
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import timedelta
 from enum import Enum
 from pathlib import Path
@@ -89,7 +89,7 @@ class VariableMetadata:
 
     unit: u.UnitBase = ""
     original_cadence_seconds: float = 0
-    source_files: list[SourceFile] = None
+    source_files: list[SourceFile] = field(default_factory=list)
     description: str = ""
     processing_notes: str = ""
     standard_name: str = ""
@@ -124,7 +124,6 @@ class Variable:
             time_bin_method=time_bin_method,
             description=description,
             processing_notes=processing_notes,
-            source_files=[],
         )
 
         # Access database
@@ -151,7 +150,8 @@ class Variable:
                     standard_unit=standard_unit,
                 )
             else:
-                raise ValueError(f"Standard info could not be loaded for variable: {self.standard_name}")
+                msg = f"Standard info could not be loaded for variable: {self.standard_name}"
+                raise ValueError(msg)
 
         self.backup_for_reset = deepcopy(self.__dict__)
 
@@ -176,7 +176,8 @@ class Variable:
         :raises ValueError: if the 'unit' attribute of the metadata has not been set
         """
         if self.metadata.unit is None:
-            raise ValueError(f"Unit has not been set for this Variable! Standard name: {self.standard_name}")
+            msg = f"Unit has not been set for this Variable! Standard name: {self.standard_name}"
+            raise ValueError(msg)
 
         if self.metadata.unit != target_unit:
 
@@ -185,7 +186,7 @@ class Variable:
 
             self.metadata.unit = target_unit
 
-    def get_standard_info(self, standard: str, target_name: str) -> Any:
+    def get_standard_info(self,target_name: str) -> Any:
         """Gets information (field name target_name) for this variable from the standard.
 
         Args:

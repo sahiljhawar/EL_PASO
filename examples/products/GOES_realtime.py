@@ -10,12 +10,15 @@ from astropy import units as u
 from dateutil import parser
 
 from el_paso.classes import DerivedVariable, SourceFile, TimeBinMethod, TimeVariable, Variable
-from el_paso.derived_variables.compute_magnetic_field_variables import compute_magnetic_field_variables
-from el_paso.derived_variables.compute_PSD import compute_PSD
-from el_paso.post_process.construct_pitch_angle_distribution import construct_pitch_angle_distribution
-from el_paso.post_process.get_real_time_tipsod import get_real_time_tipsod
+from el_paso.processing import (
+    compute_magnetic_field_variables,
+    compute_PSD,
+    construct_pitch_angle_distribution,
+    convert_all_data_to_standard_units,
+    get_real_time_tipsod,
+    time_bin_all_variables,
+)
 from el_paso.save_standards.real_time_mat import RealtimeMat
-from el_paso.standardization import convert_units_to_standard, time_bin_all_variables
 from el_paso.utils import fill_str_template_with_time
 
 
@@ -138,7 +141,7 @@ def process_goes_real_time(
     variables["FEDO"].data = variables["FEDO"].data[:, sorting_order]
     variables["FEDO"].apply_thresholds_on_data(lower_threshold=0)
 
-    convert_units_to_standard(variables)
+    convert_all_data_to_standard_units(variables)
     time_bin_all_variables(variables, timedelta(minutes=5), start_time, end_time, window_alignement="center")
 
     # Add additional variables
@@ -179,7 +182,7 @@ def process_goes_real_time(
 
     # generate differential flux
     FEDU_var = Variable(  # noqa: N806
-        time_variable=time_var, standard_name="FEDU", original_unit=(u.cm**2 * u.s * u.sr * u.keV) ** (-1)
+        time_variable=time_var, standard_name="FEDU", original_unit=(u.cm**2 * u.s * u.sr * u.keV) ** (-1),
     )
 
     FEDU_var.data = construct_pitch_angle_distribution(

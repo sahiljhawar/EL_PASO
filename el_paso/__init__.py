@@ -1,7 +1,7 @@
 from .custom_units import *
 
 # useful custom IRBEM aliases
-IRBEM_SYSAXIS_GGZ = 0
+IRBEM_SYSAXIS_GDZ = 0
 IRBEM_SYSAXIS_GEO = 1
 IRBEM_SYSAXIS_GSM = 2
 IRBEM_SYSAXIS_GSE = 3

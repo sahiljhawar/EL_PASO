@@ -9,6 +9,8 @@ from packaging import version as version_pkg
 import numpy as np
 from astropy import units as u
 
+from el_paso.classes import Variable
+
 def fill_str_template_with_time(input:str, time:datetime):
 
     yyyymmdd_str = time.strftime('%Y%m%d')
@@ -109,3 +111,101 @@ def enforce_utc_timezone(time:datetime) -> datetime:
     if time.tzinfo is None:
         time = time.replace(tzinfo=timezone.utc)
     return time
+
+def get_variable_by_standard_name(standard_name: str, variables: dict[str, Variable]):
+    num_vars_found = 0
+    var_found = None
+
+    for var in variables.values():
+        if var.standard_name == standard_name:
+            var_found = var
+            num_vars_found += 1
+
+    if num_vars_found == 0:
+        msg = f"No variable found with standard name {standard_name}!"
+        raise ValueError(msg)
+
+    if num_vars_found > 1:
+        msg = f"Found {num_vars_found} variables with standard name {standard_name}! Please specify the variable yourself."  # noqa: E501
+        raise ValueError(msg)
+
+    return var_found
+
+def get_variable_by_standard_type(standard_type: str, variables: dict[str, Variable]):
+    num_vars_found = 0
+    var_found = None
+
+    for var in variables.values():
+        if var.standard and var.standard.variable_type == standard_type:
+            var_found = var
+            num_vars_found += 1
+
+    if num_vars_found == 0:
+        msg = f"No variable found with variable type {standard_type}!"
+        raise ValueError(msg)
+
+    if num_vars_found > 1:
+        msg = f"Found {num_vars_found} variables with variable type {standard_type}! Please specify the variable yourself."  # noqa: E501
+        raise ValueError(msg)
+
+    return var_found
+
+def validate_standard(func):
+    def validate_units(variables: dict[str, Variable]):
+        for key, var in variables.items():
+            if var.standard:
+                assert (
+                    var.metadata.unit == var.standard.standard_unit
+                ), f"Variable {key} has wrong units! Actual unit: {var.metadata.unit}. Should be: {var.standard.standard_unit}."
+
+    def validate_dimensions(variables: dict[str, Variable]):
+        for key, var in variables.items():
+            if var.standard:
+                match var.standard.variable_type:
+                    case "Epoch":
+                        assert (
+                            var.data.ndim == 1
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                    case "Flux":
+                        if "DO" in var.standard_name:
+                            expected_ndim = 2
+                        elif "DU" in var.standard_name:
+                            expected_ndim = 3
+                        assert (
+                            var.data.ndim == expected_ndim
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                    case "Energy":
+                        assert (
+                            var.data.ndim == 2
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                    case "PitchAngle":
+                        assert (
+                            var.data.ndim == 2
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                    case "Position":
+                        assert (
+                            var.data.ndim == 2
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                        assert (
+                            var.data.shape[1] == 3
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong shape: {var.data.shape}!"
+
+                    case "MLT":
+                        assert (
+                            var.data.ndim == 1
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+
+
+    @wraps(func)
+    def with_validated_standard(*args:tuple, **kwargs:dict):
+        variables = args[0]
+        if not isinstance(variables, dict):
+            msg = "First argument of the function has to be a dictionary holding instances of Variable!"
+            raise TypeError(msg)
+
+        validate_units(variables)
+        validate_dimensions(variables)
+
+        return func(*args, **kwargs)
+
+    return with_validated_standard
