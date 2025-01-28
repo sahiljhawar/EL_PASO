@@ -65,7 +65,7 @@ def construct_maginput(time: np.ndarray):
     os.environ["KP_ENSEMBLE_OUTPUT_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso")
     os.environ["RT_KP_SWPC_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso")
 
-    kp_df = read_kp_from_multiple_models(start_time, end_time, download=True)
+    kp_df = read_kp_from_multiple_models(start_time, end_time, download=True, synthetic_now_time=datetime.now(tz=timezone.utc))
 
     kp_time = [dt.timestamp() for dt in kp_df.index.to_pydatetime()]
     kp_value = kp_df["kp"].values

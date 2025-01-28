@@ -42,6 +42,7 @@ def _create_binned_time_and_bins(start_time:datetime, end_time:datetime, time_bi
 
 
 def _calculate_index_iterables(timestamps: np.ndarray, time_bins: list):
+
     index_set = np.digitize(timestamps, time_bins)
     # index_set = np.where(index_set == len(time_bins), 0, index_set) # remove values before and beyond time array; -1 will be ignored later on
     index_set = index_set - 1  # shift indices by one to match time array
@@ -90,6 +91,7 @@ def time_bin_all_variables(
     non_time_variables = {key: var for key, var in variables.items() if not isinstance(var, TimeVariable)}
 
     for key, var in non_time_variables.items():
+
         # Just repeat in case of no time dependency
         if var.time_variable is None:
             if var.metadata.time_bin_method == TimeBinMethod.Repeat:

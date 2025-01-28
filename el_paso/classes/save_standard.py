@@ -1,18 +1,18 @@
-from typing import List, Optional, Dict
-from abc import ABC, abstractmethod
-from pathlib import Path
-from dataclasses import dataclass
-import warnings
-from datetime import datetime, timezone, timedelta
-from copy import deepcopy
-from enum import Enum
 import calendar
+import warnings
+from abc import ABC, abstractmethod
+from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime, timedelta, timezone
+from enum import Enum
+from pathlib import Path
+from typing import Dict, List, Optional
 
-from scipy import io as sio
-from astropy import units as u
 import numpy as np
+from astropy import units as u
+from scipy import io as sio
 
-from el_paso.utils import get_key_by_value
+from el_paso.utils import enforce_utc_timezone, get_key_by_value
 
 
 class SaveCadence(Enum):
@@ -110,10 +110,10 @@ class SaveStandard(ABC):
                 current_time = start_time
                 while current_time <= end_time:
                     day_start = datetime(
-                        current_time.year, current_time.month, current_time.day, 0, 0, 0, tzinfo=timezone.utc
+                        current_time.year, current_time.month, current_time.day, 0, 0, 0, tzinfo=timezone.utc,
                     )
                     day_end = datetime(
-                        current_time.year, current_time.month, current_time.day, 23, 59, 59, tzinfo=timezone.utc
+                        current_time.year, current_time.month, current_time.day, 23, 59, 59, tzinfo=timezone.utc,
                     )
                     time_intervals.append([day_start, day_end])
                     current_time += timedelta(days=1)
@@ -134,7 +134,11 @@ class SaveStandard(ABC):
 
         return time_intervals
 
-    def save(self, start_time: float, end_time: float, variables_dict, saved_filename_extra_text=""):
+    def save(self, start_time: datetime, end_time: datetime, variables_dict, saved_filename_extra_text=""):
+
+        start_time = enforce_utc_timezone(start_time)
+        end_time = enforce_utc_timezone(end_time)
+
         time_intervals_to_save = self.get_time_intervals_to_save(start_time, end_time)
 
         for interval_start, interval_end in time_intervals_to_save:

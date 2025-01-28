@@ -31,7 +31,6 @@ class SourceFile:
         download_arguments_prefixes: str = "",
         download_arguments_suffixes: str = "",
         file_cadence: FileCadence|str = "daily",
-        pd_read_csv_kwargs: dict|None = None,
     ):
         self.download_url = download_url
         self.download_arguments_prefixes = download_arguments_prefixes
@@ -39,9 +38,11 @@ class SourceFile:
         self.download_path = download_path
         self.variables_to_extract = variables_to_extract
         self.file_cadence = file_cadence if isinstance(file_cadence, FileCadence) else FileCadence[file_cadence.upper()]
-        self.pd_read_csv_kwargs = pd_read_csv_kwargs if pd_read_csv_kwargs else {}
 
-    def _wget_download(self, current_time):
+    def _wget_download(self, current_time:datetime):
+
+        Path(fill_str_template_with_time(self.download_path, current_time)).parents[0].mkdir(exist_ok=True, parents=True)
+
         # Replace "yyyymmdd" or "YYYYMMDD" in url, prefix, and suffix with the parsed string
         url = fill_str_template_with_time(self.download_url, current_time)
         prefix = fill_str_template_with_time(self.download_arguments_prefixes, current_time)
@@ -80,7 +81,7 @@ class SourceFile:
             var.reset()
 
     @timed_function()
-    def extract_variables(self, start_time: datetime, end_time: datetime):
+    def extract_variables(self, start_time: datetime, end_time: datetime, pd_read_csv_kwargs: dict|None = None):
         print("Extracting variables ...")
 
         start_time = enforce_utc_timezone(start_time)
@@ -100,7 +101,7 @@ class SourceFile:
             if file_path.suffix == ".cdf":
                 self._extract_varibles_from_cdf(file_path)
             elif file_path.suffix in [".txt", ".asc", ".csv", ".tab"]:
-                self._load_ascii_file_to_extract(file_path)
+                self._extract_variables_from_ascii(file_path, pd_read_csv_kwargs)
             elif file_path.suffix == ".nc":
                 self._load_nc_file_to_extract(file_path)
             elif file_path.suffix == ".h5":
@@ -195,6 +196,34 @@ class SourceFile:
             else:
                 var.data = variable_data[var.name_or_column_in_file]
 
+
+    def _extract_variables_from_ascii(self, file_path: str, pd_read_csv_kwargs: dict) -> None:
+        """Load data from an ASCII file and updates the variables.
+
+        Args:
+            file_path (str): The path to the ASCII file.
+            variables (List[Variable], optional): Specific variables to load from the file.
+
+        """
+        df = pd.read_csv(file_path, **pd_read_csv_kwargs)
+
+        for key, var in self.variables_to_extract.items():
+            if var.name_or_column_in_file:
+                if isinstance(var.name_or_column_in_file, int):
+                    new_data = np.asarray(df.iloc[:, var.name_or_column_in_file].values)
+                elif isinstance(var.name_or_column_in_file, str):
+                    new_data = np.asarray(df.loc[:, var.name_or_column_in_file].values)
+                else:
+                    msg = f"Variable {key} has invalid name_or_column_in_file value: {var.name_or_column_in_file}! Must be int or str!"
+                    raise ValueError(
+                        msg,
+                    )
+
+                if var.data is not None and (isinstance(var, TimeVariable) or var.time_variable is not None):
+                    var.data = np.concatenate((var.data, new_data), axis=0)
+                else:
+                    var.data = new_data
+
     def _get_downloaded_file_name(self, time: datetime) -> Path:
         file_path = Path(fill_str_template_with_time(self.download_path, time))
 
@@ -220,7 +249,6 @@ class SourceFile:
             case FileCadence.DAILY:
                 current_time = start_time
                 while current_time <= end_time:
-                    time_str = current_time.strftime("%Y%m%d")
 
                     file_path = self._get_downloaded_file_name(current_time)
                     file_paths.append(file_path)
@@ -231,7 +259,7 @@ class SourceFile:
 
                     current_time += timedelta(days=1)
 
-            case FileCadence.DAILY:
+            case FileCadence.MONTHLY:
                 current_time = start_time.replace(day=1)
                 while current_time <= end_time:
                     year = current_time.year
@@ -432,27 +460,6 @@ class SourceFile:
             for var_name, data_content in mat_data.items():
                 if not var_name.startswith("__"):  # Skipping meta variables in .mat files
                     update_variable(var_name, data_content)
-
-    def _load_ascii_file_to_extract(self, file_path: str) -> None:
-        """Loads data from an ASCII file and updates the variables.
-
-        Args:
-            file_path (str): The path to the ASCII file.
-            variables (List[Variable], optional): Specific variables to load from the file.
-
-        """
-        df = pd.read_csv(file_path, **self.pd_read_csv_kwargs)
-
-        for key, var in self.variables_to_extract.items():
-            if var.name_or_column_in_file:
-                if isinstance(var.name_or_column_in_file, int):
-                    var.data = np.asarray(df.iloc[:, var.name_or_column_in_file].values)
-                elif isinstance(var.name_or_column_in_file, str):
-                    var.data = np.asarray(df.loc[:, var.name_or_column_in_file].values)
-                else:
-                    raise ValueError(
-                        f"Variable {key} has invalid name_or_column_in_file value: {var.name_or_column_in_file}! Must be int or str!",
-                    )
 
     def _load_nc_file_to_extract(self, file_path: str) -> None:
         """Loads data from a NetCDF file and updates the variables.

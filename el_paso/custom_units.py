@@ -16,7 +16,7 @@ datenum = u.def_unit('datenum')
 epoch_tt2000_posixtime = [(
     tt2000,
     posixtime,
-    lambda x: cdflib.cdfepoch.unixtime(x),
+    lambda x: cdflib.cdfepoch.unixtime(x.astype(np.int64)),
     lambda x: cdflib.cdfepoch.posixtime_to_tt2000(x)
 )]
 

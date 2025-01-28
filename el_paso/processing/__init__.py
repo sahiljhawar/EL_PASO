@@ -3,6 +3,7 @@ from .compute_invarient_mu import compute_invariant_mu
 from .compute_magnetic_field_variables import compute_magnetic_field_variables
 from .compute_PSD import compute_PSD
 from .construct_pitch_angle_distribution import construct_pitch_angle_distribution
+from .convert_string_to_datetime import convert_string_to_datetime
 from .fold_pitch_angles_and_flux import fold_pitch_angles_and_flux
 from .generic import convert_all_data_to_standard_units, load_variables_from_source_files
 from .get_real_time_tipsod import get_real_time_tipsod

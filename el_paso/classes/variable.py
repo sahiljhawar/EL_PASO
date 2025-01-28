@@ -100,9 +100,12 @@ class VariableMetadata:
 class Variable:
     """Variable class holding data and metadata."""
 
+    __slots__ = "time_variable", "name_or_column_in_file", "standard_name", \
+                "dependent_variables", "data", "standard", "metadata", "backup_for_reset"
+
     def __init__(
         self,
-        time_variable: TimeVariable,
+        time_variable: TimeVariable|None,
         original_unit: u.UnitBase,
         time_bin_method: TimeBinMethod = TimeBinMethod.NoBinning,
         name_or_column_in_file: str = "",
@@ -153,7 +156,10 @@ class Variable:
                 msg = f"Standard info could not be loaded for variable: {self.standard_name}"
                 raise ValueError(msg)
 
-        self.backup_for_reset = deepcopy(self.__dict__)
+        self.backup_for_reset = self.get_slots_dict()
+
+    def get_slots_dict(self) -> dict[str,Any]:
+        return {slot: getattr(self, slot) for slot in self.__slots__ if slot != "backup_for_reset"}
 
     def reset(self) -> None:
         """Reset the variable to its default state."""
@@ -161,7 +167,7 @@ class Variable:
             # do not make a copy of the time variable as this variable is holding a reference
             if key == "time_variable":
                 continue
-            self.__dict__[key] = deepcopy(value)
+            setattr(self, key, deepcopy(value))
 
     def convert_to_standard_unit(self) -> None:
         """Convert the data to the units defined by the variable's standard."""
@@ -180,7 +186,6 @@ class Variable:
             raise ValueError(msg)
 
         if self.metadata.unit != target_unit:
-
             data_with_unit = self.data * self.metadata.unit
             self.data = data_with_unit.to_value(target_unit)
 
@@ -271,6 +276,7 @@ class Variable:
 
 
 class TimeVariable(Variable):
+
     def __init__(
         self,
         original_unit: u.UnitBase,

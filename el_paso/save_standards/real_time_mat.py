@@ -73,7 +73,7 @@ class RealtimeMat(SaveStandard):
         year_month_day = start_time.strftime("%Y%m%d")
 
         file_folder_name = Path(f"{self.save_text_segments[0]}/{year_month}")
-        file_folder_name.mkdir(exist_ok=True)
+        file_folder_name.mkdir(exist_ok=True, parents=True)
         file_name = (
             f"{self.save_text_segments[0]}/{year_month}/{self.source}_{self.save_text_segments[1]}_"
             f"{year_month_day}_{self.save_text_segments[2]}_{self.save_text_segments[3]}.mat"
