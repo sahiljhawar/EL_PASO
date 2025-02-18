@@ -78,10 +78,13 @@ def compute_magnetic_field_variables(
             if "B_local" in var.standard_name:
                 magnetic_field_results |= proc.get_local_B_field(xgeo_var, time_var, irbem_input)
 
+            elif "B_fofl" in var.standard_name:
+                magnetic_field_results |= proc.get_footpoint_atmosphere(xgeo_var, time_var, irbem_input)
+
             elif "MLT" in var.standard_name:
                 magnetic_field_results |= proc.get_MLT(xgeo_var, time_var, irbem_input)
 
-            elif "R_eq" in var.standard_name or "B_eq" in var.standard_name:
+            elif "R_eq" in var.standard_name or "B_eq" in var.standard_name or "xGEO" in var.standard_name:
                 magnetic_field_results |= proc.get_magequator(xgeo_var, time_var, irbem_input)
 
             elif "Lstar_" in var.standard_name:
@@ -131,7 +134,7 @@ def _get_pa_eq(
     magnetic_field_results: dict,
     irbem_input: proc.IrbemInput,
 ):
-    print("\tCalculating equatorial pitch angle ...")
+    logging.info("\tCalculating equatorial pitch angle ...")
 
     pa_local = (pa_local_var.data * pa_local_var.metadata.unit).to_value("")
 

@@ -13,7 +13,7 @@ import cdflib
 import numpy as np
 import pandas as pd
 
-from el_paso.classes import TimeVariable
+from el_paso.classes import TimeVariable, Variable
 from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version, timed_function
 
 
@@ -81,7 +81,7 @@ class SourceFile:
             var.reset()
 
     @timed_function()
-    def extract_variables(self, start_time: datetime, end_time: datetime, pd_read_csv_kwargs: dict|None = None):
+    def extract_variables(self, start_time: datetime, end_time: datetime, pd_read_csv_kwargs: dict|None = None)-> dict[str, Variable]:
         print("Extracting variables ...")
 
         start_time = enforce_utc_timezone(start_time)

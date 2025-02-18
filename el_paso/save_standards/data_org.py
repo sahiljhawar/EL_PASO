@@ -63,7 +63,8 @@ class DataorgPMF(SaveStandard):
             "InvK",
             "B_eq",
             "B_local",
-            "R_eq",
+            "R0",
+            "density",
         ]
 
         assert all(
@@ -87,7 +88,8 @@ class DataorgPMF(SaveStandard):
             OutputFile("xGEO", ["time", "xGEO"], [u.datenum, u.RE]),
             OutputFile("invmu_and_invk", ["time", "InvMu", "InvK"], [u.datenum, u.MeV / u.G, u.RE * u.G ** (1 / 2)]),
             OutputFile("bfield", ["time", "B_eq", "B_local"], [u.datenum, u.G, u.G]),
-            OutputFile("R_eq", ["time", "R_eq"], [u.datenum, u.RE]),
+            OutputFile("R0", ["time", "R0"], [u.datenum, u.RE]),
+            OutputFile("density", ["time", "density"], [u.datenum, u.cm**(-3)]),
         ]
 
     def get_saved_file_name(
@@ -110,14 +112,14 @@ class DataorgPMF(SaveStandard):
             f"{self.mission.lower()}/{self.save_text_segments[0]}/{self.save_text_segments[1]}/Processed_Mat_Files/"
         )
 
-        if output_file.name in ["flux", "psd", "xGEO"]:
+        if output_file.name in ["flux", "psd", "xGEO", "density"]:
             os.makedirs(file_folder_name, exist_ok=True)
             file_name = (
                 f"{file_folder_name}"
                 f"{self.save_text_segments[1]}_{self.instrument}_{start_year_month_day}to{end_year_month_day}_{output_file.name}_"
                 f"{self.save_text_segments[5]}.mat"
             )
-        elif output_file.name in ["alpha_and_energy", "lstar", "lm", "invmu_and_invk", "mlt", "bfield", "R_eq"]:
+        elif output_file.name in ["alpha_and_energy", "lstar", "lm", "invmu_and_invk", "mlt", "bfield", "R0"]:
             os.makedirs(file_folder_name, exist_ok=True)
             file_name = (
                 f"{file_folder_name}"

@@ -389,6 +389,17 @@ def main():
                                       standard.id, mag_field.id, species_id, related_flux, dependency_ids,
                                       dependency_names)
 
+                add_standard_variable(session, [
+                    f"xGEO_{mag_field.standard_tag}",
+                    f"",
+                    "Position",
+                    "RE",
+                    ""
+                ],
+                                      standard.id, mag_field.id, species_id, related_flux, dependency_ids,
+                                      dependency_names)
+
+
     coordinate_systems = [
         CoordinateSystems(name='GDZ', description='Position in geodetic coordinates',
                           definition='(geodetic; altitude, latitude, East longitude), '

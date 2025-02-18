@@ -203,6 +203,7 @@ def get_magequator(xgeo_var: Variable, time_var: TimeVariable, irbem_input: Irbe
 
     magequator_output = {}
     magequator_output["B_eq_" + irbem_input.magnetic_field_str] = (B_eq.astype(np.float64), u.nT)
+    magequator_output["xGEO_" + irbem_input.magnetic_field_str]  = (xGEO_min.astype(np.float64), u.RE)
 
     # add total radial distance field in SM coordinates
     xSM = Coords(path=irbem_input.irbem_lib_path).transform(
@@ -215,6 +216,66 @@ def get_magequator(xgeo_var: Variable, time_var: TimeVariable, irbem_input: Irbe
 
     return magequator_output
 
+def _get_footpoint_atmosphere_parallel(irbem_args: list, xGEO: np.ndarray, datetimes: np.ndarray, maginput: dict, it: int):
+    model = MagFields(
+        path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False,
+    )
+
+    x_dict_single = {"dateTime": datetimes[it], "x1": xGEO[it, 0], "x2": xGEO[it, 1], "x3": xGEO[it, 2]}
+    maginput_single = {key: maginput[key][it] for key in maginput.keys()}
+
+    footpoint_output = model.find_foot_point(x_dict_single, maginput_single, stopAlt=100, hemiFlag=0)
+
+    return footpoint_output["BFOOTMAG"]
+
+@timed_function()
+def get_footpoint_atmosphere(xgeo_var: Variable, time_var: TimeVariable, irbem_input: IrbemInput):
+    logging.info("\tCalculating magnetic foot point at the atmosphere ...")
+
+    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+
+    datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
+    sysaxes = IRBEM_SYSAXIS_GEO
+
+    # Define Fortran bad value as a float
+    fortran_bad_value = np.float64(-1.0e31)
+    # Ensure xGEO and maginput are floating-point arrays
+    xGEO = np.array(xGEO, dtype=np.float64)
+
+    assert len(datetimes) == len(xGEO)
+
+    kext = _magnetic_field_str_to_kext(irbem_input.magnetic_field_str)
+
+    irbem_args = [irbem_input.irbem_lib_path, irbem_input.irbem_options, kext, sysaxes]
+
+    parallel_func = partial(_get_footpoint_atmosphere_parallel, irbem_args, xGEO, datetimes, irbem_input.maginput)
+
+    with Pool(processes=irbem_input.num_cores) as pool:
+        rs = pool.map_async(parallel_func, range(len(datetimes)), chunksize=1)
+        init = rs._number_left
+        with tqdm(total=init) as t:
+            while True:
+                if rs.ready():
+                    break
+                t.n = init - rs._number_left
+                t.refresh()
+                time.sleep(1)
+
+    # write async results into one array
+    B_foot = np.empty_like(datetimes)
+    for i in range(len(datetimes)):
+        if isinstance(rs._value, Exception):
+            print(rs._value)
+            continue
+
+        B_foot[i] = rs._value[i][0]
+
+    B_foot[B_foot == fortran_bad_value] = np.nan
+
+    footpoint_output = {"B_fofl_" + irbem_input.magnetic_field_str: (B_foot.astype(np.float64), u.nT)}
+
+    return footpoint_output
 
 @timed_function()
 def get_MLT(

@@ -12,6 +12,7 @@ import numpy as np
 from astropy import units as u
 from scipy import io as sio
 
+from el_paso.classes import Variable
 from el_paso.utils import enforce_utc_timezone, get_key_by_value
 
 
@@ -134,7 +135,7 @@ class SaveStandard(ABC):
 
         return time_intervals
 
-    def save(self, start_time: datetime, end_time: datetime, variables_dict, saved_filename_extra_text=""):
+    def save(self, start_time: datetime, end_time: datetime, variables_dict: dict[str, Variable], saved_filename_extra_text:str="") -> None:
 
         start_time = enforce_utc_timezone(start_time)
         end_time = enforce_utc_timezone(end_time)

@@ -1,16 +1,18 @@
 from datetime import timedelta
 
-from astropy import units as u
 import numpy as np
+from astropy import units as u
 
-from el_paso.classes import SourceFile
-from el_paso.classes import Variable, TimeVariable, TimeBinMethod, VariableMetadata, DerivedVariable
-from el_paso.standardization import load_variables, convert_units_to_standard, time_bin_all_variables
+from el_paso.classes import DerivedVariable, SourceFile, TimeBinMethod, TimeVariable, Variable
+from el_paso.processing import (
+    compute_magnetic_field_variables,
+    compute_PSD,
+    convert_all_data_to_standard_units,
+    fold_pitch_angles_and_flux,
+    load_variables_from_source_files,
+    time_bin_all_variables,
+)
 from el_paso.save_standards.data_org import DataorgPMF
-from el_paso.save_standards.basic_standard import BasicStandard
-from el_paso.post_process.fold_pitch_angles_and_flux import fold_pitch_angles_and_flux
-from el_paso.derived_variables.compute_magnetic_field_variables import compute_magnetic_field_variables
-from el_paso.derived_variables import compute_PSD
 
 
 def process_rbsp_hope_electron(
@@ -86,14 +88,14 @@ def process_rbsp_hope_electron(
 
     # source_file.download(start_time, end_time)
 
-    variables: dict[str, Variable] = load_variables(source_file, start_time, end_time)
+    variables: dict[str, Variable] = load_variables_from_source_files(source_file, start_time, end_time)
 
     # Part 2: standardize variables
 
     variables["FEDU"].transpose_data((0, 2, 1))
     variables["FEDU"].apply_thresholds_on_data(lower_threshold=0)
 
-    convert_units_to_standard(variables)
+    convert_all_data_to_standard_units(variables)
     time_bin_all_variables(variables, timedelta(minutes=5), start_time, end_time, window_alignement="center")
 
     # Part 3: compute derived variables

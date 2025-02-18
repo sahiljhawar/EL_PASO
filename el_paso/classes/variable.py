@@ -13,6 +13,7 @@ from typing import Any, List
 import cdflib
 import numpy as np
 from astropy import units as u
+from numpy.typing import NDArray
 from sqlalchemy import MetaData, create_engine, select
 from sqlalchemy.orm import sessionmaker
 
@@ -102,6 +103,8 @@ class Variable:
 
     __slots__ = "time_variable", "name_or_column_in_file", "standard_name", \
                 "dependent_variables", "data", "standard", "metadata", "backup_for_reset"
+
+    data:NDArray[np.float64]
 
     def __init__(
         self,
