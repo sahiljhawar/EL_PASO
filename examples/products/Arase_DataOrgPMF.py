@@ -38,9 +38,6 @@ def process_arase_xep_real_time(
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     varnames = {}
-    varnames["newtime"] = "Epoch"
-    varnames["Energy"] = "Energy_FEDO"
-
     varnames["time"] = "Epoch"
     varnames["energy_channels"] = "Energy_FEDU"
     varnames["Flux"] = "FEDU"
@@ -65,6 +62,7 @@ def process_arase_xep_real_time(
         instrument="XEP",
         save_text_segments=[save_data_dir, "arase", "n4", "4", "T89", "oneraextrap"],
         product_variable_names = varnames,
+        file_format=".pickle",
     )
 
     orb_variables = _get_orb_variables(download_data_dir, start_time, end_time, irbem_lib_path)
@@ -117,7 +115,7 @@ def process_arase_xep_real_time(
     compute_PSD(variables, PSD_var, flux_key="FEDU")
     variables["PSD_FEDU"] = PSD_var
 
-    save_standard.save(start_time, end_time, variables)
+    save_standard.save(start_time, end_time, variables, append=True)
 
 def process_arase_pew_real_time(
     save_data_dir:str,

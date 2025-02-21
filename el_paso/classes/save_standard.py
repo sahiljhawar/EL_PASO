@@ -1,4 +1,5 @@
 import calendar
+import pickle
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
@@ -6,10 +7,11 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 
 import numpy as np
 from astropy import units as u
+from numpy.typing import NDArray
 from scipy import io as sio
 
 from el_paso.classes import Variable
@@ -44,7 +46,7 @@ class SaveStandard(ABC):
         version: str,
         save_text_segments: Dict[str, List[str]],
         default_db: str,
-        default_format: str,
+        file_format: str,
         product_variable_names: Dict[str, str] = None,
         outputs: List[str] = [],
         files: Dict[str, List[str]] = {},
@@ -75,7 +77,7 @@ class SaveStandard(ABC):
         self.version = version
         self.save_text_segments = save_text_segments
         self.default_db = default_db
-        self.default_format = default_format
+        self.file_format = file_format
         self.outputs = outputs
         self.files = files
         self.file_variables = file_variables
@@ -135,7 +137,13 @@ class SaveStandard(ABC):
 
         return time_intervals
 
-    def save(self, start_time: datetime, end_time: datetime, variables_dict: dict[str, Variable], saved_filename_extra_text:str="") -> None:
+    def save(self,
+             start_time: datetime,
+             end_time: datetime,
+             variables_dict: dict[str, Variable],
+             saved_filename_extra_text:str="",
+             *,
+             append:bool=False) -> None:
 
         start_time = enforce_utc_timezone(start_time)
         end_time = enforce_utc_timezone(end_time)
@@ -162,7 +170,7 @@ class SaveStandard(ABC):
                         stacklevel=2,
                     )
                 else:
-                    self._save_single_file(file_name, target_variables)
+                    self._save_single_file(file_name, target_variables, append=append)
 
     def _get_target_variables(self, output_file: OutputFile, variables_dict, start_time, end_time):
         target_variables = {}
@@ -216,9 +224,8 @@ class SaveStandard(ABC):
 
         return sanitized_dict
 
-    def _save_single_file(self, in_file_name, target_variables):
-        """
-        Saves specified variables into the specified file name.
+    def _save_single_file(self, in_file_name:Path, target_variables:dict[str,Variable], *, append:bool=False):
+        """Save specified variables into the specified file name.
 
         Args:
             in_file_name (str): The name of the file to save data into.
@@ -227,7 +234,6 @@ class SaveStandard(ABC):
         Raises:
             UnsupportedFormatError: If the file format is not supported.
         """
-
         print(f"Saving file {in_file_name}...")
 
         in_file_name = Path(in_file_name)
@@ -246,7 +252,7 @@ class SaveStandard(ABC):
 
                 data_content = variable.data
                 if data_content is None:
-                    warnings.warn(f"Variable {variable.standard_name} does not hold any content! Skipping ...")
+                    warnings.warn(f"Variable {variable.standard_name} does not hold any content! Skipping ...", stacklevel=2)
                     continue
                 if data_content.ndim == 1:
                     data_content = data_content.reshape(-1, 1)
@@ -267,6 +273,47 @@ class SaveStandard(ABC):
 
             # Save the dictionary into a .mat file
             sio.savemat(str(in_file_name), data_dict)
+
+        elif format_name == ".pickle":
+            # Create a dictionary to store data and metadata
+            data_dict:dict[str,NDArray[np.float64]|dict[str,Any]] = {}
+            metadata_dict = {}
+
+            for save_name, variable in target_variables.items():
+                # Save the data_content into a field named by save_name
+
+                data_dict[save_name] = variable.data
+
+                data_content = variable.data
+                if data_content is None:
+                    warnings.warn(f"Variable {variable.standard_name} does not hold any content! Skipping ...", stacklevel=2)
+                    continue
+                if data_content.ndim == 1:
+                    data_content = data_content.reshape(-1, 1)
+                data_dict[save_name] = data_content
+                # Create metadata for each variable
+                metadata_dict[save_name] = {
+                    "unit": str(variable.metadata.unit),
+                    "original_cadence_seconds": variable.metadata.original_cadence_seconds,
+                    "source_files": variable.metadata.source_files,
+                    "description": variable.metadata.description,
+                    "processing_notes": variable.metadata.processing_notes,
+                    "time_bin_method": variable.metadata.time_bin_method,
+                    "time_bin_interval": variable.metadata.time_bin_interval,
+                }
+
+            # Add metadata to the dictionary
+            data_dict["metadata"] = self._sanitize_metadata_dict(metadata_dict)
+
+            print(in_file_name)
+            if in_file_name.exists() and append:
+                with in_file_name.open("rb") as file:
+                    data_dict_old = pickle.load(file)
+                    data_dict = SaveStandard._concatenate_data_dicts(data_dict_old, data_dict)
+
+            # Save the dictionary into a .npy file
+            with in_file_name.open("wb") as file:
+                pickle.dump(data_dict, file)
 
         elif format_name == ".csv":
             data_arr = []
@@ -343,3 +390,36 @@ class SaveStandard(ABC):
             raise UnsupportedFormatError(f"The '{format_name}' format is not supported yet.")
         else:
             raise UnsupportedFormatError(f"The '{format_name}' format is not implemented.")
+
+    @staticmethod
+    def _concatenate_data_dicts(data_dict_1:dict[str,Any], data_dict_2:dict[str,Any]) -> dict[str, Any]:
+
+        time_1 = np.squeeze(data_dict_1["time"])
+        time_2 = np.squeeze(data_dict_2["time"])
+
+        idx_to_insert = np.searchsorted(time_1, time_2[0])
+
+        time_1_in_2 = np.squeeze(np.isin(time_1, time_2))
+
+        for key, value_1 in data_dict_1.items():
+
+            if key not in data_dict_2:
+                msg = "Key missmatch when concatenating data dicts!"
+                raise ValueError(msg)
+
+            if isinstance(value_1, np.ndarray):
+                value_1 = value_1[~time_1_in_2]
+
+                value_2 = data_dict_2[key]
+
+                concatenated_value = value_2 if value_1.size == 0 else np.insert(value_1, idx_to_insert, value_2, axis=0)
+
+                if key == "time" and len(np.unique(concatenated_value)) != len(concatenated_value):
+                    msg = "Time values were not unique when concatinating arrays!"
+                    raise ValueError(msg)
+                data_dict_2[key] = concatenated_value
+
+            elif isinstance(value_1, dict): # this is the metadata dict
+                continue
+
+        return data_dict_2

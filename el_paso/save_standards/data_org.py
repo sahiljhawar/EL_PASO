@@ -1,11 +1,12 @@
+import operator
 import os
 from datetime import datetime
-from el_paso.classes.variable import Variable
-from el_paso.classes.save_standard import SaveStandard, OutputFile, SaveCadence
-from typing import List, Optional, Dict
-import operator
+from typing import Dict, List, Literal, Optional
 
 from astropy import units as u
+
+from el_paso.classes.save_standard import OutputFile, SaveCadence, SaveStandard
+from el_paso.classes.variable import Variable
 
 
 class DataorgPMF(SaveStandard):
@@ -20,7 +21,7 @@ class DataorgPMF(SaveStandard):
         version: str = None,
         save_text_segments: List[str] = None,
         default_db: str = None,
-        default_format: str = None,
+        file_format: Literal[".mat", ".pickle"] = ".mat",
     ):
         """Initialize a DataorgPMF object.
 
@@ -44,7 +45,7 @@ class DataorgPMF(SaveStandard):
             version,
             save_text_segments,
             default_db,
-            default_format,
+            file_format,
             product_variable_names,
         )
 
@@ -117,7 +118,7 @@ class DataorgPMF(SaveStandard):
             file_name = (
                 f"{file_folder_name}"
                 f"{self.save_text_segments[1]}_{self.instrument}_{start_year_month_day}to{end_year_month_day}_{output_file.name}_"
-                f"{self.save_text_segments[5]}.mat"
+                f"{self.save_text_segments[5]}{self.file_format}"
             )
         elif output_file.name in ["alpha_and_energy", "lstar", "lm", "invmu_and_invk", "mlt", "bfield", "R0"]:
             os.makedirs(file_folder_name, exist_ok=True)
@@ -125,7 +126,7 @@ class DataorgPMF(SaveStandard):
                 f"{file_folder_name}"
                 f"{self.save_text_segments[1]}_{self.instrument}_{start_year_month_day}to{end_year_month_day}_"
                 f"{output_file.name}_{self.save_text_segments[2]}_{self.save_text_segments[3]}_"
-                f"{self.save_text_segments[4]}_{self.save_text_segments[5]}.mat"
+                f"{self.save_text_segments[4]}_{self.save_text_segments[5]}{self.file_format}"
             )
         else:
             raise ValueError(f"Output file name '{output_file.name}' is not supported.")

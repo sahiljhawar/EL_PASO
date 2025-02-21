@@ -68,9 +68,6 @@ def process_goes_real_time(
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     varnames = {}
-    varnames["newtime"] = "Epoch"
-    varnames["Energy"] = "Energy_FEDO"
-
     varnames["time"] = "Epoch"
     varnames["energy_channels"] = "Energy_FEDU"
     varnames["Flux"] = "FEDU"
@@ -96,6 +93,7 @@ def process_goes_real_time(
         instrument="MAGED",
         save_text_segments=[save_data_dir, f"tmp_{satellite_str}", "n4", "4", "T89", "ver4"],
         product_variable_names=varnames,
+        file_format=".pickle",
     )
 
     # Part 1: specify source files to extract variables
@@ -223,4 +221,4 @@ def process_goes_real_time(
     compute_PSD(variables, PSD_var, flux_key="FEDU")
     variables["PSD_FEDU"] = PSD_var
 
-    save_standard.save(start_time, end_time, variables)
+    save_standard.save(start_time, end_time, variables, append=True)

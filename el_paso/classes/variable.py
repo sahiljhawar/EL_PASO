@@ -105,6 +105,7 @@ class Variable:
                 "dependent_variables", "data", "standard", "metadata", "backup_for_reset"
 
     data:NDArray[np.float64]
+    metadata:VariableMetadata
 
     def __init__(
         self,
