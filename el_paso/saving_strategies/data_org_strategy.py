@@ -7,7 +7,7 @@ from pathlib import Path
 from astropy import units as u
 
 from el_paso.classes import Variable
-from el_paso.classes.saving_strategy import OutputFile, SavingStrategy
+from el_paso.saving_strategy import OutputFile, SavingStrategy
 
 
 class DataOrgStrategy(SavingStrategy):
