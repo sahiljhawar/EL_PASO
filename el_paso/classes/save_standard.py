@@ -295,10 +295,10 @@ class SaveStandard(ABC):
                 metadata_dict[save_name] = {
                     "unit": str(variable.metadata.unit),
                     "original_cadence_seconds": variable.metadata.original_cadence_seconds,
-                    "source_files": variable.metadata.source_files,
+                    "source_files": [],
                     "description": variable.metadata.description,
                     "processing_notes": variable.metadata.processing_notes,
-                    "time_bin_method": variable.metadata.time_bin_method,
+                    "time_bin_method": str(variable.metadata.time_bin_method),
                     "time_bin_interval": variable.metadata.time_bin_interval,
                 }
 

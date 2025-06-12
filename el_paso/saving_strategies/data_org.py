@@ -110,7 +110,7 @@ class DataorgPMF(SaveStandard):
         end_year_month_day = end_time.strftime("%Y%m%d")
 
         file_folder_name = (
-            f"{self.mission.lower()}/{self.save_text_segments[0]}/{self.save_text_segments[1]}/Processed_Mat_Files/"
+            f"{self.mission.upper()}/{self.save_text_segments[0]}/{self.save_text_segments[1]}/Processed_Mat_Files/"
         )
 
         if output_file.name in ["flux", "psd", "xGEO", "density"]:

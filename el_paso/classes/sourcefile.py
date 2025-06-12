@@ -4,40 +4,36 @@ import calendar
 import json
 import os
 import warnings
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from datetime import timezone as tz
-from enum import Enum
 from pathlib import Path
+from typing import Any, Literal
 
-import cdflib
 import numpy as np
 import pandas as pd
+from astropy import units as u
+from numpy.typing import NDArray
 
-from el_paso.classes import TimeVariable, Variable
+from el_paso.classes import Variable
+from el_paso.classes.extraction_functions import ExtractionInfo, extract_data_from_ascii, extract_varibles_from_cdf
 from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version, timed_function
 
-
-class FileCadence(Enum):
-    DAILY = 0
-    MONTHLY = 1
-    CUSTOM_ONE_FILE = 2
 
 class SourceFile:
     def __init__(
         self,
-        variables_to_extract: dict,
         download_path: str,
         download_url: str = "",
         download_arguments_prefixes: str = "",
         download_arguments_suffixes: str = "",
-        file_cadence: FileCadence|str = "daily",
-    ):
+        file_cadence: Literal["daily", "monthly", "single_file"] = "daily",
+    ) -> None:
         self.download_url = download_url
         self.download_arguments_prefixes = download_arguments_prefixes
         self.download_arguments_suffixes = download_arguments_suffixes
         self.download_path = download_path
-        self.variables_to_extract = variables_to_extract
-        self.file_cadence = file_cadence if isinstance(file_cadence, FileCadence) else FileCadence[file_cadence.upper()]
+        self.file_cadence = file_cadence
 
     def _wget_download(self, current_time:datetime):
 
@@ -65,43 +61,49 @@ class SourceFile:
         curr_time = start_time
 
         match self.file_cadence:
-            case FileCadence.DAILY:
+            case "daily":
                 while curr_time <= end_time:
                     self._wget_download(curr_time)
                     curr_time += timedelta(days=1)
 
-            case FileCadence.MONTHLY:
+            case "monthly":
                 raise NotImplementedError
 
-            case FileCadence.CUSTOM_ONE_FILE:
+            case "single_file":
                 self._wget_download(start_time)
 
-    def reset_variables(self):
-        for var in self.variables_to_extract.values():
-            var.reset()
+            case _:
+                raise NotImplementedError
+
 
     @timed_function()
-    def extract_variables(self, start_time: datetime, end_time: datetime, pd_read_csv_kwargs: dict|None = None)-> dict[str, Variable]:
+    def extract_variables(self, start_time: datetime,
+                          end_time: datetime,
+                          extraction_infos: list[ExtractionInfo],
+                          pd_read_csv_kwargs:dict[str, Any]|None=None)-> dict[str, Variable]:
         print("Extracting variables ...")
+
+        if pd_read_csv_kwargs is None:
+            pd_read_csv_kwargs = {}
 
         start_time = enforce_utc_timezone(start_time)
         end_time = enforce_utc_timezone(end_time)
-
-        self.reset_variables()
 
         files_list, _ = self._construct_downloaded_file_list(start_time, end_time)
 
         if len(files_list) == 1 and files_list[0] is None:
             raise ValueError("No file found to extract variables!")
 
+        variable_data = {info.name_or_column: np.array([]) for info in extraction_infos}
+
         for file_path in files_list:
             if file_path is None:
                 continue
 
             if file_path.suffix == ".cdf":
-                self._extract_varibles_from_cdf(file_path)
+                new_data = extract_varibles_from_cdf(str(file_path), extraction_infos)
             elif file_path.suffix in [".txt", ".asc", ".csv", ".tab"]:
-                self._extract_variables_from_ascii(file_path, pd_read_csv_kwargs)
+                new_data = extract_data_from_ascii(str(file_path), extraction_infos, pd_read_csv_kwargs)
             elif file_path.suffix == ".nc":
                 self._load_nc_file_to_extract(file_path)
             elif file_path.suffix == ".h5":
@@ -114,34 +116,23 @@ class SourceFile:
             else:
                 raise ValueError(f"Unsupported file extension: {file_path.suffix}")
 
-        return self.variables_to_extract
+            # Update the data content of variables
+            for info in extraction_infos:
+                key = info.name_or_column
+                if variable_data[key].size == 0:
+                    variable_data[key] = new_data[key]
+                elif info.is_time_dependent:
+                    print(f"Concatenating data for {key} ...")
+                    variable_data[key] = np.concatenate((variable_data[key], new_data[key]), axis=0)
 
-    def _extract_varibles_from_cdf(self, file_path: str):
-        # Open the CDF file
-        cdf_file = cdflib.CDF(file_path)
-        cdfinfo = cdf_file.cdf_info()
-        variable_data = {}
+        # create variables based on the extraction_infos
+        variables:dict[str, Variable] = {}
 
-        # Extract data for each variable in self.variables
-        for key, var in self.variables_to_extract.items():
-            if var.name_or_column_in_file in cdfinfo.zVariables:
-                # Retrieve data corresponding to the variable name from the CDF file
-                variable_data[var.name_or_column_in_file] = cdf_file.varget(var.name_or_column_in_file)
-            else:
-                warnings.warn(
-                    f"Variable {key} with name_or_column_in_file: {var.name_or_column_in_file} was not found in file {file_path}!",
-                )
+        for info in extraction_infos:
+            variables[info.result_key] = Variable(original_unit=info.unit, data=variable_data[info.name_or_column])
+            variables[info.result_key].metadata.source_files = [path.name for path in files_list]
 
-        # Update the data content of variables
-        for var in self.variables_to_extract.values():
-            if var.name_or_column_in_file in variable_data:
-                # if the variable is not time dependent, we do not want to concatinate
-                if var.data is not None and (isinstance(var, TimeVariable) or var.time_variable is not None):
-                    var.data = np.concatenate((var.data, variable_data[var.name_or_column_in_file]), axis=0)
-                else:
-                    var.data = variable_data[var.name_or_column_in_file]
-
-                var.metadata.source_files.append(str(file_path))
+        return variables
 
     def _extract_variables_from_json(self, file_path: str) -> None:
 
@@ -196,34 +187,6 @@ class SourceFile:
             else:
                 var.data = variable_data[var.name_or_column_in_file]
 
-
-    def _extract_variables_from_ascii(self, file_path: str, pd_read_csv_kwargs: dict) -> None:
-        """Load data from an ASCII file and updates the variables.
-
-        Args:
-            file_path (str): The path to the ASCII file.
-            variables (List[Variable], optional): Specific variables to load from the file.
-
-        """
-        df = pd.read_csv(file_path, **pd_read_csv_kwargs)
-
-        for key, var in self.variables_to_extract.items():
-            if var.name_or_column_in_file:
-                if isinstance(var.name_or_column_in_file, int):
-                    new_data = np.asarray(df.iloc[:, var.name_or_column_in_file].values)
-                elif isinstance(var.name_or_column_in_file, str):
-                    new_data = np.asarray(df.loc[:, var.name_or_column_in_file].values)
-                else:
-                    msg = f"Variable {key} has invalid name_or_column_in_file value: {var.name_or_column_in_file}! Must be int or str!"
-                    raise ValueError(
-                        msg,
-                    )
-
-                if var.data is not None and (isinstance(var, TimeVariable) or var.time_variable is not None):
-                    var.data = np.concatenate((var.data, new_data), axis=0)
-                else:
-                    var.data = new_data
-
     def _get_downloaded_file_name(self, time: datetime) -> Path:
         file_path = Path(fill_str_template_with_time(self.download_path, time))
 
@@ -239,14 +202,14 @@ class SourceFile:
 
         return file_path_latest
 
-    def _construct_downloaded_file_list(self, start_time: datetime, end_time: datetime):
+    def _construct_downloaded_file_list(self, start_time: datetime, end_time: datetime) -> tuple[list[Path], list[list[datetime]]]:
 
         file_paths = []
         time_intervals = []
 
         match self.file_cadence:
 
-            case FileCadence.DAILY:
+            case "daily":
                 current_time = start_time
                 while current_time <= end_time:
 
@@ -259,7 +222,7 @@ class SourceFile:
 
                     current_time += timedelta(days=1)
 
-            case FileCadence.MONTHLY:
+            case "monthly":
                 current_time = start_time.replace(day=1)
                 while current_time <= end_time:
                     year = current_time.year
@@ -279,7 +242,7 @@ class SourceFile:
                     else:
                         current_time = datetime(year, month + 1, 1, tzinfo=tz.utc)
 
-            case FileCadence.CUSTOM_ONE_FILE:
+            case "single_file":
                 file_paths.append(self._get_downloaded_file_name(start_time))
 
                 day_start = datetime(start_time.year, start_time.month, start_time.day, 0, 0, 0, tzinfo=tz.utc)

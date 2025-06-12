@@ -11,6 +11,7 @@ from .generic import convert_all_data_to_standard_units, load_variables_from_sou
 from .get_real_time_tipsod import get_real_time_tipsod
 from .magnetic_field_functions import (
     IrbemInput,
+    IrbemOutput,
     construct_maginput,
     get_footpoint_atmosphere,
     get_local_B_field,
@@ -19,4 +20,4 @@ from .magnetic_field_functions import (
     get_mirror_point,
     get_MLT,
 )
-from .time_bin_all_variables import time_bin_all_variables
+from .bin_by_time import bin_by_time

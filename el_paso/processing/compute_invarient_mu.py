@@ -1,9 +1,14 @@
 import numpy as np
 from astropy import units as u
+from numpy.typing import NDArray
 
-from el_paso.physics import en2pc, rest_energy
+from el_paso.physics import ParticleLiteral, en2pc, rest_energy
 
-def compute_invariant_mu(energy, alpha, magnetic_field, species_char):
+
+def compute_invariant_mu(energy:NDArray[np.float64],
+                         alpha:NDArray[np.float64],
+                         magnetic_field:NDArray[np.float64],
+                         particle_species:ParticleLiteral) -> tuple[NDArray[np.float64], u.UnitBase]:
     """
     Calculate the relativistic energy for a given kinetic energy.
 
@@ -16,8 +21,8 @@ def compute_invariant_mu(energy, alpha, magnetic_field, species_char):
     Returns:
         InvMu(np.ndarray or float): The calculated adiabatic invariant mu.
     """
-    mc2 = rest_energy(species_char)
-    pct = en2pc(energy, species_char)  # Relativistic energy for the particles
+    mc2 = rest_energy(particle_species)
+    pct = en2pc(energy, particle_species)  # Relativistic energy for the particles
 
     # Calculate InvMu and PSD using broadcasting
     #sin_alpha_eq = np.sin(np.radians(in_alpha_eq))

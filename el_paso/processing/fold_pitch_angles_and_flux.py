@@ -5,25 +5,21 @@ from typing import TYPE_CHECKING
 import numpy as np
 from astropy import units as u
 from matplotlib import pyplot as plt
+from numpy.typing import NDArray
 
-from el_paso.utils import (
-    get_variable_by_standard_name,
-    get_variable_by_standard_type,
-    timed_function,
-    validate_standard,
-)
-
-if TYPE_CHECKING:
-    from el_paso.classes import Variable
+from el_paso.classes import Variable
+from el_paso.utils import timed_function
 
 
-def _fold_pitch_angles_and_flux(pitch_angles, flux, produce_statistic_plot):
+def _fold_pitch_angles_and_flux(pitch_angles:NDArray[np.float64],
+                                flux:NDArray[np.float64],
+                                *, produce_statistic_plot:bool) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     # Normalize pitch angles to the range [0, 180]
     pitch_angles_abs = np.abs(pitch_angles)
 
     # Fold around 90 degrees
     folded_pitch_angles = np.minimum(pitch_angles_abs, 180 - pitch_angles_abs)
-    folded_pitch_angles = np.round(folded_pitch_angles, 1)
+    folded_pitch_angles = np.round(folded_pitch_angles, 1).astype(np.float64)
 
     # Create an array to hold the folded flux values
     nN, nE, _ = flux.shape
@@ -50,47 +46,34 @@ def _fold_pitch_angles_and_flux(pitch_angles, flux, produce_statistic_plot):
                 mask_diff = diff_energy > 0
 
                 axes[i,ie].hist(diff_energy[mask_diff].compressed(), bins=10)
-                axes[i,ie].set_title(f'Energy = {ie}, alpha = {angle}')
+                axes[i,ie].set_title(f"Energy = {ie}, alpha = {angle}")
 
         folded_flux[:,:,i] = np.nanmean(masked_flux, axis=2)
-    
+
     # add time dimension
     unique_angles = np.tile(unique_angles.reshape(1, -1), (nN, 1))
-    
+
     if produce_statistic_plot:
-        fig.savefig('test.png')
+        fig.savefig("folded_pitch_angle_statistics.png")
 
     return folded_flux, unique_angles
 
-@validate_standard
 @timed_function()
-def fold_pitch_angles_and_flux(input_variables:dict[str,Variable], flux_key:str=None, pa_local_key:str=None, produce_statistic_plot:bool=False):
-    """
-    Folds the pitch_angles array around 90 degrees and folds the flux array correspondingly,
-    combining elements using nanmean.
+def fold_pitch_angles_and_flux(flux_var:Variable, pa_local_var:Variable, *, produce_statistic_plot:bool=False) -> None:
+    print("Folding pitch angles and flux ...")
 
-    Args:
-        flux (np.ndarray): A time x energy x pitch angle array of flux values.
-        pitch_angles (np.ndarray): A time x pitch angle array of pitch angles (in degrees between -180 and 180).
+    flux     = flux_var.get_data()
+    pa_local = pa_local_var.get_data(u.deg)
 
-    Returns:
-        folded_flux (np.ndarray): The folded flux array.
-        folded_pitch_angles (np.ndarray): The folded pitch angles array.
-    """
-    print('Folding pitch angles and flux ...')
-
-    flux_var = input_variables[flux_key] if flux_key else get_variable_by_standard_type('Flux', input_variables)
-    pa_local_var = input_variables[pa_local_key] if pa_local_key else get_variable_by_standard_name('PA_local', input_variables)
-
-    flux     = flux_var.data
-    pa_local = pa_local_var.data
-
-    assert np.all(np.repeat(pa_local[0,:][np.newaxis,:], pa_local.shape[0], axis=0) == pa_local), 'We assume that local pitch angles do not change in time!'
+    assert np.all(np.repeat(pa_local[0,:][np.newaxis,:], pa_local.shape[0], axis=0) == pa_local), "We assume that local pitch angles do not change in time!"
 
     assert len(flux) == len(pa_local)
-    assert flux.shape[2] == pa_local.shape[1], f'Dimension missmatch: flux: {flux.shape}, pitch angle: {pa_local.shape}'
+    assert flux.shape[2] == pa_local.shape[1], f"Dimension missmatch: flux: {flux.shape}, pitch angle: {pa_local.shape}"
 
-    folded_flux, unique_angles = _fold_pitch_angles_and_flux(pa_local, flux, produce_statistic_plot)
+    folded_flux, unique_angles = _fold_pitch_angles_and_flux(pa_local, flux, produce_statistic_plot=produce_statistic_plot)
 
-    flux_var.data     = folded_flux
-    pa_local_var.data = unique_angles
+    flux_var.set_data(folded_flux, "same")
+    flux_var.metadata.add_processing_note("Folded around 90 degrees local pitch angle")
+
+    pa_local_var.set_data(unique_angles, u.deg)
+    pa_local_var.metadata.add_processing_note("Folded around 90 degrees local pitch angle")

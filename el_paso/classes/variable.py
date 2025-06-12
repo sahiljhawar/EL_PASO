@@ -2,15 +2,12 @@ from __future__ import annotations
 
 import os
 import typing
-from collections.abc import Iterable
-from copy import deepcopy
 from dataclasses import dataclass, field
-from datetime import timedelta
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import Any, List
+from typing import Any, Literal
 
-import cdflib
 import numpy as np
 from astropy import units as u
 from numpy.typing import NDArray
@@ -18,9 +15,7 @@ from sqlalchemy import MetaData, create_engine, select
 from sqlalchemy.orm import sessionmaker
 
 from el_paso.metadata.models import StandardVariable
-
-if typing.TYPE_CHECKING:
-    from el_paso.classes import SourceFile
+from el_paso.utils import enforce_utc_timezone
 
 
 class TimeBinMethod(Enum):
@@ -31,13 +26,12 @@ class TimeBinMethod(Enum):
     Median = "Median"
     NanMedian = "NanMedian"
     Merge = "Merge"
-    MergeString = "MergeString"
     NanMax = "NanMax"
     NanMin = "NanMin"
     NoBinning = "NoBinning"
-    Repeat = 0
+    Repeat = "Repeat"
 
-    def __call__(self, x:np.ndarray) -> np.ndarray:
+    def __call__(self, x:NDArray[np.float64]) -> NDArray[np.float64]:
         """Call the binning method on the provided data.
 
         :param x: Numpy array which is binned
@@ -88,97 +82,90 @@ class VariableMetadata:
     :type standard_name: str
     """
 
-    unit: u.UnitBase = ""
+    unit: u.UnitBase = u.dimensionless_unscaled
     original_cadence_seconds: float = 0
-    source_files: list[SourceFile] = field(default_factory=list)
+    source_files: list[str] = field(default_factory=list)
     description: str = ""
     processing_notes: str = ""
     standard_name: str = ""
-    time_bin_method: TimeBinMethod = TimeBinMethod.NoBinning
-    time_bin_interval: timedelta = None
 
+    def __post_init__(self) -> None:
+        self.processing_steps_counter = 1
+
+    def add_processing_note(self, processing_note:str) -> None:
+
+        processing_note = f"{self.processing_steps_counter}) {processing_note}\n"
+
+        self.processing_notes += processing_note
+        self.processing_steps_counter += 1
 
 class Variable:
     """Variable class holding data and metadata."""
 
-    __slots__ = "time_variable", "name_or_column_in_file", "standard_name", \
-                "dependent_variables", "data", "standard", "metadata", "backup_for_reset"
+    __slots__ = "standard_name", "dependent_variables", "_data", "metadata", "backup_for_reset"
 
-    data:NDArray[np.float64]
+    _data:NDArray[np.float64]
     metadata:VariableMetadata
 
     def __init__(
         self,
-        time_variable: TimeVariable|None,
         original_unit: u.UnitBase,
-        time_bin_method: TimeBinMethod = TimeBinMethod.NoBinning,
-        name_or_column_in_file: str = "",
-        standard_name: str = "",
+        data:NDArray[np.float64]|None = None,
         description: str = "",
         processing_notes: str = "",
-        dependent_variables: list|None = None
+        dependent_variables: list[Variable]|None = None,
     ) -> None:
 
-        self.data = None
-        self.name_or_column_in_file = name_or_column_in_file
-        self.standard_name = standard_name
-        self.time_variable = time_variable
+        self._data = np.array([], dtype=np.float64) if data is None else data
         self.dependent_variables = dependent_variables if dependent_variables else []
 
-        self.standard = None
         self.metadata = VariableMetadata(
             unit=original_unit,
-            time_bin_method=time_bin_method,
             description=description,
             processing_notes=processing_notes,
         )
 
-        # Access database
-        db_path = Path(os.getenv("HOME")) / ".el_paso" / "metadata_database.db"
-        table_name = "StandardVariable"
-
-        if self.standard_name != "":
-            standard_variable_info = self._get_standard_info_from_db(
-                db_path, table_name, "standard_name", self.standard_name
-            )
-
-            # If database reading is successful, construct and store the relevant StandardVariable
-            if standard_variable_info:
-                standard_unit = u.Unit(standard_variable_info.get("standard_unit"))
-
-                # Constructing the StandardVariable object
-                self.standard = StandardVariable(
-                    id=standard_variable_info["id"],
-                    standard_id=standard_variable_info["standard_id"],
-                    variable_type=standard_variable_info["variable_type"],
-                    standard_name=standard_variable_info["standard_name"],
-                    standard_description=standard_variable_info.get("standard_description"),
-                    standard_notes=standard_variable_info.get("standard_notes"),
-                    standard_unit=standard_unit,
-                )
-            else:
-                msg = f"Standard info could not be loaded for variable: {self.standard_name}"
-                raise ValueError(msg)
-
-        self.backup_for_reset = self.get_slots_dict()
-
-    def get_slots_dict(self) -> dict[str,Any]:
-        return {slot: getattr(self, slot) for slot in self.__slots__ if slot != "backup_for_reset"}
-
-    def reset(self) -> None:
-        """Reset the variable to its default state."""
-        for key, value in self.backup_for_reset.items():
-            # do not make a copy of the time variable as this variable is holding a reference
-            if key == "time_variable":
-                continue
-            setattr(self, key, deepcopy(value))
+    def __repr__(self) -> str:
+        return f"Variable holding {self._data.shape} data points with metadata: {self.metadata}"
 
     def convert_to_standard_unit(self) -> None:
         """Convert the data to the units defined by the variable's standard."""
         if self.standard:
             self.convert_to_unit(self.standard.standard_unit)
 
-    def convert_to_unit(self, target_unit:u.UnitBase) -> None:
+    def convert_to_standard(self, standard_name:str) -> None:
+      # Access database
+        home_path = os.getenv("HOME")
+        if home_path is None:
+            raise ValueError("HOME environmental variable not set!")
+        db_path = Path(home_path) / ".el_paso" / "metadata_database.db"
+        table_name = "StandardVariable"
+
+        standard_variable_info = self._get_standard_info_from_db(
+            db_path, table_name, "standard_name", standard_name
+        )
+
+        # If database reading is successful, construct and store the relevant StandardVariable
+        if standard_variable_info:
+            standard_unit = u.Unit(standard_variable_info.get("standard_unit"))
+
+            # Constructing the StandardVariable object
+            standard = StandardVariable(
+                id=standard_variable_info["id"],
+                standard_id=standard_variable_info["standard_id"],
+                variable_type=standard_variable_info["variable_type"],
+                standard_name=standard_variable_info["standard_name"],
+                standard_description=standard_variable_info.get("standard_description"),
+                standard_notes=standard_variable_info.get("standard_notes"),
+                standard_unit=standard_unit,
+            )
+        else:
+            msg = f"Standard info could not be loaded for variable: {standard_name}"
+            raise ValueError(msg)
+
+        self.convert_to_unit(u.Unit(standard.standard_unit))
+
+    def convert_to_unit(self, target_unit:u.UnitBase|str) -> None:
         """Convert the data to a given unit.
 
         :param target_unit: The unit the data should be converted to.
@@ -189,9 +176,12 @@ class Variable:
             msg = f"Unit has not been set for this Variable! Standard name: {self.standard_name}"
             raise ValueError(msg)
 
+        if isinstance(target_unit, str):
+            target_unit = u.Unit(target_unit)
+
         if self.metadata.unit != target_unit:
-            data_with_unit = self.data * self.metadata.unit
-            self.data = data_with_unit.to_value(target_unit)
+            data_with_unit = u.Quantity(self._data, self.metadata.unit)
+            self._data = data_with_unit.to_value(target_unit)
 
             self.metadata.unit = target_unit
 
@@ -205,29 +195,27 @@ class Variable:
         Returns:
             Any: The value of the target attribute.
         """
-        if self.standard is not None:
-            return getattr(self.standard, target_name, None)
-        else:
-            # Access database
-            db_path = f"{os.getenv('RT_SCRIPTS_DIR')}/Metadata/metadata_database.db"
-            table_name = "StandardVariable"  # Replace with your actual table name
-            standard_variable_info = self._get_standard_info_from_db(
-                db_path, table_name, "standard_name", self.standard_name
+
+        # Access database
+        db_path = f"{os.getenv('RT_SCRIPTS_DIR')}/Metadata/metadata_database.db"
+        table_name = "StandardVariable"  # Replace with your actual table name
+        standard_variable_info = self._get_standard_info_from_db(
+            db_path, table_name, "standard_name", self.standard_name
+        )
+        # If database reading is successful, construct and store the relevant StandardVariable
+        if standard_variable_info:
+            # Constructing the StandardVariable object
+            self.standard = StandardVariable(
+                id=standard_variable_info["id"],
+                standard_id=standard_variable_info["standard_id"],
+                variable_type=standard_variable_info["variable_type"],
+                standard_name=standard_variable_info["standard_name"],
+                standard_description=standard_variable_info.get("standard_description"),
+                standard_notes=standard_variable_info.get("standard_notes"),
+                standard_unit=standard_variable_info.get("standard_unit"),
             )
-            # If database reading is successful, construct and store the relevant StandardVariable
-            if standard_variable_info:
-                # Constructing the StandardVariable object
-                self.standard = StandardVariable(
-                    id=standard_variable_info["id"],
-                    standard_id=standard_variable_info["standard_id"],
-                    variable_type=standard_variable_info["variable_type"],
-                    standard_name=standard_variable_info["standard_name"],
-                    standard_description=standard_variable_info.get("standard_description"),
-                    standard_notes=standard_variable_info.get("standard_notes"),
-                    standard_unit=standard_variable_info.get("standard_unit"),
-                )
-                return getattr(self.standard, target_name, None)
-            return None
+            return getattr(self.standard, target_name, None)
+        return None
 
     def _get_standard_info_from_db(self, db_path: str, table_name: str, column_name: str, filter_value: str) -> dict:
         """Helper method to get standard information from the database.
@@ -263,55 +251,49 @@ class Variable:
 
         return dict(result) if result else None
 
-    def transpose_data(self, seq: Iterable[int]):
-        self.data = np.transpose(self.data, seq)
+    def get_data(self, target_unit:u.UnitBase|str|None=None) -> NDArray[np.float64]:
+        """Get the data of the variable.
+
+        :return: The data of the variable.
+        :rtype: NDArray[np.float64]
+        """
+        if target_unit is None:
+            return self._data
+
+        if isinstance(target_unit, str):
+            target_unit = u.Unit(target_unit)
+
+        return (self._data * self.metadata.unit).to_value(target_unit)
+
+    def set_data(self, data:NDArray[np.float64], unit:Literal["same"]|str|u.UnitBase) -> None:
+        self._data = data
+
+        if isinstance(unit, str):
+            if unit != "same":
+                self.metadata.unit = u.Unit(unit)
+        elif isinstance(unit, u.UnitBase):
+            self.metadata.unit = unit
+        else:
+            msg = "unit must be either a str or a astropy unit!"
+            raise TypeError(msg)
+
+    def transpose_data(self, seq: list[int]|tuple[int,...]):
+        self._data = np.transpose(self._data, axes=seq)
 
     def apply_thresholds_on_data(self, lower_threshold: float = -np.inf, upper_threshold: float = np.inf):
-        self.data = np.where((self.data > lower_threshold) & (self.data < upper_threshold), self.data, np.nan)
+        self._data = np.where((self._data > lower_threshold) & (self._data < upper_threshold), self._data, np.nan)
 
-    def truncate(self, start_timestamp, end_timestamp):
-        assert isinstance(start_timestamp, float)
-        assert isinstance(end_timestamp, float)
+    def truncate(self, time_variable:Variable, start_time:float|datetime, end_time:float|datetime) -> None:
 
-        if self.time_variable is None:
-            raise ValueError(f"Time variable has not been set for this Variable! Standard name: {self.standard_name}")
+        if isinstance(start_time, datetime):
+            start_time = enforce_utc_timezone(start_time).timestamp()
+        if isinstance(end_time, datetime):
+            end_time = enforce_utc_timezone(end_time).timestamp()
 
-        self.data = self.data[(self.time_variable.data >= start_timestamp) & (self.time_variable.data <= end_timestamp)]
+        if self._data.shape[0] != time_variable.get_data().shape[0]:
+            msg = "Encountered length missmatch between variable and time variable!"
+            raise ValueError(msg)
 
+        time_var_data = time_variable.get_data(u.posixtime)
 
-class TimeVariable(Variable):
-
-    def __init__(
-        self,
-        original_unit: u.UnitBase,
-        standard_name: str = "",
-        name_or_column_in_file: str = "",
-        do_time_binning: bool = True,
-    ):
-        super().__init__(
-            original_unit=original_unit,
-            time_variable=None,
-            time_bin_method=TimeBinMethod.NoBinning,
-            name_or_column_in_file=name_or_column_in_file,
-            standard_name=standard_name,
-        )
-
-        self.do_time_binning = do_time_binning
-
-    def truncate(self, start_timestamp, end_timestamp):
-        assert isinstance(start_timestamp, float)
-        assert isinstance(end_timestamp, float)
-
-        self.data = self.data[(self.data >= start_timestamp) & (self.data <= end_timestamp)]
-
-
-class DerivedVariable(Variable):
-    def __init__(
-        self,
-        standard_name: str = "",
-    ):
-        super().__init__(
-            original_unit="",
-            time_variable=None,
-            standard_name=standard_name,
-        )
+        self._data = self._data[(time_var_data >= start_time) & (time_var_data <= end_time)]

@@ -2,12 +2,13 @@ from datetime import datetime
 from datetime import timezone as tz
 
 import numpy as np
+from astropy import units as u
 from sscws.sscws import CoordinateSystem, SscWs
 
-from el_paso.utils import enforce_utc_timezone
+import el_paso as ep
 
 
-def get_real_time_tipsod(timestamps:np.ndarray, sat_name:str, coord_system:str="GEO"):
+def get_real_time_tipsod(timestamps:np.ndarray, sat_name:str, coord_system:str="GEO") -> ep.Variable:
     """
     Return xGEO to be used in the adiabatic invariant calculation.
 
@@ -82,4 +83,7 @@ def get_real_time_tipsod(timestamps:np.ndarray, sat_name:str, coord_system:str="
         z_median = np.median(z_coords[last_bin_mask])
         all_xyz.append([x_median, y_median, z_median])
 
-    return np.array(all_xyz)
+    var = ep.Variable(data=np.asarray(all_xyz), original_unit=u.km)
+    var.convert_to_unit(u.RE)
+
+    return var

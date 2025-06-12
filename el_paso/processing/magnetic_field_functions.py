@@ -6,15 +6,17 @@ from datetime import datetime, timezone
 from functools import partial
 from multiprocessing import Pool
 from pathlib import Path
+from typing import NamedTuple
 
 import numpy as np
 from astropy import units as u
+from numpy.typing import NDArray
 from scipy.interpolate import interp1d
 from tqdm import tqdm
 
 from data_management.io.kp import read_kp_from_multiple_models
 from el_paso import IRBEM_SYSAXIS_GEO, IRBEM_SYSAXIS_SM
-from el_paso.classes import TimeVariable, Variable
+from el_paso.classes import Variable
 from el_paso.utils import timed_function
 from IRBEM import Coords, MagFields
 
@@ -27,8 +29,11 @@ class IrbemInput:
     irbem_options: list
     num_cores: int = 4
 
+class IrbemOutput(NamedTuple):
+    arr: NDArray[np.float64]
+    unit: u.UnitBase
 
-def construct_maginput(time: np.ndarray):
+def construct_maginput(time_var: Variable):
     """Construct the basic magnetospheric input parameters array.
 
     This function retrieves all solar wind data from the ACE dataset on CDAWeb, as well as the Kp and Dst indices,
@@ -48,15 +53,17 @@ def construct_maginput(time: np.ndarray):
     Args:
         newtime (array-like): Array of new time points for interpolation.
         sw_path (str, optional): Path to the solar wind data directory.
-                                Defaults to environment variable 'FC_ACE_REALTIME_PROCESSED_DATA_DIR'.
+                                Defaults to environment Variable 'FC_ACE_REALTIME_PROCESSED_DATA_DIR'.
         kp_path (str, optional): Path to the Kp data directory.
-                                Defaults to environment variable 'RT_KP_PROC_DIR'.
+                                Defaults to environment Variable 'RT_KP_PROC_DIR'.
         kp_type (str, optional): Type of Kp to read using data_management.
                                 Defaults to 'niemegk'.
 
     Returns:
         np.ndarray: Array of interpolated magnetospheric input parameters.
     """
+    time = time_var.get_data()
+
     start_time = datetime.fromtimestamp(time[0], tz=timezone.utc)
     end_time = datetime.fromtimestamp(time[-1], tz=timezone.utc)
 
@@ -140,7 +147,7 @@ def _magnetic_field_str_to_kext(magnetic_field_str):
     return kext
 
 
-def _get_magequator_parallel(irbem_args: list, xGEO: np.ndarray, datetimes: np.ndarray, maginput: dict, it: int):
+def _get_magequator_parallel(irbem_args: list, xGEO: NDArray[np.float64], datetimes: NDArray[np.object_], maginput: dict, it: int) -> tuple[NDArray[np.float64],NDArray[np.float64]]:
     model = MagFields(
         path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
     )
@@ -154,11 +161,11 @@ def _get_magequator_parallel(irbem_args: list, xGEO: np.ndarray, datetimes: np.n
 
 
 @timed_function()
-def get_magequator(xgeo_var: Variable, time_var: TimeVariable, irbem_input: IrbemInput):
+def get_magequator(xgeo_var: Variable, time_var: Variable, irbem_input: IrbemInput) -> dict[str, IrbemOutput]:
     logging.info("\tCalculating magnetic field and radial distance at the equator ...")
 
-    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
-    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+    timestamps = (time_var.get_data() * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.get_data() * xgeo_var.metadata.unit).to_value(u.RE)
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = IRBEM_SYSAXIS_GEO
@@ -201,15 +208,15 @@ def get_magequator(xgeo_var: Variable, time_var: TimeVariable, irbem_input: Irbe
     B_eq[B_eq == fortran_bad_value] = np.nan
     xGEO_min[xGEO_min == fortran_bad_value] = np.nan
 
-    magequator_output = {}
-    magequator_output["B_eq_" + irbem_input.magnetic_field_str] = (B_eq.astype(np.float64), u.nT)
-    magequator_output["xGEO_" + irbem_input.magnetic_field_str]  = (xGEO_min.astype(np.float64), u.RE)
+    magequator_output:dict[str,IrbemOutput] = {}
+    magequator_output["B_eq_" + irbem_input.magnetic_field_str] = IrbemOutput(B_eq.astype(np.float64), u.nT)
+    magequator_output["xGEO_" + irbem_input.magnetic_field_str] = IrbemOutput(xGEO_min.astype(np.float64), u.RE)
 
     # add total radial distance field in SM coordinates
     xSM = Coords(path=irbem_input.irbem_lib_path).transform(
         datetimes, xGEO_min, IRBEM_SYSAXIS_GEO, IRBEM_SYSAXIS_SM
     )
-    magequator_output["R_eq_" + irbem_input.magnetic_field_str] = (
+    magequator_output["R_eq_" + irbem_input.magnetic_field_str] = IrbemOutput(
         np.linalg.norm(xSM, ord=2, axis=1).astype(np.float64),
         u.RE,
     )
@@ -229,11 +236,11 @@ def _get_footpoint_atmosphere_parallel(irbem_args: list, xGEO: np.ndarray, datet
     return footpoint_output["BFOOTMAG"]
 
 @timed_function()
-def get_footpoint_atmosphere(xgeo_var: Variable, time_var: TimeVariable, irbem_input: IrbemInput):
+def get_footpoint_atmosphere(xgeo_var: Variable, time_var: Variable, irbem_input: IrbemInput) -> dict[str, IrbemOutput]:
     logging.info("\tCalculating magnetic foot point at the atmosphere ...")
 
-    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
-    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+    timestamps = (time_var.get_data() * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.get_data() * xgeo_var.metadata.unit).to_value(u.RE)
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = IRBEM_SYSAXIS_GEO
@@ -279,12 +286,12 @@ def get_footpoint_atmosphere(xgeo_var: Variable, time_var: TimeVariable, irbem_i
 
 @timed_function()
 def get_MLT(
-    xgeo_var: Variable, time_var: TimeVariable, irbem_input: IrbemInput
-) -> dict[str, tuple[np.ndarray, u.UnitBase]]:
+    xgeo_var: Variable, time_var: Variable, irbem_input: IrbemInput
+) -> dict[str, IrbemOutput]:
     logging.info("\tCalculating magnetic local time ...")
 
-    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
-    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+    timestamps = (time_var.get_data() * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.get_data() * xgeo_var.metadata.unit).to_value(u.RE)
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = IRBEM_SYSAXIS_GEO
@@ -312,17 +319,17 @@ def get_MLT(
 
     unit = u.hour
     # convert to dict to match other functions
-    mlt_output = {"MLT_" + irbem_input.magnetic_field_str: (mlt_output, unit)}
+    mlt_output = {"MLT_" + irbem_input.magnetic_field_str: IrbemOutput(mlt_output, unit)}
 
     return mlt_output
 
 
 @timed_function()
-def get_local_B_field(xgeo_var: Variable, time_var: Variable, irbem_input: IrbemInput):
+def get_local_B_field(xgeo_var: Variable, time_var: Variable, irbem_input: IrbemInput) -> dict[str, IrbemOutput]:
     logging.info("\tCalculating local magnetic field values ...")
 
-    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
-    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
+    timestamps = (time_var.get_data() * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.get_data() * xgeo_var.metadata.unit).to_value(u.RE)
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = IRBEM_SYSAXIS_GEO
@@ -350,13 +357,9 @@ def get_local_B_field(xgeo_var: Variable, time_var: Variable, irbem_input: Irbem
     for key in field_multi_output.keys():
         field_multi_output[key][field_multi_output[key] == fortran_bad_value] = np.nan
 
-    # map irbem output names to standard names and add unit information
-    irbem_name_map = {"Bl": "B_local_" + irbem_input.magnetic_field_str}
-    field_multi_output_mapped = {}
-    for key in irbem_name_map.keys():
-        field_multi_output_mapped[irbem_name_map[key]] = (field_multi_output[key], u.nT)
+    field_multi_output = {"B_local_" + irbem_input.magnetic_field_str: IrbemOutput(field_multi_output["Bl"], u.nT)}
 
-    return field_multi_output_mapped
+    return field_multi_output
 
 
 def _get_mirror_point_parallel(irbem_args, xGEO, datetimes, maginput, pa_local, it):
@@ -376,12 +379,12 @@ def _get_mirror_point_parallel(irbem_args, xGEO, datetimes, maginput, pa_local, 
 
 
 @timed_function()
-def get_mirror_point(xgeo_var: Variable, time_var: Variable, pa_local_var: Variable, irbem_input: IrbemInput):
+def get_mirror_point(xgeo_var: Variable, time_var: Variable, pa_local_var: Variable, irbem_input: IrbemInput) -> dict[str, IrbemOutput]:
     logging.info("\tCalculating mirror points ...")
 
-    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
-    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
-    pa_local = (pa_local_var.data * pa_local_var.metadata.unit).to_value(u.deg)
+    timestamps = (time_var.get_data() * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.get_data() * xgeo_var.metadata.unit).to_value(u.RE)
+    pa_local = (pa_local_var.get_data() * pa_local_var.metadata.unit).to_value(u.deg)
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = IRBEM_SYSAXIS_GEO
@@ -424,7 +427,7 @@ def get_mirror_point(xgeo_var: Variable, time_var: Variable, pa_local_var: Varia
     # replace bad values with nan
     mirror_point_output[mirror_point_output < 0] = np.nan
 
-    return {"B_mirr_" + irbem_input.magnetic_field_str: (mirror_point_output, u.nT)}
+    return {"B_mirr_" + irbem_input.magnetic_field_str: IrbemOutput(mirror_point_output, u.nT)}
 
 
 def _make_lstar_shell_splitting_parallel(
@@ -452,12 +455,12 @@ def _make_lstar_shell_splitting_parallel(
 
 
 @timed_function()
-def get_Lstar(xgeo_var: Variable, time_var: Variable, pa_local_var: Variable, irbem_input: IrbemInput):
+def get_Lstar(xgeo_var: Variable, time_var: Variable, pa_local_var: Variable, irbem_input: IrbemInput) -> dict[str, IrbemOutput]:
     logging.info("\tCalculating Lstar and J ...")
 
-    timestamps = (time_var.data * time_var.metadata.unit).to_value(u.posixtime)
-    xGEO = (xgeo_var.data * xgeo_var.metadata.unit).to_value(u.RE)
-    pa_local = (pa_local_var.data * pa_local_var.metadata.unit).to_value(u.deg)
+    timestamps = (time_var.get_data() * time_var.metadata.unit).to_value(u.posixtime)
+    xGEO = (xgeo_var.get_data() * xgeo_var.metadata.unit).to_value(u.RE)
+    pa_local = (pa_local_var.get_data() * pa_local_var.metadata.unit).to_value(u.deg)
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = IRBEM_SYSAXIS_GEO
@@ -509,9 +512,10 @@ def get_Lstar(xgeo_var: Variable, time_var: Variable, pa_local_var: Variable, ir
         if not np.any(np.isfinite(arr)):
             raise ValueError("Lstar calculation failed! All NaNs!")
 
-    Lstar_output_mapped = {}
-    Lstar_output_mapped["Lm_" + irbem_input.magnetic_field_str] = (Lm, "")
-    Lstar_output_mapped["Lstar_" + irbem_input.magnetic_field_str] = (Lstar, "")
-    Lstar_output_mapped["XJ_" + irbem_input.magnetic_field_str] = (xj, "")
+    Lstar_output_mapped = {
+        "Lm_" + irbem_input.magnetic_field_str: IrbemOutput(Lm, u.dimensionless_unscaled),
+        "Lstar_" + irbem_input.magnetic_field_str: IrbemOutput(Lstar, u.dimensionless_unscaled),
+        "XJ_" + irbem_input.magnetic_field_str: IrbemOutput(xj, u.dimensionless_unscaled),
+    }
 
     return Lstar_output_mapped
