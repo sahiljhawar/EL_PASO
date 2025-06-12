@@ -18,11 +18,7 @@ Now we can start installing EL-PASO using pip:
 ```
 pip install .
 ```
-For installing data_management, we have to edit the requirements.txt file inside data_management and change the required numpy version:
-```
-numpy==1.19.3 --> numpy>=1.19.3
-```
-Afterwards, we can install it:
+Afterwards, we can install data_management:
 ```
 pip install data_management/
 ```
@@ -36,6 +32,6 @@ make OS=linux64 ENV=gfortran64 install
 This compiles the *libirbem.so* file and puts it in the IRBEM folder.
 We apply a small patch to the IRBEM python wrapper, which adds the Lstar calculation, and install the wrapper afterwards:
 ```
-cp ../IRBEM.py python/
+cp ../IRBEM.py python/IRBEM/
 pip install python/
 ```

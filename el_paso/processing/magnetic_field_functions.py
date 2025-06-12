@@ -15,8 +15,7 @@ from scipy.interpolate import interp1d
 from tqdm import tqdm
 
 from data_management.io.kp import read_kp_from_multiple_models
-from el_paso import IRBEM_SYSAXIS_GEO, IRBEM_SYSAXIS_SM
-from el_paso.classes import Variable
+from el_paso import IRBEM_SYSAXIS_GEO, IRBEM_SYSAXIS_SM, Variable
 from el_paso.utils import timed_function
 from IRBEM import Coords, MagFields
 

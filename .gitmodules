@@ -4,3 +4,4 @@
 [submodule "data_management"]
 	path = data_management
 	url = git@rbm9.gfz-potsdam.de:pager-wp8/data_management.git
+    branch = tests
