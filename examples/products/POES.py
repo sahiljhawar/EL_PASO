@@ -53,6 +53,7 @@ def process_poes_ted_electron(
     varnames["B_local"] = "B_local_T89"
     varnames["InvMu"] = "invMu_T89"
     varnames["InvK"] = "invK_T89"
+    varnames["density"] = "density"
     save_standard = DataorgPMF(
         mission="POES",
         source=satellite_str,
@@ -126,7 +127,7 @@ def process_poes_ted_electron(
         variables_to_extract=variables_to_extract,
     )
 
-    #source_file.download(start_time, end_time)
+    source_file.download(start_time, end_time)
 
     variables: dict[str, Variable] = load_variables_from_source_files(source_file, start_time, end_time)
 
@@ -176,12 +177,12 @@ def process_poes_ted_electron(
     value_3 = np.sum(np.sum(np.isnan(variables["FEDU"].data[:,:,0]), axis=1) == 3)
     value_4 = np.sum(np.sum(np.isnan(variables["FEDU"].data[:,:,0]), axis=1) == 4)
 
-    print(value_1)
-    print(value_2)
-    print(value_3)
-    print(value_4)
+    logging.info(f"{value_1}")
+    logging.info(f"{value_2}")
+    logging.info(f"{value_3}")
+    logging.info(f"{value_4}")
 
-    print((value_1 + value_2 + value_3 + value_4) / variables["FEDU"].data.shape[0] * 100)
+    logging.info(f'{(value_1 + value_2 + value_3 + value_4) / variables["FEDU"].data.shape[0] * 100}')
 
     xGDZ_arr = np.stack((variables["alt"].data, variables["lat"].data, variables["lon"].data)).T
     xGEO_var = Variable(time_variable=time_var, standard_name="xGEO", original_unit=u.RE, time_bin_method=TimeBinMethod.Mean)
@@ -230,7 +231,7 @@ def process_poes_ted_electron(
     variables["PA_eq_T89"] = pa_eq_extrap_var
     variables["FEDU"] = flux_extrap_var
 
-    print(np.sum(np.isnan(flux_extrap_var.data)) / flux_extrap_var.data.size * 100)
+    logging.info(f"{np.sum(np.isnan(flux_extrap_var.data)) / flux_extrap_var.data.size * 100}")
 
     magnetic_field_variables = {
         "invMu_T89": DerivedVariable(standard_name="invMu_T89"),

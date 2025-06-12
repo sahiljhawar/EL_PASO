@@ -20,7 +20,18 @@ from el_paso.processing import (
     time_bin_all_variables,
 )
 from el_paso.save_standards.real_time_mat import RealtimeMat
+from el_paso.save_standards.data_org import DataorgPMF
 from el_paso.utils import fill_str_template_with_time
+import logging
+from datetime import timedelta
+from datetime import datetime, timezone
+from examples.products.GOES_realtime import process_goes_real_time
+from examples.products.Arase_realtime import process_arase_xep_real_time
+from pathlib import Path
+import time
+
+
+logging.captureWarnings(True)
 
 
 def _weight_energy_channels_exponentially(energy_ranges: list[str]):
@@ -47,6 +58,7 @@ def _weight_energy_channels_exponentially(energy_ranges: list[str]):
 
 def process_goes_real_time(
     satellite_str: Literal["primary", "secondary"],
+    save_data_dir: str,
     download_data_dir: str,
     irbem_lib_path: str,
     start_time: datetime,
@@ -56,32 +68,38 @@ def process_goes_real_time(
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     varnames = {}
-    varnames["newtime"] = "Epoch"
-    varnames["Energy"] = "Energy_FEDO"
+    varnames["time"] = "Epoch"
+    varnames["energy_channels"] = "Energy_FEDU"
     varnames["Flux"] = "FEDU"
-    varnames["Pitch_Angles"] = "PA_local_FEDU"
-    varnames["alpha_loc"] = "PA_local_FEDU"
-    varnames["alpha_eq"] = "PA_eq_T89"
-    varnames["Position_GEO"] = "xGEO"
+    varnames["alpha_local"] = "PA_local_FEDU"
+    varnames["xGEO"] = "xGEO"
     varnames["PSD"] = "PSD_FEDU"
+    varnames["alpha_eq_model"] = "PA_eq_T89"
     varnames["MLT"] = "MLT_T89"
     varnames["Lstar"] = "Lstar_T89"
+    varnames["Lm"] = "Lm_T89"
+    varnames["R0"] = "R_eq_T89"
+    varnames["PSD"] = "PSD_FEDU"
     varnames["B_eq"] = "B_eq_T89"
-    varnames["B_loc"] = "B_local_T89"
+    varnames["B_local"] = "B_local_T89"
     varnames["InvMu"] = "invMu_T89"
     varnames["InvK"] = "invK_T89"
+    varnames["density"] = "density"
 
-    save_standard = RealtimeMat(
+
+    save_standard = DataorgPMF(
         mission="GOES",
         source=satellite_str,
         instrument="MAGED",
-        save_text_segments=["goes", "flux_e", "T89", "oneraextrap"],
+        save_text_segments=[save_data_dir, f"tmp_{satellite_str}", "n4", "4", "T89", "ver4"],
         product_variable_names=varnames,
+        file_format=".pickle",
     )
 
     # Part 1: specify source files to extract variables
 
     time_var = TimeVariable(name_or_column_in_file="time_tag", standard_name="Epoch_posixtime", original_unit="")
+
     energy_var = Variable(
         name_or_column_in_file="energy",
         standard_name="Energy_FEDO",
@@ -171,6 +189,7 @@ def process_goes_real_time(
         "B_local_T89": DerivedVariable(standard_name="B_local_T89"),
         "MLT_T89": DerivedVariable(standard_name="MLT_T89"),
         "B_eq_T89": DerivedVariable(standard_name="B_eq_T89"),
+        "R_eq_T89": DerivedVariable(standard_name="R_eq_T89"),
         "Lstar_T89": DerivedVariable(standard_name="Lstar_T89"),
         "PA_eq_T89": DerivedVariable(standard_name="PA_eq_T89"),
         "invMu_T89": DerivedVariable(standard_name="invMu_T89"),
@@ -202,4 +221,4 @@ def process_goes_real_time(
     compute_PSD(variables, PSD_var, flux_key="FEDU")
     variables["PSD_FEDU"] = PSD_var
 
-    save_standard.save(start_time, end_time, variables)
+    save_standard.save(start_time, end_time, variables, append=True)

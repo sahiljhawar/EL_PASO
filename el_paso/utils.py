@@ -1,15 +1,22 @@
-from datetime import datetime, timezone
-from pathlib import Path
+from __future__ import annotations
+
+import logging
 import re
 import timeit
-import logging
+from collections.abc import Iterable
+from datetime import datetime, timedelta, timezone
 from functools import wraps
+from pathlib import Path
+from typing import TYPE_CHECKING, TypeVar
 
-from packaging import version as version_pkg
 import numpy as np
+import pandas as pd
 from astropy import units as u
+from packaging import version as version_pkg
 
-from el_paso.classes import Variable
+if TYPE_CHECKING:
+    from el_paso.classes import Variable
+
 
 def fill_str_template_with_time(input:str, time:datetime):
 
@@ -25,17 +32,16 @@ def fill_str_template_with_time(input:str, time:datetime):
                 .replace("DD", DD_str)
     
 
-def extract_version(file_name):
-    """
-    Extracts the version string from the file name.
+def extract_version(file_name:str|Path) -> tuple[str, version_pkg.Version]:
+    """Extract the version string from the file name.
 
     Args:
         file_name (str): The name of the file.
 
     Returns:
         tuple: A tuple containing the base file name without the version and the parsed version object.
+
     """
-    
     # convert to str in case of Path object
     file_name = str(file_name)
 
@@ -50,9 +56,9 @@ def extract_version(file_name):
     else:
         return file_name, version_pkg.parse("0")
 
-def get_file_by_version(file_paths:Path, version:str):
-    """
-    Filters the list of files to keep only the one with the highest version or matching version.
+T = TypeVar("T", bound=Path|str)
+def get_file_by_version(file_paths:Iterable[T], version:str) -> T|None:
+    """Filter the list of files to keep only the one with the highest version or matching version.
 
     Args:
         file_names (list): List of file paths.
@@ -60,10 +66,11 @@ def get_file_by_version(file_paths:Path, version:str):
 
     Returns:
         list: List of file paths with the highest version or matching version.
+
     """
     latest_file = None
 
-    if version != 'latest':
+    if version != "latest":
         normalized_version = re.sub(r"[_-]", ".", version.replace("v", ""))
         target_version = version_pkg.parse(normalized_version)
     else:
@@ -73,17 +80,12 @@ def get_file_by_version(file_paths:Path, version:str):
         _, ver_obj = extract_version(file)
 
         # Check if the current file matches the target version if specified
-        if target_version:
-            if ver_obj == target_version:
-                return file
+        if target_version and ver_obj == target_version:
+            return file
 
         # If no specific version is targeted, find the highest version
-        if latest_file is None:
+        if latest_file is None or ver_obj > extract_version(latest_file)[1]:
             latest_file = file
-        else:
-            # Compare versions and keep the file with the highest version
-            if ver_obj > extract_version(latest_file)[1]:
-                latest_file = file
 
     # Extract the file names from the dictionary
     return latest_file
@@ -99,9 +101,9 @@ def timed_function(func_name=None):
             result = f(*args, **kw)
             toc = timeit.default_timer()
             if func_name:
-                logging.info(f"\t\t{func_name} finished in {toc-tic:0.3f} seconds")
+                print(f"\t\t{func_name} finished in {toc-tic:0.3f} seconds")
             else:
-                logging.info(f"\t\tFinished in {toc-tic:0.3f} seconds")
+                print(f"\t\tFinished in {toc-tic:0.3f} seconds")
 
             return result
         return wrap
@@ -112,12 +114,12 @@ def enforce_utc_timezone(time:datetime) -> datetime:
         time = time.replace(tzinfo=timezone.utc)
     return time
 
-def get_variable_by_standard_name(standard_name: str, variables: dict[str, Variable]):
+def get_variable_by_standard_name(standard_name: str, variables: dict[str, Variable]) -> Variable:
     num_vars_found = 0
     var_found = None
 
     for var in variables.values():
-        if var.standard_name == standard_name:
+        if var.standard.standard_name == standard_name:
             var_found = var
             num_vars_found += 1
 
@@ -127,6 +129,10 @@ def get_variable_by_standard_name(standard_name: str, variables: dict[str, Varia
 
     if num_vars_found > 1:
         msg = f"Found {num_vars_found} variables with standard name {standard_name}! Please specify the variable yourself."  # noqa: E501
+        raise ValueError(msg)
+
+    if var_found is None:
+        msg = f"Variable with standard name {standard_name} not found!"
         raise ValueError(msg)
 
     return var_found
@@ -164,36 +170,36 @@ def validate_standard(func):
                 match var.standard.variable_type:
                     case "Epoch":
                         assert (
-                            var.data.ndim == 1
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                            var.get_data().ndim == 1
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
                     case "Flux":
                         if "DO" in var.standard_name:
                             expected_ndim = 2
                         elif "DU" in var.standard_name:
                             expected_ndim = 3
                         assert (
-                            var.data.ndim == expected_ndim
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                            var.get_data().ndim == expected_ndim
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
                     case "Energy":
                         assert (
-                            var.data.ndim == 2
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                            var.get_data().ndim == 2
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
                     case "PitchAngle":
                         assert (
-                            var.data.ndim == 2
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                            var.get_data().ndim == 2
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
                     case "Position":
                         assert (
-                            var.data.ndim == 2
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                            var.get_data().ndim == 2
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
                         assert (
-                            var.data.shape[1] == 3
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong shape: {var.data.shape}!"
+                            var.get_data().shape[1] == 3
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong shape: {var.get_data().shape}!"
 
                     case "MLT":
                         assert (
-                            var.data.ndim == 1
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.data.ndim}!"
+                            var.get_data().ndim == 1
+                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
 
 
     @wraps(func)
@@ -209,3 +215,12 @@ def validate_standard(func):
         return func(*args, **kwargs)
 
     return with_validated_standard
+
+def datenum_to_datetime(datenum_val: float) -> datetime:
+    return pd.to_datetime(datenum_val-719529, unit="D", origin=pd.Timestamp("1970-01-01")).to_pydatetime().replace(tzinfo=timezone.utc)
+
+def datetime_to_datenum(datetime_val: datetime) -> float:
+    mdn = datetime_val + timedelta(days = 366)
+    frac = (datetime_val - datetime(datetime_val.year, datetime_val.month, datetime_val.day, 0, 0, 0, tzinfo=timezone.utc)).seconds / (24.0 * 60.0 * 60.0)
+
+    return mdn.toordinal() + round(frac, 6)

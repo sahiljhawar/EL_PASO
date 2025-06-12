@@ -27,6 +27,7 @@ from IRBEM import Coords
 
 
 def process_arase_xep_real_time(
+    save_data_dir:str,
     download_data_dir:str,
     irbem_lib_path:str,
     start_time:datetime,
@@ -37,27 +38,31 @@ def process_arase_xep_real_time(
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     varnames = {}
-    varnames["newtime"] = "Epoch"
-    varnames["Energy"] = "Energy_FEDO"
+    varnames["time"] = "Epoch"
+    varnames["energy_channels"] = "Energy_FEDU"
     varnames["Flux"] = "FEDU"
-    varnames["Pitch_Angles"] = "PA_local_FEDU"
-    varnames["alpha_loc"] = "PA_local_FEDU"
-    varnames["alpha_eq"] = "PA_eq_T89"
-    varnames["Position_GEO"] = "xGEO"
+    varnames["alpha_local"] = "PA_local_FEDU"
+    varnames["xGEO"] = "xGEO"
     varnames["PSD"] = "PSD_FEDU"
+    varnames["alpha_eq_model"] = "PA_eq_T89"
     varnames["MLT"] = "MLT_T89"
     varnames["Lstar"] = "Lstar_T89"
+    varnames["Lm"] = "Lm_T89"
+    varnames["R0"] = "R_eq_T89"
+    varnames["PSD"] = "PSD_FEDU"
     varnames["B_eq"] = "B_eq_T89"
-    varnames["B_loc"] = "B_local_T89"
+    varnames["B_local"] = "B_local_T89"
     varnames["InvMu"] = "invMu_T89"
     varnames["InvK"] = "invK_T89"
+    varnames["density"] = "density"
 
-    save_standard = RealtimeMat(
+    save_standard = DataorgPMF(
         mission="Arase",
         source="Arase",
         instrument="XEP",
-        save_text_segments=["arase", "xep", "T89", "oneraextrap"],
+        save_text_segments=[save_data_dir, "arase", "n4", "4", "T89", "oneraextrap"],
         product_variable_names = varnames,
+        file_format=".pickle",
     )
 
     orb_variables = _get_orb_variables(download_data_dir, start_time, end_time, irbem_lib_path)
@@ -110,7 +115,7 @@ def process_arase_xep_real_time(
     compute_PSD(variables, PSD_var, flux_key="FEDU")
     variables["PSD_FEDU"] = PSD_var
 
-    save_standard.save(start_time, end_time, variables)
+    save_standard.save(start_time, end_time, variables, append=True)
 
 def process_arase_pew_real_time(
     save_data_dir:str,
