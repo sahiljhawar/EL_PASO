@@ -5,8 +5,7 @@ import numpy as np
 from astropy import units as u
 from numpy.typing import NDArray
 
-from el_paso.classes import Variable
-from el_paso.classes.variable import TimeBinMethod
+from el_paso import TimeBinMethod, Variable
 from el_paso.utils import datenum_to_datetime, timed_function
 
 

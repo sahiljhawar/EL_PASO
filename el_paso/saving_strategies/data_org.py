@@ -6,7 +6,7 @@ from typing import Dict, List, Literal, Optional
 from astropy import units as u
 
 from el_paso.classes.save_standard import OutputFile, SaveCadence, SaveStandard
-from el_paso.classes.variable import Variable
+from el_paso.variable import Variable
 
 
 class DataorgPMF(SaveStandard):

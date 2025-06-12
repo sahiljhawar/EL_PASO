@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from pathlib import Path
 
-from el_paso.classes.saving_strategy import OutputFile, SavingStrategy
-from el_paso.classes.variable import Variable
+from el_paso import Variable
+from el_paso.saving_strategy import OutputFile, SavingStrategy
 
 
 class SingleFileStrategy(SavingStrategy):
