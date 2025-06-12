@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import os
-import typing
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -11,10 +10,7 @@ from typing import Any, Literal
 import numpy as np
 from astropy import units as u
 from numpy.typing import NDArray
-from sqlalchemy import MetaData, create_engine, select
-from sqlalchemy.orm import sessionmaker
 
-from el_paso.metadata.models import StandardVariable
 from el_paso.utils import enforce_utc_timezone
 
 
@@ -128,43 +124,6 @@ class Variable:
     def __repr__(self) -> str:
         return f"Variable holding {self._data.shape} data points with metadata: {self.metadata}"
 
-    def convert_to_standard_unit(self) -> None:
-        """Convert the data to the units defined by the variable's standard."""
-        if self.standard:
-            self.convert_to_unit(self.standard.standard_unit)
-
-    def convert_to_standard(self, standard_name:str) -> None:
-      # Access database
-        home_path = os.getenv("HOME")
-        if home_path is None:
-            raise ValueError("HOME environmental variable not set!")
-        db_path = Path(home_path) / ".el_paso" / "metadata_database.db"
-        table_name = "StandardVariable"
-
-        standard_variable_info = self._get_standard_info_from_db(
-            db_path, table_name, "standard_name", standard_name
-        )
-
-        # If database reading is successful, construct and store the relevant StandardVariable
-        if standard_variable_info:
-            standard_unit = u.Unit(standard_variable_info.get("standard_unit"))
-
-            # Constructing the StandardVariable object
-            standard = StandardVariable(
-                id=standard_variable_info["id"],
-                standard_id=standard_variable_info["standard_id"],
-                variable_type=standard_variable_info["variable_type"],
-                standard_name=standard_variable_info["standard_name"],
-                standard_description=standard_variable_info.get("standard_description"),
-                standard_notes=standard_variable_info.get("standard_notes"),
-                standard_unit=standard_unit,
-            )
-        else:
-            msg = f"Standard info could not be loaded for variable: {standard_name}"
-            raise ValueError(msg)
-
-        self.convert_to_unit(u.Unit(standard.standard_unit))
-
     def convert_to_unit(self, target_unit:u.UnitBase|str) -> None:
         """Convert the data to a given unit.
 
@@ -184,72 +143,6 @@ class Variable:
             self._data = data_with_unit.to_value(target_unit)
 
             self.metadata.unit = target_unit
-
-    def get_standard_info(self,target_name: str) -> Any:
-        """Gets information (field name target_name) for this variable from the standard.
-
-        Args:
-            standard (str): The name of the standard.
-            target_name (str): The name of the target attribute to retrieve.
-
-        Returns:
-            Any: The value of the target attribute.
-        """
-
-        # Access database
-        db_path = f"{os.getenv('RT_SCRIPTS_DIR')}/Metadata/metadata_database.db"
-        table_name = "StandardVariable"  # Replace with your actual table name
-        standard_variable_info = self._get_standard_info_from_db(
-            db_path, table_name, "standard_name", self.standard_name
-        )
-        # If database reading is successful, construct and store the relevant StandardVariable
-        if standard_variable_info:
-            # Constructing the StandardVariable object
-            self.standard = StandardVariable(
-                id=standard_variable_info["id"],
-                standard_id=standard_variable_info["standard_id"],
-                variable_type=standard_variable_info["variable_type"],
-                standard_name=standard_variable_info["standard_name"],
-                standard_description=standard_variable_info.get("standard_description"),
-                standard_notes=standard_variable_info.get("standard_notes"),
-                standard_unit=standard_variable_info.get("standard_unit"),
-            )
-            return getattr(self.standard, target_name, None)
-        return None
-
-    def _get_standard_info_from_db(self, db_path: str, table_name: str, column_name: str, filter_value: str) -> dict:
-        """Helper method to get standard information from the database.
-
-        Args:
-            db_path (str): The path to the database.
-            table_name (str): The name of the table.
-            column_name (str): The name of the column to filter by.
-            filter_value (str): The value to filter the column by.
-
-        Returns:
-            dict: The dictionary of the target attribute.
-        """
-        engine = create_engine(f"sqlite:///{db_path}")
-        metadata = MetaData()
-        metadata.reflect(bind=engine)
-        table = metadata.tables.get(table_name)
-
-        if table is None:
-            print(f"Table {table_name} does not exist.")
-            return None
-
-        session_engine = sessionmaker(bind=engine)
-        session = session_engine()
-
-        # Create a select statement for all columns in the table
-        stmt = select(table).where(table.c[column_name] == filter_value)
-
-        # Execute the query and fetch all results
-        result = session.execute(stmt).mappings().first()
-
-        session.close()
-
-        return dict(result) if result else None
 
     def get_data(self, target_unit:u.UnitBase|str|None=None) -> NDArray[np.float64]:
         """Get the data of the variable.

@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import NamedTuple
 
-from el_paso.classes import Variable
+from el_paso import Variable
 
 
 class OutputFile(NamedTuple):

@@ -16,7 +16,7 @@ import pandas as pd
 from astropy import units as u
 from numpy.typing import NDArray
 
-from el_paso.classes import Variable
+from el_paso import Variable
 from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version, timed_function
 
 

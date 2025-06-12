@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from el_paso.classes import SourceFile, Variable
+    from el_paso import SourceFile, Variable
 
 
 def load_variables_from_source_files(

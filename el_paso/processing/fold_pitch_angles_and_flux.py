@@ -7,7 +7,7 @@ from astropy import units as u
 from matplotlib import pyplot as plt
 from numpy.typing import NDArray
 
-from el_paso.classes import Variable
+from el_paso import Variable
 from el_paso.utils import timed_function
 
 

@@ -1,6 +1,6 @@
 import numpy as np
 
-from el_paso.classes import Variable
+from el_paso import Variable
 
 
 def compute_equatorial_plasmaspheric_density(density:Variable,

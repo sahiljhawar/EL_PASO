@@ -3,7 +3,7 @@ from datetime import timezone
 import numpy as np
 from dateutil import parser
 
-from el_paso.classes import Variable
+from el_paso import Variable
 
 
 def convert_string_to_datetime(time_var:Variable):

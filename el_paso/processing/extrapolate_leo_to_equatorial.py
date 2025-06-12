@@ -8,7 +8,7 @@ from scipy.optimize import fmin
 from scipy.special import iv
 from tqdm import tqdm
 
-from el_paso.classes import Variable
+from el_paso import Variable
 from el_paso.utils import validate_standard
 
 

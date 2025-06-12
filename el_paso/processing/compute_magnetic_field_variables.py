@@ -9,7 +9,7 @@ import numpy as np
 from astropy import units as u
 
 import el_paso.processing as proc
-from el_paso.classes import Variable
+from el_paso import Variable
 from el_paso.processing.magnetic_field_functions import IrbemOutput
 from el_paso.utils import timed_function
 
