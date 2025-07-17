@@ -15,7 +15,7 @@ datenum = u.def_unit("datenum")
 epoch_tt2000_posixtime = [(
     tt2000,
     posixtime,
-    lambda x: cdflib.cdfepoch.unixtime(x),
+    lambda x: cdflib.cdfepoch.unixtime(x.astype(np.int64)),
     lambda x: cdflib.cdfepoch.posixtime_to_tt2000(x)
 )]
 
@@ -61,7 +61,7 @@ def tt2000_to_datenum(tt2000_val):
     This function will be used directly in the new equivalency.
     """
     # 1. Convert tt2000 to posixtime
-    posix_val = cdflib.cdfepoch.unixtime(tt2000_val) # Returns in seconds
+    posix_val = cdflib.cdfepoch.unixtime(tt2000_val.astype(np.int64)) # Returns in seconds
     # 2. Convert posixtime to datenum
     datenum_val = posixtime_to_datenum(posix_val) # Returns in days
     return datenum_val

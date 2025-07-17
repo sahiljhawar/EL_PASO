@@ -2,3 +2,11 @@ line-length = 120
 
 [lint]
 select = ["ALL"]
+ignore = ["D100", # undocumented-public-module
+          "G004", # logging-f-string
+          "PLR0913", # too-many-arguments
+          "UP017", # datetime-timezone-undocumented
+          ]
+
+[lint.pydocstyle]
+convention = "google"

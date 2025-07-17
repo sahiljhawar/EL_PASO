@@ -1,17 +1,19 @@
 from __future__ import annotations
 
-import os
+import typing
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-from pathlib import Path
-from typing import Any, Literal
+from typing import Literal, overload
 
 import numpy as np
-from astropy import units as u
-from numpy.typing import NDArray
+from astropy import units as u  # type: ignore[reportMissingTypeStubs]
 
+import el_paso as ep
 from el_paso.utils import enforce_utc_timezone
+
+if typing.TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 
 class TimeBinMethod(Enum):
@@ -27,35 +29,48 @@ class TimeBinMethod(Enum):
     NoBinning = "NoBinning"
     Repeat = "Repeat"
 
-    def __call__(self, x:NDArray[np.float64]) -> NDArray[np.float64]:
-        """Call the binning method on the provided data.
+    def __call__(self, data:NDArray[np.generic]) -> NDArray[np.generic]:  # noqa: C901
+        """Applyies the binning method to the provided data.
 
-        :param x: Numpy array which is binned
-        :type x: np.ndarray
-        :return: A numpy array holding the binned data
-        :rtype: np.ndarray
+        Args:
+            data (NDArray[np.generic]): The input data array to be binned or aggregated.
+
+        Returns:
+            NDArray[np.generic]: The resulting array after applying the selected binning or aggregation method.
+
+        Raises:
+            TypeError: If the selected binning method requires numeric types and the input data is not numeric.
         """
-        binned_array = None
+        binned_array:NDArray[np.generic]
+
+        if self.value in ["Mean", "NanMean", "Median", "NanMedian", "NanMax", "NanMin"] \
+            and not np.issubdtype(data.dtype, np.number):
+                msg = f"{self.value} time bin method is only supported for numeric types!"
+                raise TypeError(msg)
 
         match self.value:
             case "Mean":
-                binned_array = np.mean(x, axis=0)
+                data = typing.cast("NDArray[np.floating]", data)
+                binned_array = np.mean(data, axis=0)
             case "NanMean":
-                binned_array = np.nanmean(x, axis=0)
+                data = typing.cast("NDArray[np.floating]", data)
+                binned_array = np.nanmean(data, axis=0)
             case "Median":
-                binned_array = np.nanmedian(x, axis=0)
+                data = typing.cast("NDArray[np.floating]", data)
+                binned_array = np.nanmedian(data, axis=0)
             case "NanMedian":
-                binned_array = np.nanmedian(x, axis=0)
+                data = typing.cast("NDArray[np.floating]", data)
+                binned_array = np.nanmedian(data, axis=0)
             case "Merge":
-                binned_array = np.concatenate(x, axis=0)
+                binned_array = np.concatenate(data, axis=0)
             case "NanMax":
-                binned_array = np.nanmax(x, axis=0)
+                binned_array = np.nanmax(data, axis=0)
             case "NanMin":
-                binned_array = np.nanmin(x, axis=0)
+                binned_array = np.nanmin(data, axis=0)
             case "NoBinning":
-                binned_array = x
+                binned_array = data
             case "Repeat":
-                binned_array = x
+                binned_array = data
 
         return binned_array
 
@@ -80,16 +95,27 @@ class VariableMetadata:
 
     unit: u.UnitBase = u.dimensionless_unscaled
     original_cadence_seconds: float = 0
-    source_files: list[str] = field(default_factory=list)
+    source_files: list[str] = field(default_factory=list[str])
     description: str = ""
     processing_notes: str = ""
     standard_name: str = ""
 
     def __post_init__(self) -> None:
+        """Initializes the processing_steps_counter attribute to 1 after the dataclass has been instantiated.
+
+        This method is automatically called by the dataclass after the __init__ method.
+        """
         self.processing_steps_counter = 1
 
     def add_processing_note(self, processing_note:str) -> None:
+        """Adds a processing note to the metadata.
 
+        The note is prefixed with the current processing steps counter and a newline character is appended.
+        The processing steps counter is then incremented.
+
+        Args:
+            processing_note (str): The note to be added to the processing notes.
+        """
         processing_note = f"{self.processing_steps_counter}) {processing_note}\n"
 
         self.processing_notes += processing_note
@@ -98,22 +124,20 @@ class VariableMetadata:
 class Variable:
     """Variable class holding data and metadata."""
 
-    __slots__ = "standard_name", "dependent_variables", "_data", "metadata", "backup_for_reset"
+    __slots__ = "_data", "metadata"
 
-    _data:NDArray[np.float64]
+    _data:NDArray[np.generic]
     metadata:VariableMetadata
 
     def __init__(
         self,
         original_unit: u.UnitBase,
-        data:NDArray[np.float64]|None = None,
+        data:NDArray[np.generic]|None = None,
         description: str = "",
         processing_notes: str = "",
-        dependent_variables: list[Variable]|None = None,
     ) -> None:
 
-        self._data = np.array([], dtype=np.float64) if data is None else data
-        self.dependent_variables = dependent_variables if dependent_variables else []
+        self._data = np.array([], dtype=np.generic) if data is None else data
 
         self.metadata = VariableMetadata(
             unit=original_unit,
@@ -131,24 +155,28 @@ class Variable:
         :type target_unit: u.UnitBase
         :raises ValueError: if the 'unit' attribute of the metadata has not been set
         """
-        if self.metadata.unit is None:
-            msg = f"Unit has not been set for this Variable! Standard name: {self.standard_name}"
-            raise ValueError(msg)
-
         if isinstance(target_unit, str):
             target_unit = u.Unit(target_unit)
 
         if self.metadata.unit != target_unit:
             data_with_unit = u.Quantity(self._data, self.metadata.unit)
-            self._data = data_with_unit.to_value(target_unit)
+            self._data = typing.cast("NDArray[np.generic]", data_with_unit.to_value(target_unit)) #type: ignore
 
             self.metadata.unit = target_unit
 
-    def get_data(self, target_unit:u.UnitBase|str|None=None) -> NDArray[np.float64]:
+    @overload
+    def get_data(self, target_unit:u.UnitBase|str) -> NDArray[np.floating|np.integer]:
+        ...
+
+    @overload
+    def get_data(self, target_unit:None=None) -> NDArray[np.generic]:
+        ...
+
+    def get_data(self, target_unit:u.UnitBase|str|None=None) -> NDArray[np.generic]:
         """Get the data of the variable.
 
         :return: The data of the variable.
-        :rtype: NDArray[np.float64]
+        :rtype: NDArray[np.generic]
         """
         if target_unit is None:
             return self._data
@@ -156,15 +184,19 @@ class Variable:
         if isinstance(target_unit, str):
             target_unit = u.Unit(target_unit)
 
-        return (self._data * self.metadata.unit).to_value(target_unit)
+        if not np.issubdtype(self._data.dtype, np.number):
+            msg = f"Unit conversion is only supported for numeric types! Encountered for variable {self}."
+            raise TypeError(msg)
 
-    def set_data(self, data:NDArray[np.float64], unit:Literal["same"]|str|u.UnitBase) -> None:
+        return typing.cast("NDArray[np.generic]", u.Quantity(self._data, self.metadata.unit).to_value(target_unit)) #type: ignore
+
+    def set_data(self, data:NDArray[np.generic], unit:Literal["same"]|str|u.UnitBase) -> None:
         self._data = data
 
         if isinstance(unit, str):
             if unit != "same":
                 self.metadata.unit = u.Unit(unit)
-        elif isinstance(unit, u.UnitBase):
+        elif isinstance(unit, u.UnitBase): #type: ignore
             self.metadata.unit = unit
         else:
             msg = "unit must be either a str or a astropy unit!"
@@ -174,6 +206,12 @@ class Variable:
         self._data = np.transpose(self._data, axes=seq)
 
     def apply_thresholds_on_data(self, lower_threshold: float = -np.inf, upper_threshold: float = np.inf):
+
+        if not np.issubdtype(self._data.dtype, np.number):
+            msg = f"Thresholds are only supported for numeric types! Encountered for variable {self}."
+            raise TypeError(msg)
+        self._data = typing.cast("NDArray[np.number]", self._data)
+
         self._data = np.where((self._data > lower_threshold) & (self._data < upper_threshold), self._data, np.nan)
 
     def truncate(self, time_variable:Variable, start_time:float|datetime, end_time:float|datetime) -> None:
@@ -187,6 +225,6 @@ class Variable:
             msg = "Encountered length missmatch between variable and time variable!"
             raise ValueError(msg)
 
-        time_var_data = time_variable.get_data(u.posixtime)
+        time_var_data = time_variable.get_data(ep.units.posixtime)
 
         self._data = self._data[(time_var_data >= start_time) & (time_var_data <= end_time)]

@@ -3,20 +3,16 @@ from __future__ import annotations
 import logging
 import re
 import timeit
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, TypeVar
+from typing import ParamSpec, TypeVar
 
-import numpy as np
 import pandas as pd
-from astropy import units as u
 from packaging import version as version_pkg
 
-if TYPE_CHECKING:
-    from el_paso.classes import Variable
-
+logger = logging.getLogger(__name__)
 
 def fill_str_template_with_time(input:str, time:datetime):
 
@@ -30,7 +26,6 @@ def fill_str_template_with_time(input:str, time:datetime):
                 .replace("YYYY", yyyy_str) \
                 .replace("MM", MM_str) \
                 .replace("DD", DD_str)
-    
 
 def extract_version(file_name:str|Path) -> tuple[str, version_pkg.Version]:
     """Extract the version string from the file name.
@@ -93,17 +88,20 @@ def get_file_by_version(file_paths:Iterable[T], version:str) -> T|None:
 def get_key_by_value(dict, value):
     return list(dict.keys())[list(dict.values()).index(value)]
 
-def timed_function(func_name=None):
-    def timed_function_(f):
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def timed_function(func_name:str|None=None) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    def timed_function_(f: Callable[P, R]) -> Callable[P, R]:
         @wraps(f)
-        def wrap(*args, **kw):
+        def wrap(*args: P.args, **kwargs: P.kwargs) -> R:
             tic = timeit.default_timer()
-            result = f(*args, **kw)
+            result = f(*args, **kwargs)
             toc = timeit.default_timer()
             if func_name:
-                print(f"\t\t{func_name} finished in {toc-tic:0.3f} seconds")
+                logger.info(f"\t\t{func_name} finished in {toc-tic:0.3f} seconds")
             else:
-                print(f"\t\tFinished in {toc-tic:0.3f} seconds")
+                logger.info(f"\t\tFinished in {toc-tic:0.3f} seconds")
 
             return result
         return wrap
@@ -113,108 +111,6 @@ def enforce_utc_timezone(time:datetime) -> datetime:
     if time.tzinfo is None:
         time = time.replace(tzinfo=timezone.utc)
     return time
-
-def get_variable_by_standard_name(standard_name: str, variables: dict[str, Variable]) -> Variable:
-    num_vars_found = 0
-    var_found = None
-
-    for var in variables.values():
-        if var.standard.standard_name == standard_name:
-            var_found = var
-            num_vars_found += 1
-
-    if num_vars_found == 0:
-        msg = f"No variable found with standard name {standard_name}!"
-        raise ValueError(msg)
-
-    if num_vars_found > 1:
-        msg = f"Found {num_vars_found} variables with standard name {standard_name}! Please specify the variable yourself."  # noqa: E501
-        raise ValueError(msg)
-
-    if var_found is None:
-        msg = f"Variable with standard name {standard_name} not found!"
-        raise ValueError(msg)
-
-    return var_found
-
-def get_variable_by_standard_type(standard_type: str, variables: dict[str, Variable]):
-    num_vars_found = 0
-    var_found = None
-
-    for var in variables.values():
-        if var.standard and var.standard.variable_type == standard_type:
-            var_found = var
-            num_vars_found += 1
-
-    if num_vars_found == 0:
-        msg = f"No variable found with variable type {standard_type}!"
-        raise ValueError(msg)
-
-    if num_vars_found > 1:
-        msg = f"Found {num_vars_found} variables with variable type {standard_type}! Please specify the variable yourself."  # noqa: E501
-        raise ValueError(msg)
-
-    return var_found
-
-def validate_standard(func):
-    def validate_units(variables: dict[str, Variable]):
-        for key, var in variables.items():
-            if var.standard:
-                assert (
-                    var.metadata.unit == var.standard.standard_unit
-                ), f"Variable {key} has wrong units! Actual unit: {var.metadata.unit}. Should be: {var.standard.standard_unit}."
-
-    def validate_dimensions(variables: dict[str, Variable]):
-        for key, var in variables.items():
-            if var.standard:
-                match var.standard.variable_type:
-                    case "Epoch":
-                        assert (
-                            var.get_data().ndim == 1
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
-                    case "Flux":
-                        if "DO" in var.standard_name:
-                            expected_ndim = 2
-                        elif "DU" in var.standard_name:
-                            expected_ndim = 3
-                        assert (
-                            var.get_data().ndim == expected_ndim
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
-                    case "Energy":
-                        assert (
-                            var.get_data().ndim == 2
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
-                    case "PitchAngle":
-                        assert (
-                            var.get_data().ndim == 2
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
-                    case "Position":
-                        assert (
-                            var.get_data().ndim == 2
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
-                        assert (
-                            var.get_data().shape[1] == 3
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong shape: {var.get_data().shape}!"
-
-                    case "MLT":
-                        assert (
-                            var.get_data().ndim == 1
-                        ), f"Variable {key} with type {var.standard.variable_type} has wrong dimensions: {var.get_data().ndim}!"
-
-
-    @wraps(func)
-    def with_validated_standard(*args:tuple, **kwargs:dict):
-        variables = args[0]
-        if not isinstance(variables, dict):
-            msg = "First argument of the function has to be a dictionary holding instances of Variable!"
-            raise TypeError(msg)
-
-        validate_units(variables)
-        validate_dimensions(variables)
-
-        return func(*args, **kwargs)
-
-    return with_validated_standard
 
 def datenum_to_datetime(datenum_val: float) -> datetime:
     return pd.to_datetime(datenum_val-719529, unit="D", origin=pd.Timestamp("1970-01-01")).to_pydatetime().replace(tzinfo=timezone.utc)

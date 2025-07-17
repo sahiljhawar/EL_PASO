@@ -9,7 +9,6 @@ from scipy.special import iv
 from tqdm import tqdm
 
 from el_paso import Variable
-from el_paso.utils import validate_standard
 
 
 def steady_state_inside_lc(alpha:float|NDArray[np.float64], alpha_lc:float, z0:float, N:float) -> float|NDArray[np.float64]:

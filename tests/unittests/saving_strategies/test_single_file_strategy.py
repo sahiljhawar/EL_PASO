@@ -1,0 +1,24 @@
+from pathlib import Path
+
+import numpy as np
+import pytest
+from astropy import units as u
+
+import el_paso as ep
+
+rng = np.random.default_rng(1337)
+
+@pytest.mark.parametrize("file_format", [".mat", ".pickle", ".h5"])
+def test_basic_single_file_strategy(tmp_path: Path, file_format:str):
+
+    variables_to_save = {
+        "var1": ep.Variable(original_unit=u.dimensionless_unscaled, data=rng.normal((20,21))),
+        "var2": ep.Variable(original_unit=u.dimensionless_unscaled, data=rng.normal((10,11))),
+        "var3": ep.Variable(original_unit=u.dimensionless_unscaled, data=rng.normal((51,))),
+    }
+
+    save_path = tmp_path / ("test" + file_format)
+    strategy = ep.saving_strategies.SingleFileStrategy(file_path=save_path)
+    ep.save(variables_to_save, strategy)
+
+    assert save_path.exists()

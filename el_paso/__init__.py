@@ -1,4 +1,4 @@
-from .custom_units import *
+from .units import *
 
 # useful custom IRBEM aliases
 IRBEM_SYSAXIS_GDZ = 0
@@ -18,3 +18,4 @@ from . import processing, saving_strategies
 from .save import save
 from .download import download
 from .extract_variables_from_files import extract_variables_from_files, ExtractionInfo
+from .load_indices_solar_wind_parameters import load_indices_solar_wind_parameters

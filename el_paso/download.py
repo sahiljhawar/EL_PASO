@@ -12,6 +12,8 @@ import requests
 
 from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version
 
+ERROR_NOT_FOUND = 404
+logger = logging.getLogger(__name__)
 
 def download(start_time: datetime,
              end_time: datetime,
@@ -26,8 +28,39 @@ def download(start_time: datetime,
              rename_file_name_stem: str|None = None,
              *,
              skip_existing: bool = True) -> None:
-    """Download the product data according to the specified standard."""
+    """Download satellite data files within a specified time range and cadence.
 
+    Examples can be found in the 'examples' and 'tutorials' folder.
+
+    Args:
+        start_time (datetime): The start of the time range for downloading files. Must be timezone-aware (UTC).
+        end_time (datetime): The end of the time range for downloading files. Must be timezone-aware (UTC).
+        save_path (str | Path): Directory path where downloaded files will be saved.
+        file_cadence (Literal["daily", "monthly", "single_file"]): Frequency of file downloads.
+            - "daily": Download files for each day in the range.
+            - "monthly": Download files for each month in the range.
+            - "single_file": Download a single file.
+        download_url (str): Base URL for downloading files.
+        file_name_stem (str): Stem for the file name to be downloaded.
+        download_arguments_prefixes (str, optional): Additional arguments to prefix to the download command
+                                                     (used with wget). Defaults to "".
+        download_arguments_suffixes (str, optional): Additional arguments to suffix to the download command
+                                                     (used with wget). Defaults to "".
+        method (Literal["request", "wget"], optional): Download method to use. Either "request" (Python requests) or
+                                                       "wget" (system wget). Defaults to "request".
+        authentification_info (tuple[str, str], optional): Tuple of (username, password) for authentication.
+                                                           Defaults to ("", "").
+        rename_file_name_stem (str | None, optional): If provided, rename the downloaded file to this stem.
+                                                      Defaults to None.
+        skip_existing (bool, optional): If True, skip downloading files that already exist. Defaults to True.
+
+    Raises:
+        NotImplementedError: If "monthly" cadence or an unsupported cadence is specified.
+
+    Returns:
+        None
+
+    """
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
 
@@ -35,27 +68,39 @@ def download(start_time: datetime,
 
     curr_time = start_time
 
-    match file_cadence:
-        case "daily":
-            while curr_time <= end_time:
-                match method:
-                    case "request":
-                        _requests_download(curr_time, save_path, download_url, file_name_stem, authentification_info, rename_file_name_stem, skip_existing=skip_existing)
-                    case "wget":
-                        _wget_download(curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes)
+    while True:
+        match method:
+            case "request":
+                _requests_download(curr_time,
+                                    save_path,
+                                    download_url,
+                                    file_name_stem,
+                                    authentification_info,
+                                    rename_file_name_stem,
+                                    skip_existing=skip_existing)
+            case "wget":
+                _wget_download(curr_time,
+                                save_path,
+                                download_url,
+                                download_arguments_prefixes,
+                                download_arguments_suffixes)
+
+        match file_cadence:
+            case "daily":
+                if curr_time > end_time:
+                    break
                 curr_time += timedelta(days=1)
 
-        case "monthly":
-            raise NotImplementedError
+            case "monthly":
+                msg = "Monthly file cadence has not been implemented yet!"
+                raise NotImplementedError(msg)
 
-        case "single_file":
-            match method:
-                case "request":
-                    _requests_download(curr_time, save_path, download_url, file_name_stem, authentification_info, rename_file_name_stem, skip_existing=skip_existing)
-                case "wget":
-                    _wget_download(curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes)
-        case _:
-            raise NotImplementedError
+            case "single_file":
+                break
+
+            case _:
+                msg = "File cadence must be 'single_file', 'daily', or 'monthly'"
+                raise NotImplementedError(msg)
 
 def _requests_download(current_time:datetime,
                        save_path:Path,
@@ -73,9 +118,12 @@ def _requests_download(current_time:datetime,
     file_name_stem = fill_str_template_with_time(file_name_stem, current_time)
 
     try:
-        response = requests.get(url, stream=True, auth=requests.auth.HTTPDigestAuth(*authentification_info))
+        response = requests.get(url,
+                                stream=True,
+                                timeout=10,
+                                auth=requests.auth.HTTPDigestAuth(*authentification_info)) #type: ignore[reportUnknownMemberType]
 
-        if response.status_code == 404:
+        if response.status_code == ERROR_NOT_FOUND:
             msg = f"File not found on server: {url}"
             raise FileNotFoundError(msg)
 
@@ -94,12 +142,15 @@ def _requests_download(current_time:datetime,
             save_file_name = fill_str_template_with_time(rename_file_name_stem, current_time)
 
         if skip_existing and (save_path / save_file_name).exists():
-            print(f"File already exists, skipping download: {save_path / save_file_name}")
+            logger.info(f"File already exists, skipping download: {save_path / save_file_name}")
             return
 
-        response = requests.get(f"{url}/{latest_file_name}", stream=True, auth=requests.auth.HTTPDigestAuth(*authentification_info))
+        response = requests.get(f"{url}/{latest_file_name}",
+                                stream=True,
+                                timeout=10,
+                                auth=requests.auth.HTTPDigestAuth(*authentification_info)) #type: ignore[reportUnknownMemberType]
 
-        if response.status_code == 404:
+        if response.status_code == ERROR_NOT_FOUND:
             msg = f"File not found on server: {url}"
             raise FileNotFoundError(msg)
 
@@ -109,10 +160,10 @@ def _requests_download(current_time:datetime,
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
 
-        print(f"Downloaded successfully: {save_path / latest_file_name}")
+        logger.info(f"Downloaded successfully: {save_path / latest_file_name}")
 
     except requests.exceptions.RequestException as e:
-        print(f"Error downloading file from {url}: {e}")
+        logger.info(f"Error downloading file from {url}: {e}")
 
 
 def _wget_download(current_time:datetime,
@@ -128,10 +179,10 @@ def _wget_download(current_time:datetime,
     prefix = fill_str_template_with_time(download_arguments_prefixes, current_time)
     suffix = fill_str_template_with_time(download_arguments_suffixes, current_time)
     download_command = f"wget {prefix} {url} {suffix}"
-    logging.info(download_command)
+    logger.info(download_command)
 
     # Execute the download command
     try:
-        os.system(download_command)
-    except Exception as e:
-        logging.info(f"Error downloading file using command {download_command}: {e}")
+        os.system(download_command)  # noqa: S605
+    except Exception as e:  # noqa: BLE001
+        logger.info(f"Error downloading file using command {download_command}: {e}")
