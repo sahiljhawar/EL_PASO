@@ -1,3 +1,24 @@
+Metadata-Version: 2.4
+Name: el_paso
+Version: 0.1
+Author-email: Bernhard Haas <bhaas@gfz.de>
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: astropy==7.0.0
+Requires-Dist: cdflib==1.3.3
+Requires-Dist: matplotlib==3.10.0
+Requires-Dist: numpy==2.2.2
+Requires-Dist: pandas==2.2.3
+Requires-Dist: pytest==8.3.4
+Requires-Dist: python-dateutil==2.9.0.post0
+Requires-Dist: requests==2.32.3
+Requires-Dist: scipy==1.15.1
+Requires-Dist: sscws
+Requires-Dist: tabulate
+Requires-Dist: tqdm==4.67.1
+Requires-Dist: wget==3.2
+Requires-Dist: wheel
+
 # ELaborative Particle Analysis from Satellite Observations (EL PASO)
 
 ## Installation 

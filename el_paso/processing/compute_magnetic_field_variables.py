@@ -21,6 +21,7 @@ def compute_magnetic_field_variables(
     irbem_lib_path: str,
     irbem_options: list[int],
     num_cores: int,
+    indices_solar_wind: dict[str, Variable]|None = None,
     pa_local_var: Variable|None = None,
     energy_var: Variable|None = None,
     particle_species:Literal["electron", "proton"]|None = None,
@@ -57,10 +58,6 @@ def compute_magnetic_field_variables(
     # collect magnetic_field results in this dictionary; holds the data array and the unit
     magnetic_field_results: dict[str, proc.IrbemOutput] = {}
 
-    # construct the maginput (Kp, Dst, ...) used for all irbem calls
-    maginput = proc.construct_maginput(time_var)
-    irbem_input = proc.IrbemInput(irbem_lib_path, "", maginput, irbem_options, num_cores)
-
     computed_variables:dict[str, Variable] = {}
 
     for var_name in var_names_to_compute:
@@ -71,7 +68,10 @@ def compute_magnetic_field_variables(
             new_var.set_data(magnetic_field_results[var_name].arr, magnetic_field_results[var_name].unit)
         else:
             magnetic_field_str = var_name.split("_")[-1]
-            irbem_input.magnetic_field_str = magnetic_field_str
+
+            # construct the maginput (Kp, Dst, ...) used for all irbem calls
+            maginput = proc.construct_maginput(time_var, indices_solar_wind, magnetic_field_str)
+            irbem_input = proc.IrbemInput(irbem_lib_path, magnetic_field_str, maginput, irbem_options, num_cores)
 
             if "B_local" in var_name:
                 magnetic_field_results |= proc.get_local_B_field(xgeo_var, time_var, irbem_input)
@@ -137,7 +137,7 @@ def _get_pa_eq(
 ) -> dict[str, proc.IrbemOutput]:
     print("\tCalculating equatorial pitch angle ...")
 
-    pa_local = (pa_local_var.get_data() * pa_local_var.metadata.unit).to_value(u.radian)
+    pa_local = pa_local_var.get_data(u.radian)
 
     if ("B_eq_" + irbem_input.magnetic_field_str) not in magnetic_field_results:
         magnetic_field_results |= proc.get_magequator(xgeo_var, time_var, irbem_input)

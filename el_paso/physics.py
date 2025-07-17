@@ -6,13 +6,14 @@ from numpy.typing import NDArray
 ParticleLiteral = Literal["electron", "proton", "helium", "oxygen"]
 
 def rest_energy(species:ParticleLiteral) -> float:
-    """
-    Return the rest energy for the input species.
+    """Return the rest energy for the input species.
+
     Args:
         species (str): The species of particle ('electron', 'proton', 'helium', 'oxygen').
 
     Returns:
         np.ndarray or float: The rest energy of the species in MeV.
+
     Raises:
         ValueError: If an unknown species is provided.
     """
@@ -21,7 +22,7 @@ def rest_energy(species:ParticleLiteral) -> float:
         "electron": 0.511,  # MeV
         "proton": 938.272,  # MeV
         "helium": 3727.379,  # MeV (Helium-4 nucleus)
-        "oxygen": 14958.9  # MeV (Oxygen-16 nucleus)
+        "oxygen": 14958.9,  # MeV (Oxygen-16 nucleus)
     }
 
     # Set mc2 based on the species

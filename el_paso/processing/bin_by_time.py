@@ -1,26 +1,31 @@
+import logging
+import typing
 from datetime import datetime, timedelta
 from typing import Literal
 
 import numpy as np
-from astropy import units as u
 from numpy.typing import NDArray
 
-from el_paso import TimeBinMethod, Variable
+import el_paso as ep
 from el_paso.utils import datenum_to_datetime, timed_function
 
 
 @timed_function()
 def bin_by_time(
-    time_variable: Variable,
-    variables: dict[str, Variable],
-    time_bin_method_dict: dict[str, TimeBinMethod],
+    time_variable: ep.Variable,
+    variables: dict[str, ep.Variable],
+    time_bin_method_dict: dict[str, ep.TimeBinMethod],
     time_binning_cadence: timedelta,
-    window_alignement: Literal["center", "left"] = "center",
-) -> Variable:
-    print("Time binning ...")
+    window_alignement: Literal["center", "left", "right"] = "center",
+    start_time: datetime|None=None,
+    end_time: datetime|None=None,
+) -> ep.Variable:
 
-    start_time = datenum_to_datetime(time_variable.get_data(u.datenum)[0])
-    end_time   = datenum_to_datetime(time_variable.get_data(u.datenum)[-1])
+    logger = logging.getLogger(__name__)
+    logger.info("Binning by time...")
+
+    start_time = start_time or datenum_to_datetime(time_variable.get_data(ep.units.datenum)[0])
+    end_time   = end_time or datenum_to_datetime(time_variable.get_data(ep.units.datenum)[-1])
 
     binned_time, time_bins = _create_binned_time_and_bins(start_time, end_time, time_binning_cadence, window_alignement)
 
@@ -33,18 +38,20 @@ def bin_by_time(
             continue
 
         # Just repeat in case of no time dependency
-        if time_bin_method_dict[key] == TimeBinMethod.Repeat:
+        if time_bin_method_dict[key] == ep.TimeBinMethod.Repeat:
             var.set_data(np.repeat(var.get_data()[np.newaxis, ...], len(binned_time), axis=0), "same")
             continue
 
         # check if time variable and data content sizes match
 
         if var.get_data().shape[0] != len(time_variable.get_data()):
-            raise ValueError(f"Variable {key}: size of dimension 0 does not match length of time variable!")
+            msg = f"Variable {key}: size of dimension 0 does not match length of time variable!"
+            raise ValueError(msg)
 
         # calculate bin indices for given time array if it has not been calculated before
         if not index_iterables:
-            index_iterables = _calculate_index_iterables(time_variable.get_data(u.posixtime), time_bins)
+            timestamps = typing.cast("NDArray[np.floating]", time_variable.get_data(ep.units.posixtime))
+            index_iterables = _calculate_index_iterables(timestamps, time_bins)
 
         unique_indices, indices_separation = index_iterables
 
@@ -76,13 +83,17 @@ def bin_by_time(
         # update metadata
         var.metadata.add_processing_note(f"Time binned with method {time_bin_method_dict[key].value} and cadence of {time_binning_cadence.total_seconds()/60} minutes")
 
-    new_time_var = Variable(data=binned_time, original_unit=u.posixtime)
+    new_time_var = ep.Variable(data=binned_time, original_unit=ep.units.posixtime)
     new_time_var.metadata.add_processing_note("Created while time binning")
 
     return new_time_var
 
 
-def _create_binned_time_and_bins(start_time:datetime, end_time:datetime, time_binning_cadence:timedelta, window_alignement:str):
+def _create_binned_time_and_bins(start_time:datetime,
+                                 end_time:datetime,
+                                 time_binning_cadence:timedelta,
+                                 window_alignement:Literal["left", "center", "right"]) -> tuple[NDArray[np.floating], list[float]]:
+
     binned_time = np.arange(start_time.timestamp(), end_time.timestamp(), time_binning_cadence.total_seconds())
 
     # built bins
@@ -109,15 +120,15 @@ def _create_binned_time_and_bins(start_time:datetime, end_time:datetime, time_bi
             current_time = time_bins[-1] + time_binning_cadence.total_seconds()
             time_bins.append(current_time)
     else:
-        raise ValueError(f"Encountered invalid window_alignment argument in time binning: {window_alignement}!")
+        msg = f"Encountered invalid window_alignment argument in time binning: {window_alignement}!"
+        raise ValueError(msg)
 
     return binned_time, time_bins
 
 
-def _calculate_index_iterables(timestamps: NDArray[np.float64], time_bins: list[int]):
+def _calculate_index_iterables(timestamps: NDArray[np.floating], time_bins: list[float]) -> tuple[NDArray[np.intp], list[int]]:
 
     index_set = np.digitize(timestamps, time_bins)
-    # index_set = np.where(index_set == len(time_bins), 0, index_set) # remove values before and beyond time array; -1 will be ignored later on
     index_set = index_set - 1  # shift indices by one to match time array
 
     unique_indices = np.unique(index_set)

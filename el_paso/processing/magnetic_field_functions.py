@@ -2,13 +2,16 @@ import logging
 import os
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from functools import partial
+from io import StringIO
 from multiprocessing import Pool
 from pathlib import Path
 from typing import NamedTuple
 
 import numpy as np
+import pandas as pd
+import requests
 from astropy import units as u
 from numpy.typing import NDArray
 from scipy.interpolate import interp1d
@@ -20,19 +23,108 @@ from el_paso.utils import timed_function
 from IRBEM import Coords, MagFields
 
 
+def get_W_parameters(timestamps:NDArray[np.float64]) -> dict[str, NDArray[np.float64]]:
+
+    datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
+    years = np.unique([dt.year for dt in datetimes])
+
+    if years[-1] > 2023:
+        msg = "W parameters are only available until 2023!"
+        raise ValueError(msg)
+
+    w_params:dict[str, list[float]] = {"W1":[], "W2":[], "W3":[], "W4":[], "W5":[], "W6":[]}
+
+    for year in years:
+
+        url = f"https://geo.phys.spbu.ru/~tsyganenko/models/ts05/{year:d}_OMNI_5m_with_TS05_variables.dat"
+
+        response = requests.get(url, stream=True, verify=False)
+
+        if response.status_code == 404:
+            msg = f"File not found on server: {url}"
+            raise FileNotFoundError(msg)
+
+        response.raise_for_status()
+
+        df = pd.read_csv(StringIO(response.text), names=["Year", "Day", "Hour", "Min", "W1", "W2", "W3", "W4", "W5", "W6"], usecols=[0,1,2,3,17,18,19,20,21,22], sep="\s+")
+
+        timestamps_data:list[datetime] = []
+
+        for _, row in df.loc[:,["Year","Day","Hour","Min"]].iterrows():
+            year = int(row["Year"])
+            day  = int(row["Day"])
+            hour = int(row["Hour"])
+            minute = int(row["Min"])
+
+            timestamps_data.append(datetime.strptime(f"{year:04d}-{day:03d}-{hour:02d}-{minute:02d}", "%Y-%j-%H-%M").replace(tzinfo=timezone.utc).timestamp())
+
+        # find the timestamps for the current year
+        timestamp_year_begin = datetime(year,1,1,tzinfo=timezone.utc).timestamp()
+        timestamp_year_end = datetime(year,12,31,23,59,59,tzinfo=timezone.utc).timestamp()
+
+        curr_year_idx = (timestamps >= timestamp_year_begin) & (timestamps <= timestamp_year_end)
+
+        for w_str in ["W1", "W2", "W3", "W4", "W5", "W6"]:
+            w_data = np.interp(timestamps[curr_year_idx], timestamps_data, df[w_str].values)
+
+            w_params[w_str] += list(w_data)
+
+    return {key: np.asarray(data).astype(np.float64) for key, data in w_params.items()}
+
+
+def calculate_G1(timestamps:NDArray[np.float64], sw_speed:NDArray[np.float64], IMF_Bz:NDArray[np.float64], IMF_By:NDArray[np.float64]) -> NDArray[np.float64]:
+
+    B_perp = np.sqrt(IMF_Bz**2 + IMF_By**2)
+    theta = np.atan2(IMF_By, IMF_Bz)
+
+    G1:list[float] = []
+
+    for it, curr_time in enumerate(timestamps):
+        idx = np.argwhere(np.abs(timestamps[:it+1] - curr_time) <= timedelta(hours=1).total_seconds())
+
+        G1.append(float(np.nanmean(sw_speed[idx] * (B_perp[idx]/40)**2/(1+B_perp[idx]/40) * np.sin(theta[idx]/2)**3)))
+
+    return np.asarray(G1)
+
+def calculate_G2(timestamps:NDArray[np.float64], sw_speed:NDArray[np.float64], IMF_Bz:NDArray[np.float64]) -> NDArray[np.float64]:
+
+    Bs = np.where(IMF_Bz < 0, -IMF_Bz, 0)
+
+    G2:list[float] = []
+
+    for it, curr_time in enumerate(timestamps):
+        idx = np.argwhere(np.abs(timestamps[:it+1] - curr_time) <= timedelta(hours=1).total_seconds())
+
+        G2.append(float(np.nanmean(sw_speed[idx] * Bs[idx]/200)))
+
+    return np.asarray(G2)
+
+def calculate_G3(timestamps:NDArray[np.float64], sw_speed:NDArray[np.float64], sw_density:NDArray[np.float64], IMF_Bz:NDArray[np.float64]) -> NDArray[np.float64]:
+
+    Bs = np.where(IMF_Bz < 0, -IMF_Bz, 0)
+
+    G3:list[float] = []
+
+    for it, curr_time in enumerate(timestamps):
+        idx = np.argwhere(np.abs(timestamps[:it+1] - curr_time) <= timedelta(hours=1).total_seconds())
+
+        G3.append(float(np.nanmean(sw_density[idx] * sw_speed[idx] * Bs[idx]/2000)))
+
+    return np.asarray(G3)
+
 @dataclass
 class IrbemInput:
     irbem_lib_path: str
     magnetic_field_str: str
     maginput: dict[str, np.ndarray]
-    irbem_options: list
+    irbem_options: list[int]
     num_cores: int = 4
 
 class IrbemOutput(NamedTuple):
     arr: NDArray[np.float64]
     unit: u.UnitBase
 
-def construct_maginput(time_var: Variable):
+def construct_maginput(time_var: Variable, indices_solar_wind: dict[str, Variable]|None=None, magnetic_field_str:str|None=None):
     """Construct the basic magnetospheric input parameters array.
 
     This function retrieves all solar wind data from the ACE dataset on CDAWeb, as well as the Kp and Dst indices,
@@ -61,55 +153,185 @@ def construct_maginput(time_var: Variable):
     Returns:
         np.ndarray: Array of interpolated magnetospheric input parameters.
     """
-    time = time_var.get_data()
 
-    start_time = datetime.fromtimestamp(time[0], tz=timezone.utc)
-    end_time = datetime.fromtimestamp(time[-1], tz=timezone.utc)
+    time = time_var.get_data(u.posixtime)
 
-    os.environ["OMNI_LOW_RES_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso" / "KpOmni")
-    os.environ["RT_KP_NIEMEGK_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso" / "KpNiemegk")
-    os.environ["KP_ENSEMBLE_OUTPUT_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso")
-    os.environ["RT_KP_SWPC_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso")
+    if indices_solar_wind is None:
 
-    kp_df = read_kp_from_multiple_models(start_time, end_time, download=True, synthetic_now_time=datetime.now(tz=timezone.utc))
+        start_time = datetime.fromtimestamp(time[0], tz=timezone.utc)
+        end_time = datetime.fromtimestamp(time[-1], tz=timezone.utc)
 
-    kp_time = [dt.timestamp() for dt in kp_df.index.to_pydatetime()]
-    kp_value = kp_df["kp"].values
+        os.environ["OMNI_LOW_RES_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso" / "KpOmni")
+        os.environ["RT_KP_NIEMEGK_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso" / "KpNiemegk")
+        os.environ["KP_ENSEMBLE_OUTPUT_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso")
+        os.environ["RT_KP_SWPC_STREAM_DIR"] = str(Path(os.getenv("HOME")) / ".el_paso")
 
-    interpolation_function = interp1d(kp_time, kp_value, kind="previous", bounds_error=False, fill_value="extrapolate")
+        kp_df = read_kp_from_multiple_models(start_time, end_time, download=True, synthetic_now_time=datetime.now(tz=timezone.utc))
 
-    # Interpolate the data
-    interpolated_data = interpolation_function(time)
-    kp_data = interpolated_data
+        kp_time = [dt.timestamp() for dt in kp_df.index.to_pydatetime()]
+        kp_value = kp_df["kp"].values
 
-    # Interpolate data to the newtime cadence
-    # Dst = interpolate_data(dst_data['Dst'], newtime)
-    # Dsw = interpolate_data(ace_data['n_p'], newtime)
-    # Vsw = interpolate_data(ace_data['v_sw'], newtime)
-    # Pdyn = 1.6726e-6 * Dsw * Vsw ** 2  # Calculate dynamic pressure
-    # By = interpolate_data(ace_data['by_gsm'], newtime)
-    # Bz = interpolate_data(ace_data['bz_gsm'], newtime)
-    # AL = np.full_like(Kp, np.nan)  # Fill AL with NaNs
+        interpolation_function = interp1d(kp_time, kp_value, kind="previous", bounds_error=False, fill_value="extrapolate")
 
-    # Construct the output array
-    maginput = np.full((len(time), 25), np.nan)
-    maginput[:, 0] = np.asarray(kp_data * 10, dtype=np.float64)
-    # IRBEM takes Kp10 as an input
-    """
-    1 Kp value of Kp as in OMNI2 files but has to be double instead of integer type. (NOTE, consistent with OMNI2, this is Kp*10, and it is in the range 0 to 90)
-    2 Dst Dst index (nT)
-    3 Dsw solar wind density (cm-3)
-    4 Vsw solar wind velocity (km/s)
-    5 Pdyn solar wind dynamic pressure (nPa)
-    6 By GSM y component of interplanetary magnetic field (nT)
-    7 Bz GSM z component of interplanetary magnetic field (nT)
-    8 G1 <Vsw (Bperp/40)2/(1+Bperp/40) sin3(θ/2)> where the <> mean an average over the previous 1 hour, Bperp is the transverse IMF component (GSM) and θ its clock angle
-    9 G2 <a Vsw Bs> where Bs=|IMF Bz| when IMF Bz < 0 and Bs=0 when IMF Bz > 0, a=0.005
-    10 G3 <Vsw Dsw Bs/2000>
-    11-16 W1 W2 W3 W4 W5 W6 see definitions in (Tsyganenko et al., 2005)
-    17 AL auroral index
-    18-25 reserved for future use (leave as NaN)
-    """
+        # Interpolate the data
+        interpolated_data = interpolation_function(time)
+        kp_data = interpolated_data
+
+        # Interpolate data to the newtime cadence
+        # Dst = interpolate_data(dst_data['Dst'], newtime)
+        # Dsw = interpolate_data(ace_data['n_p'], newtime)
+        # Vsw = interpolate_data(ace_data['v_sw'], newtime)
+        # Pdyn = 1.6726e-6 * Dsw * Vsw ** 2  # Calculate dynamic pressure
+        # By = interpolate_data(ace_data['by_gsm'], newtime)
+        # Bz = interpolate_data(ace_data['bz_gsm'], newtime)
+        # AL = np.full_like(Kp, np.nan)  # Fill AL with NaNs
+
+        # Construct the output array
+        maginput = np.full((len(time), 25), np.nan)
+        maginput[:, 0] = np.asarray(kp_data * 10, dtype=np.float64)
+        # IRBEM takes Kp10 as an input
+        """
+        1 Kp value of Kp as in OMNI2 files but has to be double instead of integer type. (NOTE, consistent with OMNI2, this is Kp*10, and it is in the range 0 to 90)
+        2 Dst Dst index (nT)
+        3 Dsw solar wind density (cm-3)
+        4 Vsw solar wind velocity (km/s)
+        5 Pdyn solar wind dynamic pressure (nPa)
+        6 By GSM y component of interplanetary magnetic field (nT)
+        7 Bz GSM z component of interplanetary magnetic field (nT)
+        8 G1 <Vsw (Bperp/40)2/(1+Bperp/40) sin3(θ/2)> where the <> mean an average over the previous 1 hour, Bperp is the transverse IMF component (GSM) and θ its clock angle
+        9 G2 <a Vsw Bs> where Bs=|IMF Bz| when IMF Bz < 0 and Bs=0 when IMF Bz > 0, a=0.005
+        10 G3 <Vsw Dsw Bs/2000>
+        11-16 W1 W2 W3 W4 W5 W6 see definitions in (Tsyganenko et al., 2005)
+        17 AL auroral index
+        18-25 reserved for future use (leave as NaN)
+        """
+
+    else:
+
+        maginput = np.full((len(time), 25), np.nan)
+        if "Kp" in indices_solar_wind:
+            kp_data = indices_solar_wind["Kp"].get_data()
+
+            if len(kp_data) != len(time):
+                msg = f"Encountered size missmatch for Kp: len of Kp data: {len(kp_data)}, requested len: {len(time)}"
+                raise ValueError(msg)
+
+            maginput[:, 0] = np.asarray(np.round(kp_data*10), dtype=np.float64)
+
+        if "Dst" in indices_solar_wind:
+            dst_data = indices_solar_wind["Dst"].get_data()
+
+            match magnetic_field_str:
+                case "T89"|"T01s"|"TS04"|"T04s"|"TS05":
+                    pass
+                case "T01":
+                    dst_data = dst_data.clip(-50, 20)
+                case "T96":
+                    dst_data = dst_data.clip(-100, 20)
+                case _:
+                    msg = "Please provide a valid magnetic field string!"
+                    raise ValueError(msg)
+
+            if len(dst_data) != len(time):
+                msg = f"Encountered size missmatch for Kp: len of Kp data: {len(dst_data)}, requested len: {len(time)}"
+                raise ValueError(msg)
+
+            maginput[:, 1] = np.asarray(dst_data, dtype=np.float64)
+
+        if "Pdyn" in indices_solar_wind:
+            pdyn_data = indices_solar_wind["Pdyn"].get_data()
+
+            match magnetic_field_str:
+                case "T89"|"T01s"|"TS04"|"T04s"|"TS05":
+                    pass
+                case "T01":
+                    pdyn_data = pdyn_data.clip(0.5, 5)
+                case "T96":
+                    pdyn_data = pdyn_data.clip(0.5, 10)
+                case _:
+                    msg = "Please provide a valid magnetic field string!"
+                    raise ValueError(msg)
+
+            if len(pdyn_data) != len(time):
+                msg = f"Encountered size missmatch for Kp: len of Kp data: {len(pdyn_data)}, requested len: {len(time)}"
+                raise ValueError(msg)
+
+            maginput[:, 4] = np.asarray(pdyn_data, dtype=np.float64)
+
+        if "IMF_By" in indices_solar_wind:
+            imf_by_data = indices_solar_wind["IMF_By"].get_data()
+
+            match magnetic_field_str:
+                case "T89"|"T01s"|"TS04"|"T04s"|"TS05":
+                    pass
+                case "T01":
+                    imf_by_data = imf_by_data.clip(-5, 5)
+                case "T96":
+                    imf_by_data = imf_by_data.clip(-10, 10)
+                case _:
+                    msg = "Please provide a valid magnetic field string!"
+                    raise ValueError(msg)
+
+            if len(imf_by_data) != len(time):
+                msg = f"Encountered size missmatch for Kp: len of Kp data: {len(imf_by_data)}, requested len: {len(time)}"
+                raise ValueError(msg)
+
+            maginput[:, 5] = np.asarray(np.abs(imf_by_data), dtype=np.float64)
+
+        if "IMF_Bz" in indices_solar_wind:
+            imf_bz_data = indices_solar_wind["IMF_Bz"].get_data()
+
+            match magnetic_field_str:
+                case "T89"|"T01s"|"TS04"|"T04s"|"TS05":
+                    pass
+                case "T01":
+                    imf_bz_data = imf_bz_data.clip(-5, 5)
+                case "T96":
+                    imf_bz_data = imf_bz_data.clip(-10, 10)
+                case _:
+                    msg = "Please provide a valid magnetic field string!"
+                    raise ValueError(msg)
+
+            if len(imf_bz_data) != len(time):
+                msg = f"Encountered size missmatch for Kp: len of Kp data: {len(imf_bz_data)}, requested len: {len(time)}"
+                raise ValueError(msg)
+
+            maginput[:, 6] = np.asarray(np.abs(imf_bz_data), dtype=np.float64)
+
+
+        if magnetic_field_str in ["T01", "T01s"]:
+
+            sw_speed = indices_solar_wind["SW_speed"].get_data()
+            sw_density = indices_solar_wind["SW_density"].get_data()
+            imf_bz = indices_solar_wind["IMF_Bz"].get_data()
+            imf_by = indices_solar_wind["IMF_By"].get_data()
+
+            g2 = calculate_G2(time, sw_speed, imf_bz)
+
+            if magnetic_field_str == "T01":
+                g1 = calculate_G1(time, sw_speed, imf_bz, imf_by)
+                g1 = g1.clip(0, 10)
+
+                g2 = g2.clip(0, 10)
+
+                maginput[:, 7] = g1
+
+            maginput[:, 8] = g2
+
+            if magnetic_field_str == "T01s":
+                g3 = calculate_G3(time, sw_speed, sw_density, imf_bz)
+                maginput[:, 9] = g3
+
+    if magnetic_field_str in ["TS04", "T04s", "TS05"]:
+
+        w_params = get_W_parameters(time)
+
+        maginput[:,10] = w_params["W1"]
+        maginput[:,11] = w_params["W2"]
+        maginput[:,12] = w_params["W3"]
+        maginput[:,13] = w_params["W4"]
+        maginput[:,14] = w_params["W5"]
+        maginput[:,15] = w_params["W6"]
 
     maginput_dict = {
         "Kp": maginput[:, 0],
@@ -134,14 +356,23 @@ def construct_maginput(time_var: Variable):
     return maginput_dict
 
 
-def _magnetic_field_str_to_kext(magnetic_field_str):
+def _magnetic_field_str_to_kext(magnetic_field_str:str) -> int:
     match magnetic_field_str:
         case "T89":
             kext = 4
-        case "T04s":
+        case "T01":
+            kext = 9
+        case "T01s":
+            kext = 10
+        case "TS04"|"TS05"|"T04s":
             kext = 11
+        case "T96":
+            kext = 7
         case "OP77Q":
             kext = 5
+        case _:
+            msg = "Invalid magnetic field model!"
+            raise ValueError(msg)
 
     return kext
 

@@ -1,0 +1,20 @@
+site_name: ELoberative Particle Analysis from Particle Observations (EL PASO)
+site_url: https://example.com
+
+theme:
+  name: material
+  features:
+    - navigation.instant
+
+nav:
+  - Home: index.md
+  - Usage:
+    - Getting Started: Usage/getting_started.md
+  - API Reference:
+    - API_reference/save_standard.md
+    - API_reference/source_file.md
+    - API_reference/variable.md
+
+plugins:
+- mkdocstrings:
+    default_handler: python
