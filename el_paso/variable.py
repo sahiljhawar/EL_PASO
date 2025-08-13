@@ -17,7 +17,20 @@ if typing.TYPE_CHECKING:
 
 
 class TimeBinMethod(Enum):
-    """Enum for time binning methods."""
+    """Enum for time binning methods.
+
+    Attributes:
+        Mean (str): Calculates the mean of the data.
+        NanMean (str): Calculates the mean of the data, ignoring NaNs.
+        Median (str): Calculates the median of the data.
+        NanMedian (str): Calculates the median of the data, ignoring NaNs.
+        Merge (str): Concatenates the data.
+        NanMax (str): Calculates the maximum of the data, ignoring NaNs.
+        NanMin (str): Calculates the minimum of the data, ignoring NaNs.
+        NoBinning (str): Applies no binning.
+        Repeat (str): Repeats the data.
+        Unique (str): Returns unique values from the data.
+    """
 
     Mean = "Mean"
     NanMean = "NanMean"
@@ -28,18 +41,21 @@ class TimeBinMethod(Enum):
     NanMin = "NanMin"
     NoBinning = "NoBinning"
     Repeat = "Repeat"
+    Unique = "Unique"
 
     def __call__(self, data:NDArray[np.generic]) -> NDArray[np.generic]:  # noqa: C901
-        """Applyies the binning method to the provided data.
+        """Applies the binning method to the provided data.
 
         Args:
             data (NDArray[np.generic]): The input data array to be binned or aggregated.
 
         Returns:
-            NDArray[np.generic]: The resulting array after applying the selected binning or aggregation method.
+            NDArray[np.generic]: The resulting array after applying the selected
+                binning or aggregation method.
 
         Raises:
-            TypeError: If the selected binning method requires numeric types and the input data is not numeric.
+            TypeError: If the selected binning method requires numeric types and the
+                input data is not numeric.
         """
         binned_array:NDArray[np.generic]
 
@@ -71,6 +87,11 @@ class TimeBinMethod(Enum):
                 binned_array = data
             case "Repeat":
                 binned_array = data
+            case "Unique":
+                binned_array = np.unique(data, axis=0)
+
+                if data.dtype.kind in {"U", "S"}:
+                    binned_array = np.asarray(["".join(binned_array)])
 
         return binned_array
 
@@ -79,18 +100,19 @@ class TimeBinMethod(Enum):
 class VariableMetadata:
     """A class holding the metadata of a variable.
 
-    :param unit: The unit of the variable.
-    :type unit: u.UnitBase
-    :param original_cadence_seconds: The original cadence of the data in seconds.
-    :type original_cadence_seconds: float
-    :param source_files: The list of SourceFiles, which variable contains data from.
-    :type source_files: list[SourceFile]
-    :param description: The description of the variable explaining what kind of data this variable contains.
-    :type description: str
-    :param processing_notes: The processing notes of the variable explaining all steps done to achieve the final result.
-    :type processing_notes: str
-    :param standard_name: The name of the standard variable this variable complies to.
-    :type standard_name: str
+    Attributes:
+        unit (u.UnitBase): The unit of the variable. Defaults to
+            `u.dimensionless_unscaled`.
+        original_cadence_seconds (float): The original cadence of the data in seconds.
+            Defaults to 0.
+        source_files (list[str]): The list of SourceFiles, which variable contains
+            data from. Defaults to an empty list.
+        description (str): The description of the variable explaining what kind of data
+            this variable contains. Defaults to "".
+        processing_notes (str): The processing notes of the variable explaining all
+            steps done to achieve the final result. Defaults to "".
+        standard_name (str): The name of the standard variable this variable complies
+            to. Defaults to "".
     """
 
     unit: u.UnitBase = u.dimensionless_unscaled
@@ -110,8 +132,8 @@ class VariableMetadata:
     def add_processing_note(self, processing_note:str) -> None:
         """Adds a processing note to the metadata.
 
-        The note is prefixed with the current processing steps counter and a newline character is appended.
-        The processing steps counter is then incremented.
+        The note is prefixed with the current processing steps counter and a newline
+        character is appended. The processing steps counter is then incremented.
 
         Args:
             processing_note (str): The note to be added to the processing notes.
@@ -122,7 +144,13 @@ class VariableMetadata:
         self.processing_steps_counter += 1
 
 class Variable:
-    """Variable class holding data and metadata."""
+    """Variable class holding data and metadata.
+
+    Attributes:
+        _data (NDArray[np.generic]): The numerical data of the variable.
+        metadata (VariableMetadata): An instance of `VariableMetadata` holding
+            information about the variable.
+    """
 
     __slots__ = "_data", "metadata"
 
@@ -136,7 +164,15 @@ class Variable:
         description: str = "",
         processing_notes: str = "",
     ) -> None:
+        """Initializes a Variable instance.
 
+        Args:
+            original_unit (u.UnitBase): The original unit of the data.
+            data (NDArray[np.generic] | None): The numerical data. Defaults to an empty
+                numpy array if None.
+            description (str): A description of the variable. Defaults to "".
+            processing_notes (str): Notes on how the data was processed. Defaults to "".
+        """
         self._data = np.array([], dtype=np.generic) if data is None else data
 
         self.metadata = VariableMetadata(
@@ -146,21 +182,21 @@ class Variable:
         )
 
     def __repr__(self) -> str:
+        """Returns a string representation of the Variable object."""
         return f"Variable holding {self._data.shape} data points with metadata: {self.metadata}"
 
     def convert_to_unit(self, target_unit:u.UnitBase|str) -> None:
-        """Convert the data to a given unit.
+        """Converts the data to a given unit.
 
-        :param target_unit: The unit the data should be converted to.
-        :type target_unit: u.UnitBase
-        :raises ValueError: if the 'unit' attribute of the metadata has not been set
+        Args:
+            target_unit (u.UnitBase | str): The unit the data should be converted to.
         """
         if isinstance(target_unit, str):
             target_unit = u.Unit(target_unit)
 
         if self.metadata.unit != target_unit:
             data_with_unit = u.Quantity(self._data, self.metadata.unit)
-            self._data = typing.cast("NDArray[np.generic]", data_with_unit.to_value(target_unit)) #type: ignore
+            self._data = typing.cast("NDArray[np.generic]", data_with_unit.to_value(target_unit)) #type: ignore[reportUnknownMemberType]
 
             self.metadata.unit = target_unit
 
@@ -173,10 +209,18 @@ class Variable:
         ...
 
     def get_data(self, target_unit:u.UnitBase|str|None=None) -> NDArray[np.generic]:
-        """Get the data of the variable.
+        """Gets the data of the variable.
 
-        :return: The data of the variable.
-        :rtype: NDArray[np.generic]
+        Args:
+            target_unit (u.UnitBase | str | None): The unit to convert the data to
+                before returning. If None, the data is returned in its current unit.
+                Defaults to None.
+
+        Returns:
+            NDArray[np.generic]: The data of the variable.
+
+        Raises:
+            TypeError: If `target_unit` is provided and the data is not numeric.
         """
         if target_unit is None:
             return self._data
@@ -188,25 +232,54 @@ class Variable:
             msg = f"Unit conversion is only supported for numeric types! Encountered for variable {self}."
             raise TypeError(msg)
 
-        return typing.cast("NDArray[np.generic]", u.Quantity(self._data, self.metadata.unit).to_value(target_unit)) #type: ignore
+        return typing.cast("NDArray[np.generic]", u.Quantity(self._data, self.metadata.unit).to_value(target_unit)) #type: ignore[reportUnknownMemberType]
 
-    def set_data(self, data:NDArray[np.generic], unit:Literal["same"]|str|u.UnitBase) -> None:
+    def set_data(self, data:NDArray[np.generic], unit:Literal["same"]|str|u.UnitBase) -> None:  # noqa: PYI051
+        """Sets the data and optionally updates the unit of the variable.
+
+        Args:
+            data (NDArray[np.generic]): The new data array.
+            unit (Literal["same"] | str | u.UnitBase): The unit of the new data.
+                If "same", the existing unit is kept. Can be a string representation
+                of a unit or an `astropy.units.UnitBase` object.
+
+        Raises:
+            TypeError: If `unit` is not "same", a string, or an `astropy.units.UnitBase` object.
+        """
         self._data = data
 
         if isinstance(unit, str):
             if unit != "same":
                 self.metadata.unit = u.Unit(unit)
-        elif isinstance(unit, u.UnitBase): #type: ignore
+        elif isinstance(unit, u.UnitBase): #type: ignore[reportUnknownMemberType]
             self.metadata.unit = unit
         else:
             msg = "unit must be either a str or a astropy unit!"
             raise TypeError(msg)
 
-    def transpose_data(self, seq: list[int]|tuple[int,...]):
+    def transpose_data(self, seq: list[int]|tuple[int,...]) -> None:
+        """Transposes the internal data array.
+
+        Args:
+            seq (list[int] | tuple[int, ...]): The axes to transpose to. See
+                `numpy.transpose` for details.
+        """
         self._data = np.transpose(self._data, axes=seq)
 
-    def apply_thresholds_on_data(self, lower_threshold: float = -np.inf, upper_threshold: float = np.inf):
+    def apply_thresholds_on_data(self, lower_threshold: float = -np.inf, upper_threshold: float = np.inf) -> None:
+        """Applies lower and upper thresholds to the data.
 
+        Values outside the thresholds (exclusive) are set to NaN.
+
+        Args:
+            lower_threshold (float): The lower bound for the data. Defaults to
+                negative infinity.
+            upper_threshold (float): The upper bound for the data. Defaults to
+                positive infinity.
+
+        Raises:
+            TypeError: If the data is not numeric.
+        """
         if not np.issubdtype(self._data.dtype, np.number):
             msg = f"Thresholds are only supported for numeric types! Encountered for variable {self}."
             raise TypeError(msg)
@@ -215,7 +288,19 @@ class Variable:
         self._data = np.where((self._data > lower_threshold) & (self._data < upper_threshold), self._data, np.nan)
 
     def truncate(self, time_variable:Variable, start_time:float|datetime, end_time:float|datetime) -> None:
+        """Truncates the variable's data based on a time variable and a time range.
 
+        Args:
+            time_variable (Variable): A `Variable` object containing the time data.
+            start_time (float | datetime): The start time for truncation. Can be a
+                Unix timestamp (float) or a `datetime` object.
+            end_time (float | datetime): The end time for truncation. Can be a
+                Unix timestamp (float) or a `datetime` object.
+
+        Raises:
+            ValueError: If the length of the variable's data does not match the
+                length of the `time_variable`'s data.
+        """
         if isinstance(start_time, datetime):
             start_time = enforce_utc_timezone(start_time).timestamp()
         if isinstance(end_time, datetime):

@@ -8,18 +8,22 @@ from typing import Literal
 
 import numpy as np
 from astropy import units as u
-from get_arase_orbit_variables import get_arase_orbit_level_3_variables
 
 import el_paso as ep
+from IRBEM import Coords
+
+from .get_arase_orbit_variables import get_arase_orbit_level_2_variables, get_arase_orbit_level_3_variables
 
 
 def process_mepe_level_3(start_time:datetime,
                          end_time:datetime,
                          irbem_lib_path:str|Path,
-                         mag_field:Literal["T89", "TS04"],
+                         mag_field:Literal["T89", "TS04", "OP77Q"],
                          raw_data_path:str|Path = ".",
                          processed_data_path:str|Path = ".",
-                         num_cores:int=4):
+                         num_cores:int=4,
+                         cadence:timedelta = timedelta(minutes=5),
+                         *, use_level_3_orbit_data:bool = True) -> None:
 
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
@@ -28,7 +32,10 @@ def process_mepe_level_3(start_time:datetime,
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
 
-    orb_variables = get_arase_orbit_level_3_variables(start_time, end_time, mag_field, raw_data_path=raw_data_path)
+    if use_level_3_orbit_data:
+        orb_variables = get_arase_orbit_level_3_variables(start_time, end_time, mag_field, raw_data_path=raw_data_path)
+    else:
+        orb_variables = get_arase_orbit_level_2_variables(start_time, end_time)
 
     file_name_stem = "erg_mepe_l3_pa_YYYYMMDD_.{6}.cdf"
     url = "https://ergsc.isee.nagoya-u.ac.jp/data/ergsc/satellite/erg/mepe/l3/pa/YYYY/MM/"
@@ -83,36 +90,92 @@ def process_mepe_level_3(start_time:datetime,
         "Energy": ep.TimeBinMethod.Repeat,
         "FEDU": ep.TimeBinMethod.NanMedian,
         "Pitch_angle": ep.TimeBinMethod.Repeat,
-        "B_local": ep.TimeBinMethod.NanMedian,
-        "B_eq": ep.TimeBinMethod.NanMedian,
-        "Lm": ep.TimeBinMethod.NanMean,
-        "Lstar": ep.TimeBinMethod.NanMean,
-        "MLT": ep.TimeBinMethod.NanMean,
-        "R0": ep.TimeBinMethod.NanMean,
     }
 
     binned_time_variable = ep.processing.bin_by_time(mepe_variables["Epoch"], variables=mepe_variables,
                                                     time_bin_method_dict=time_bin_methods,
-                                                    time_binning_cadence=timedelta(minutes=5),
+                                                    time_binning_cadence=cadence,
                                                     start_time=start_time,
                                                     end_time=end_time)
 
-    binned_time_variable = ep.processing.bin_by_time(orb_variables["Epoch"], variables=orb_variables,
-                                  time_bin_method_dict=time_bin_methods,
-                                  time_binning_cadence=timedelta(minutes=5),
-                                  start_time=start_time,
-                                  end_time=end_time)
-
     ep.processing.fold_pitch_angles_and_flux(mepe_variables["FEDU"],
-                                             mepe_variables["Pitch_angle"])
+                                            mepe_variables["Pitch_angle"])
 
     mepe_variables["FEDU"].apply_thresholds_on_data(lower_threshold=1e-21)
 
-    pa_local = mepe_variables["Pitch_angle"].get_data(u.radian)
-    pa_eq = np.asin(np.sin(pa_local) * np.sqrt(orb_variables["B_eq"].get_data(u.nT) / orb_variables["B_local"].get_data(u.nT))[:, np.newaxis])
-    mepe_variables["Pa_eq"] = ep.Variable(data=pa_eq, original_unit=u.radian)
+    if use_level_3_orbit_data:
 
-    saving_strategy = ep.saving_strategies.DataOrgStrategy(processed_data_path, "ARASE", "arase", "mepe-l3", "T04s", ".mat")
+        time_bin_methods = {
+            "B_local": ep.TimeBinMethod.NanMedian,
+            "B_eq": ep.TimeBinMethod.NanMedian,
+            "Lm": ep.TimeBinMethod.NanMean,
+            "Lstar": ep.TimeBinMethod.NanMean,
+            "MLT": ep.TimeBinMethod.NanMean,
+            "R0": ep.TimeBinMethod.NanMean,
+        }
+
+        binned_time_variable = ep.processing.bin_by_time(orb_variables["Epoch"], variables=orb_variables,
+                                    time_bin_method_dict=time_bin_methods,
+                                    time_binning_cadence=cadence,
+                                    start_time=start_time,
+                                    end_time=end_time)
+
+        pa_local = mepe_variables["Pitch_angle"].get_data(u.radian)
+        pa_eq = np.asin(np.sin(pa_local) * np.sqrt(orb_variables["B_eq"].get_data(u.nT) / orb_variables["B_local"].get_data(u.nT))[:, np.newaxis])
+        mepe_variables["Pa_eq"] = ep.Variable(data=pa_eq, original_unit=u.radian)
+
+    else:
+        time_bin_methods = {
+            "pos_sm": ep.TimeBinMethod.NanMean,
+        }
+
+        binned_time_variable = ep.processing.bin_by_time(orb_variables["Epoch"], variables=orb_variables,
+                                    time_bin_method_dict=time_bin_methods,
+                                    time_binning_cadence=cadence,
+                                    start_time=start_time,
+                                    end_time=end_time)
+
+        datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in binned_time_variable.get_data(ep.units.posixtime)]
+
+        geo_data = Coords(path=irbem_lib_path).transform(time=datetimes,
+                                                    pos=orb_variables["pos_sm"].get_data().astype(np.float64),
+                                                    sysaxesIn=ep.IRBEM_SYSAXIS_SM,
+                                                    sysaxesOut=ep.IRBEM_SYSAXIS_GEO)
+        pos_geo_var = ep.Variable(data=geo_data, original_unit=ep.units.RE)
+
+        irbem_options = [1, 1, 4, 4, 0]
+
+        var_names_to_compute = ["B_local_" + mag_field,
+                                "MLT_" + mag_field,
+                                "B_eq_" + mag_field,
+                                "R_eq_" + mag_field,
+                                "PA_eq_" + mag_field]
+                                # "Lm_" + mag_field]
+
+        magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+            time_var = binned_time_variable,
+            xgeo_var = pos_geo_var,
+            var_names_to_compute = var_names_to_compute,
+            irbem_lib_path = str(irbem_lib_path),
+            irbem_options = irbem_options,
+            num_cores = num_cores,
+            pa_local_var = mepe_variables["Pitch_angle"],
+        )
+
+        orb_variables["R0"] = magnetic_field_variables["R_eq_" + mag_field]
+        orb_variables["MLT"] = magnetic_field_variables["MLT_" + mag_field]
+        mepe_variables["Pa_eq"] = magnetic_field_variables["PA_eq_" + mag_field]
+        # orb_variables["Lm"] = magnetic_field_variables["Lm_" + mag_field]
+
+    match mag_field:
+        case "T89":
+            mag_field_save = "T89"
+        case "TS04":
+            mag_field_save = "T04s"
+        case "OP77Q":
+            mag_field_save = "OP77"
+
+    saving_strategy = ep.saving_strategies.DataOrgStrategy(processed_data_path, "ARASE", "arase", "mepe-l3", mag_field_save, ".mat")
 
     variables_to_save = {
         "time": binned_time_variable,
@@ -122,23 +185,29 @@ def process_mepe_level_3(start_time:datetime,
         "alpha_eq_model": mepe_variables["Pa_eq"],
         "R0": orb_variables["R0"],
         "MLT": orb_variables["MLT"],
-        "Lm": orb_variables["Lm"],
+        # "Lm": orb_variables["Lm"],
     }
-
-    from matplotlib import pyplot as plt
-    plt.plot(binned_time_variable.get_data(), orb_variables["Lm"].get_data()[:,-1])
-    plt.savefig("test.png")
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
 
-    from matplotlib import pyplot as plt
-    plt.plot(binned_time_variable.get_data(), orb_variables["R0"].get_data())
-    plt.savefig("test.png")
+    # variables_to_save = {
+    #     "time": binned_time_variable,
+    #     "flux/FEDU": mepe_variables["FEDU"],
+    #     "flux/energy": mepe_variables["Energy"],
+    #     "flux/alpha_local": mepe_variables["Pitch_angle"],
+    #     "flux/alpha_eq": mepe_variables["Pa_eq"],
+    #     f"position/{mag_field}/R0": orb_variables["R0"],
+    #     f"position/{mag_field}/MLT": orb_variables["MLT"],
+    #     f"position/{mag_field}/Lm": orb_variables["Lm"],
+    # }
+
+    # saving_strategy = ep.saving_strategies.MonthlyH5Strategy(processed_data_path, "arase_mepe-l3", kext=mag_field)
+    # ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
 
 if __name__ == "__main__":
 
-    start_time = datetime(2017, 9, 6, tzinfo=timezone.utc)
-    end_time = datetime(2017, 9, 12, tzinfo=timezone.utc)
+    start_time = datetime(2017, 7, 1, tzinfo=timezone.utc)
+    end_time = datetime(2017, 9, 30, 23, 59, tzinfo=timezone.utc)
 
     process_mepe_level_3(start_time, end_time, "../../IRBEM/libirbem.so", "TS04",
                          raw_data_path=".", processed_data_path=".", num_cores=16)

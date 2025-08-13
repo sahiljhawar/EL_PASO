@@ -11,12 +11,15 @@ import el_paso as ep
 from data_management.io import RBMDataSet
 from examples.VanAllenProbes.process_hope_electrons import process_hope_electrons
 
+# ruff: noqa: D103, S101, PLR2004
+
 sat_str_list = ["a"]
 mag_field_list = ["TS04"]
 
 @pytest.mark.parametrize("sat_str", sat_str_list)
 @pytest.mark.parametrize("mag_field", mag_field_list)
-def test_mageph_rbsp_T89(sat_str:Literal["a", "b"], mag_field:Literal["T89", "TS04"]):
+@pytest.mark.visual
+def test_mageph_rbsp(sat_str:Literal["a", "b"], mag_field:Literal["T89", "TS04"]):
 
     # process Lstar using el paso
     start_time = datetime(2013, 3, 17, tzinfo=timezone.utc)
@@ -26,7 +29,7 @@ def test_mageph_rbsp_T89(sat_str:Literal["a", "b"], mag_field:Literal["T89", "TS
     Path("tests/comparisons/processed_data").mkdir(exist_ok=True)
 
     # process_hope_electrons(start_time, end_time, sat_str, "IRBEM/libirbem.so", mag_field,
-    #                        raw_data_path="tests/comparisons/raw_data", processed_data_path="tests/comparisons/processed_data", num_cores=48)
+    #                        raw_data_path="tests/comparisons/raw_data", processed_data_path="tests/comparisons/processed_data", num_cores=12)
 
     match mag_field:
         case "T89":
@@ -105,15 +108,13 @@ def test_mageph_rbsp_T89(sat_str:Literal["a", "b"], mag_field:Literal["T89", "TS
 
     server_Lstar = []
     for it, _ in enumerate(el_paso_timestamps):
-        server_Lstar.append(np.interp(20, np.rad2deg(rbsp_data_server.alpha_eq_model[it,:]), rbsp_data_server.Lstar[it,:]))
+        server_Lstar.append(np.interp(20, np.rad2deg(rbsp_data_server.alpha_local[it,:]), rbsp_data_server.Lstar[it,:]))
 
     server_timestamps = [t.timestamp() for t in rbsp_data_server.datetime]
 
-    variables["Lstar"].apply_thresholds_on_data(lower_threshold=0.0)
-
     el_paso_Lstar = []
     for it, _ in enumerate(el_paso_timestamps):
-        el_paso_Lstar.append(np.interp(20, np.rad2deg(rbsp_data.alpha_eq_model[it,:]), rbsp_data.Lstar[it,:]))
+        el_paso_Lstar.append(np.interp(20, np.rad2deg(rbsp_data.alpha_local[it,:]), rbsp_data.Lstar[it,:]))
 
     deg_idx = np.argwhere(variables["Alpha_eq"].get_data() == 20)
 
@@ -125,7 +126,7 @@ def test_mageph_rbsp_T89(sat_str:Literal["a", "b"], mag_field:Literal["T89", "TS
 
     server_Lstar = []
     for it, _ in enumerate(el_paso_timestamps):
-        server_Lstar.append(np.interp(50, np.rad2deg(rbsp_data_server.alpha_eq_model[it,:]), rbsp_data_server.Lstar[it,:]))
+        server_Lstar.append(np.interp(50, np.rad2deg(rbsp_data_server.alpha_local[it,:]), rbsp_data_server.Lstar[it,:]))
 
     server_timestamps = [t.timestamp() for t in rbsp_data_server.datetime]
 
@@ -133,7 +134,7 @@ def test_mageph_rbsp_T89(sat_str:Literal["a", "b"], mag_field:Literal["T89", "TS
 
     el_paso_Lstar = []
     for it, _ in enumerate(el_paso_timestamps):
-        el_paso_Lstar.append(np.interp(50, np.rad2deg(rbsp_data.alpha_eq_model[it,:]), rbsp_data.Lstar[it,:]))
+        el_paso_Lstar.append(np.interp(50, np.rad2deg(rbsp_data.alpha_local[it,:]), rbsp_data.Lstar[it,:]))
 
     deg_idx = np.argwhere(variables["Alpha_eq"].get_data() == 50)
 
@@ -145,7 +146,7 @@ def test_mageph_rbsp_T89(sat_str:Literal["a", "b"], mag_field:Literal["T89", "TS
 
     server_Lstar = []
     for it, _ in enumerate(el_paso_timestamps):
-        server_Lstar.append(np.interp(70, np.rad2deg(rbsp_data_server.alpha_eq_model[it,:]), rbsp_data_server.Lstar[it,:]))
+        server_Lstar.append(np.interp(70, np.rad2deg(rbsp_data_server.alpha_local[it,:]), rbsp_data_server.Lstar[it,:]))
 
     server_timestamps = [t.timestamp() for t in rbsp_data_server.datetime]
 
@@ -153,7 +154,7 @@ def test_mageph_rbsp_T89(sat_str:Literal["a", "b"], mag_field:Literal["T89", "TS
 
     el_paso_Lstar = []
     for it, _ in enumerate(el_paso_timestamps):
-        el_paso_Lstar.append(np.interp(70, np.rad2deg(rbsp_data.alpha_eq_model[it,:]), rbsp_data.Lstar[it,:]))
+        el_paso_Lstar.append(np.interp(70, np.rad2deg(rbsp_data.alpha_local[it,:]), rbsp_data.Lstar[it,:]))
 
     deg_idx = np.argwhere(variables["Alpha_eq"].get_data() == 70)
 
@@ -163,9 +164,4 @@ def test_mageph_rbsp_T89(sat_str:Literal["a", "b"], mag_field:Literal["T89", "TS
     ax3.legend(["MagEph", "EL PASO", "Data server"])
     ax3.set_title("70 deg")
 
-    plt.savefig(f"mag_eph_test_{mag_field}.png")
-    plt.clf()
-
-    # plt.plot(timestamps, variables["Kp"].get_data(), "k")
-    # plt.plot(ep_Kp["Kp"][1].get_data(), ep_Kp["Kp"][0].get_data(), "r--")
-    # plt.savefig(f"mag_eph_test_Kp_{mag_field}.png")
+    plt.savefig(f"{Path(__file__).parent / f'mag_eph_test_{mag_field}.png'}")
