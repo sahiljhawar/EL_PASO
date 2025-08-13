@@ -1,13 +1,17 @@
 import logging
 import pickle
+import typing
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, NamedTuple
 
 import h5py  # type: ignore[reportMissingTypeStubs]
+import numpy as np
+from astropy import units as u  # type: ignore[reportMissingTypeStubs]
 from scipy.io import savemat  # type: ignore[reportMissingTypeStubs]
 
 from el_paso import Variable
@@ -20,9 +24,11 @@ class OutputFile(NamedTuple):
     Attributes:
         name (str): The name of the output file.
         names_to_save (list[str]): List of variable names to be saved in the output file.
+        save_incomplete (bool): If True, allows saving even if some variables are missing.
     """
     name: str
     names_to_save: list[str]
+    save_incomplete:bool = False
 
 class SavingStrategy(ABC):
     """Abstract base class for defining strategies to save output files with specific time intervals and variables.
@@ -155,12 +161,16 @@ class SavingStrategy(ABC):
 
                 target_variables[name_to_save] = var_to_save
             else:
-                warnings.warn(f"Could not find target variable {name_to_save}!", stacklevel=2)
-                return None
+                msg = f"Could not find target variable {name_to_save}!"
+                warnings.warn(msg, stacklevel=2)
+                if output_file.save_incomplete:
+                    target_variables[name_to_save] = Variable(original_unit=u.dimensionless_unscaled, data=np.array([]))
+                else:
+                    return None
 
         return target_variables
 
-    def save_single_file(self, file_path:Path, dict_to_save:dict[str,Any], *, append:bool=False) -> None:
+    def save_single_file(self, file_path:Path, dict_to_save:dict[str,Any], *, append:bool=False) -> None:  # noqa: C901
         """Saves variable data to a single file in one of the supported formats (.mat, .pickle, .h5).
 
         Parameters:
@@ -197,10 +207,28 @@ class SavingStrategy(ABC):
 
         elif format_name == ".h5":
             with h5py.File(file_path, "w") as file:
-                for key, value in dict_to_save.items():
-                    if key == "metadata":
+
+                for path, value in dict_to_save.items():
+
+                    if path == "metadata":
                         continue
-                    file.create_dataset(key, data=value, compression="gzip") # type: ignore[reportUnknownMemberType]
+
+                    path_parts = path.split("/")
+                    groups = path_parts[:-1]
+                    dataset = path_parts[-1]
+
+                    curr_hierachy = file
+                    for group in groups:
+                        if group not in curr_hierachy:
+                            curr_hierachy = curr_hierachy.create_group(group) # type: ignore[reportUnknownVariableType]
+                        else:
+                            curr_hierachy = typing.cast("h5py.Group", curr_hierachy[group])
+
+                    data_set = curr_hierachy.create_dataset(dataset, data=value, compression="gzip", shuffle=True) # type: ignore[reportUnknownMemberType]
+
+                    if path in dict_to_save["metadata"]:
+                        for key, metadata in dict_to_save["metadata"][path].items():
+                            data_set.attrs[key] = metadata
 
         else:
             msg = f"The '{format_name}' format is not implemented."
@@ -221,3 +249,37 @@ class SavingStrategy(ABC):
         """
         msg = "This has to be overwritten for each Strategy!"
         raise NotImplementedError(msg)
+
+class _SizeAttr(NamedTuple):
+    name:str = ""
+    size:int = 0
+
+@dataclass
+class ConsistencyCheck:
+    len_time: _SizeAttr|None = None
+    len_pitch_angle: _SizeAttr|None = None
+    len_energy: _SizeAttr|None = None
+
+    def check_time_size(self, provided_len_time:int, name_in_file:str) -> None:
+        if self.len_time is None:
+            self.len_time = _SizeAttr(name_in_file, provided_len_time)
+        elif self.len_time.size != provided_len_time:
+                msg = (f"Time length missmatch! Time length of variable {self.len_time.name}: {self.len_time.size}",
+                       f"and of variable {name_in_file}: {provided_len_time}")
+                raise ValueError(msg)
+
+    def check_pitch_angle_size(self, provided_len_pitch_angle:int, name_in_file:str) -> None:
+        if self.len_pitch_angle is None:
+            self.len_pitch_angle = _SizeAttr(name_in_file, provided_len_pitch_angle)
+        elif self.len_pitch_angle.size != provided_len_pitch_angle:
+                msg = (f"Pitch angle length missmatch! Pitch angle length of variable {self.len_pitch_angle.name}:"
+                       f"{self.len_pitch_angle.size} and of variable {name_in_file}: {provided_len_pitch_angle}")
+                raise ValueError(msg)
+
+    def check_energy_size(self, provided_len_energy:int, name_in_file:str) -> None:
+        if self.len_energy is None:
+            self.len_energy = _SizeAttr(name_in_file, provided_len_energy)
+        elif self.len_energy.size != provided_len_energy:
+                msg = (f"Energy length missmatch! Energy length of variable {self.len_energy.name}:"
+                       f"{self.len_energy.size} and of variable {name_in_file}: {provided_len_energy}")
+                raise ValueError(msg)

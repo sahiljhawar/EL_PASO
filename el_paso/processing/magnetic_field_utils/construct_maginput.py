@@ -1,0 +1,198 @@
+import logging
+from datetime import datetime, timezone
+from io import StringIO
+from typing import Literal
+
+import numpy as np
+import pandas as pd
+import requests
+from numpy.typing import NDArray
+
+import el_paso as ep
+from el_paso.load_indices_solar_wind_parameters import SW_Index
+
+from .mag_field_enum import MagneticField, kext
+
+logger = logging.getLogger(__name__)
+
+FORTRAN_BAD_VALUE = np.float64(-1.0e31)
+
+MAGINPUT_CLIP_RANGES:dict[kext, dict[SW_Index, tuple[float, float]]] = {
+    MagneticField.T01.kext(): {
+        "Dst": (-50, 20),
+        "Pdyn": (0.5, 5),
+        "IMF_By": (-5, 5),
+        "IMF_Bz": (-5, 5),
+        "G1": (0, 10),
+        "G2": (0, 10),
+    },
+    MagneticField.T01s.kext(): {},
+    MagneticField.T96.kext(): {
+        "Dst": (-100, 20),
+        "Pdyn": (0.5, 10),
+        "IMF_By": (-10, 10),
+        "IMF_Bz": (-10, 10),
+    },
+    MagneticField.T89.kext(): {},
+    MagneticField.OP77Q.kext(): {},
+    MagneticField.T04s.kext(): {},
+}
+
+MAGINPUT_REQUIRED_INPUTS:dict[kext, list[SW_Index]] = {
+    MagneticField.T89.kext(): ["Kp"],
+    MagneticField.T96.kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz"],
+    MagneticField.T01.kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz", "SW_speed", "SW_density", "G1", "G2"],
+    MagneticField.T01s.kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz", "SW_speed", "SW_density", "G2", "G3"],
+    MagneticField.T04s.kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz", "W_params"],
+    MagneticField.OP77Q.kext(): [],
+}
+
+MAGINPUT_TO_INDEX:dict[SW_Index, int|list[int]] = {
+    "Kp": 0,
+    "Dst": 1,
+    "SW_density": 2,
+    "SW_speed": 3,
+    "Pdyn": 4,
+    "IMF_By": 5,
+    "IMF_Bz": 6,
+    "G1": 7,
+    "G2": 8,
+    "G3": 9,
+    "W_params": list(range(10,16)),
+}
+
+def get_W_parameters(timestamps:NDArray[np.float64]) -> dict[str, NDArray[np.float64]]:
+
+    datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
+    years = np.unique([dt.year for dt in datetimes])
+
+    if years[-1] > 2023:
+        msg = "W parameters are only available until 2023!"
+        raise ValueError(msg)
+
+    w_params:dict[str, list[float]] = {"W1":[], "W2":[], "W3":[], "W4":[], "W5":[], "W6":[]}
+
+    for year in years:
+
+        url = f"https://geo.phys.spbu.ru/~tsyganenko/models/ts05/{year:d}_OMNI_5m_with_TS05_variables.dat"
+
+        response = requests.get(url, stream=True, verify=False)
+
+        if response.status_code == 404:
+            msg = f"File not found on server: {url}"
+            raise FileNotFoundError(msg)
+
+        response.raise_for_status()
+
+        df = pd.read_csv(StringIO(response.text), names=["Year", "Day", "Hour", "Min", "W1", "W2", "W3", "W4", "W5", "W6"], usecols=[0,1,2,3,17,18,19,20,21,22], sep="\s+")
+
+        timestamps_data:list[datetime] = []
+
+        for _, row in df.loc[:,["Year","Day","Hour","Min"]].iterrows():
+            year = int(row["Year"])
+            day  = int(row["Day"])
+            hour = int(row["Hour"])
+            minute = int(row["Min"])
+
+            timestamps_data.append(datetime.strptime(f"{year:04d}-{day:03d}-{hour:02d}-{minute:02d}", "%Y-%j-%H-%M").replace(tzinfo=timezone.utc).timestamp())
+
+        # find the timestamps for the current year
+        timestamp_year_begin = datetime(year,1,1,tzinfo=timezone.utc).timestamp()
+        timestamp_year_end = datetime(year,12,31,23,59,59,tzinfo=timezone.utc).timestamp()
+
+        curr_year_idx = (timestamps >= timestamp_year_begin) & (timestamps <= timestamp_year_end)
+
+        for w_str in ["W1", "W2", "W3", "W4", "W5", "W6"]:
+            w_data = np.interp(timestamps[curr_year_idx], timestamps_data, df[w_str].values)
+
+            w_params[w_str] += list(w_data)
+
+    return {key: np.asarray(data).astype(np.float64) for key, data in w_params.items()}
+
+MagInputKeys = Literal["Kp", "Dst", "dens", "velo", "Pdyn", "ByIMF", "BzIMF", "G1", "G2",
+                       "G3", "W1", "W2", "W3", "W4", "W5", "W6", "AL"]
+
+def construct_maginput(time_var: ep.Variable,
+                       indices_solar_wind: dict[str, ep.Variable]|None=None,
+                       magnetic_field_str:str|None=None) -> dict[MagInputKeys, NDArray[np.float64]]:
+    """Construct the basic magnetospheric input parameters array.
+
+    This function retrieves all solar wind data from the ACE dataset on CDAWeb, as well as the Kp and Dst indices,
+    interpolates them to the cadence of `newtime`, and returns an array with the columns as follows:
+    1: Kp, value of Kp as in OMNI2 files but as double instead of integer type.
+    (NOTE: consistent with OMNI2, this is Kp*10, and it is in the range 0 to 90)
+    2: Dst, Dst index (nT)
+    3: Dsw, solar wind density (cm-3)
+    4: Vsw, solar wind velocity (km/s)
+    5: Pdyn, solar wind dynamic pressure (nPa)
+    6: By, GSM y component of interplanetary magnetic field (nT)
+    7: Bz, GSM z component of interplanetary magnetic field (nT), from ACE
+    8-16: Qin-Denton parameters, implement this!
+    17: AL auroral index (if not in ACE, fill with NaN)
+    18-25: fill with NaN
+
+    Args:
+        newtime (array-like): Array of new time points for interpolation.
+        sw_path (str, optional): Path to the solar wind data directory.
+                                Defaults to environment Variable 'FC_ACE_REALTIME_PROCESSED_DATA_DIR'.
+        kp_path (str, optional): Path to the Kp data directory.
+                                Defaults to environment Variable 'RT_KP_PROC_DIR'.
+        kp_type (str, optional): Type of Kp to read using data_management.
+                                Defaults to 'niemegk'.
+
+    Returns:
+        np.ndarray: Array of interpolated magnetospheric input parameters.
+    """
+    time = time_var.get_data(ep.units.posixtime).astype(np.float64)
+    start_time = datetime.fromtimestamp(time[0], tz=timezone.utc)
+    end_time = datetime.fromtimestamp(time[-1], tz=timezone.utc)
+
+    if indices_solar_wind is None:
+        indices_solar_wind = {}
+
+    kext = MagneticField(magnetic_field_str).kext()
+
+    required_inputs = MAGINPUT_REQUIRED_INPUTS[kext]
+    clip_ranges = MAGINPUT_CLIP_RANGES[kext]
+
+    maginput = np.full((len(time), 25), np.nan).astype(np.float64)
+
+    for req_input in required_inputs:
+        if req_input not in indices_solar_wind:
+            logger.info(f"Required input '{req_input}' not found in indices_solar_wind!")
+            indices_solar_wind |= ep.load_indices_solar_wind_parameters(start_time, end_time, [req_input], time_var)
+
+        req_input_data = indices_solar_wind[req_input].get_data().astype(np.float64)
+
+        if len(req_input_data) != len(time):
+            msg = (f"Encountered size missmatch for {req_input}: len of {req_input} data: "
+                   f"{len(req_input_data)}, requested len: {len(time)}")
+            raise ValueError(msg)
+
+        if req_input in clip_ranges:
+            clip_range = clip_ranges[req_input]
+            req_input_data = req_input_data.clip(clip_range[0], clip_range[1])
+
+        maginput[:, MAGINPUT_TO_INDEX[req_input]] = np.asarray(req_input_data, dtype=np.float64)
+
+    maginput_dict:dict[MagInputKeys, NDArray[np.float64]] = {
+        "Kp": maginput[:, 0],
+        "Dst": maginput[:, 1],
+        "dens": maginput[:, 2],
+        "velo": maginput[:, 3],
+        "Pdyn": maginput[:, 4],
+        "ByIMF": maginput[:, 5],
+        "BzIMF": maginput[:, 6],
+        "G1": maginput[:, 7],
+        "G2": maginput[:, 8],
+        "G3": maginput[:, 9],
+        "W1": maginput[:, 10],
+        "W2": maginput[:, 11],
+        "W3": maginput[:, 12],
+        "W4": maginput[:, 13],
+        "W5": maginput[:, 14],
+        "W6": maginput[:, 15],
+        "AL": maginput[:, 16],
+    }
+
+    return maginput_dict

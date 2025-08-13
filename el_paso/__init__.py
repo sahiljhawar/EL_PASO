@@ -13,8 +13,7 @@ IRBEM_SYSAXIS_MAG = 6
 # import physics
 # import utils
 from .variable import TimeBinMethod, Variable
-from .saving_strategy import SavingStrategy
-from . import processing, saving_strategies
+from . import physics, processing, saving_strategies
 from .save import save
 from .download import download
 from .extract_variables_from_files import extract_variables_from_files, ExtractionInfo

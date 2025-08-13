@@ -1,1 +1,1 @@
-::: el_paso.classes.variable.Variable
+::: el_paso.variable.Variable

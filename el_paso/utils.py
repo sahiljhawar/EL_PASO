@@ -2,15 +2,21 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import timeit
+import typing
 from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from multiprocessing.pool import MapResult
 from pathlib import Path
-from typing import ParamSpec, TypeVar
+from typing import Any, ParamSpec, TypeVar
 
 import pandas as pd
+import tqdm
 from packaging import version as version_pkg
+
+import el_paso as ep
 
 logger = logging.getLogger(__name__)
 
@@ -120,3 +126,23 @@ def datetime_to_datenum(datetime_val: datetime) -> float:
     frac = (datetime_val - datetime(datetime_val.year, datetime_val.month, datetime_val.day, 0, 0, 0, tzinfo=timezone.utc)).seconds / (24.0 * 60.0 * 60.0)
 
     return mdn.toordinal() + round(frac, 6)
+
+def assert_n_dim(var: ep.Variable, n_dims:int, name_in_file:str) -> None:
+
+    provided = var.get_data().ndim
+
+    if provided != n_dims:
+        msg = (f"Encountered dimension missmatch for variable with name {name_in_file}:"
+               "should be {n_dims}, got: {provided}!")
+        raise ValueError(msg)
+
+def show_process_bar_for_map_async(map_result:MapResult[Any]) -> None:
+    init = typing.cast("int", map_result._number_left)  # type: ignore[reportUnknownMemberType] # noqa: SLF001
+    with tqdm.tqdm(total=init) as t:
+        while (True):
+            if map_result.ready():
+                break
+            t.n = (init-map_result._number_left)  # type: ignore[reportUnknownMemberType] # noqa: SLF001
+            t.refresh()
+            time.sleep(1)
+

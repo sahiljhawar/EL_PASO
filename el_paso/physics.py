@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, overload
 
 import numpy as np
 from numpy.typing import NDArray
@@ -36,15 +36,30 @@ def rest_energy(species:ParticleLiteral) -> float:
     return mc2
 
 
-def en2pc(energy:NDArray[np.float64], species:ParticleLiteral="electron") -> NDArray[np.float64]:
-    """Calculate the relativistic energy for a given kinetic energy.
+@overload
+def en2pc(energy:float, species:ParticleLiteral="electron") -> float:
+    ...
+
+@overload
+def en2pc(energy:NDArray[np.number], species:ParticleLiteral="electron") -> NDArray[np.number]:
+    ...
+
+def en2pc(energy:float|NDArray[np.number], species:ParticleLiteral="electron") -> float|NDArray[np.number]:
+    r"""Calculate the relativistic momentum (p*c) for a given total energy.
+
+    This function calculates the relativistic energy using the formula:
+    $$
+    pc = \sqrt{(E/m_0c^2 + 1)^2 - 1} \cdot m_0c^2
+    $$
+    where $E$ is the total energy, $m_0c^2$ is the rest energy of the particle,
+    and $pc$ is the relativistic momentum.
 
     Args:
-        energy (np.ndarray or float): The kinetic energy in MeV.
+        energy (np.ndarray or float): The total energy in MeV.
         species (str): The species of particle ('electron', 'proton', 'helium', 'oxygen').
 
     Returns:
-        np.ndarray or float: The calculated relativistic energy.
+        np.ndarray or float: The calculated relativistic momentum times c (p*c).
 
     """
     mc2 = rest_energy(species)

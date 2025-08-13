@@ -7,7 +7,8 @@ import numpy as np
 
 
 # Time units
-tt2000 = u.def_unit("tt2000",)
+cdf_epoch = u.def_unit("cdf_epoch")
+tt2000 = u.def_unit("tt2000")
 posixtime = u.def_unit("posixtime")
 datenum = u.def_unit("datenum")
 
@@ -84,6 +85,54 @@ tt2000_datenum = [(
     lambda x: datenum_to_tt2000(x)
 )]
 
+def cdf_epoch_to_posixtime(cdf_epoch_array):
+    """Converts CDF_EPOCH (milliseconds since 0 AD) to POSIX timestamp (seconds since 1970-01-01 UTC)."""
+    # cdflib.cdfepoch.to_datetime converts CDF_EPOCH to datetime objects
+    return cdflib.cdfepoch.unixtime(cdf_epoch_array)
+    # datetime.timestamp() returns POSIX timestamp (seconds)
+
+def posixtime_to_cdf_epoch(posixtime_array):
+    """Converts POSIX timestamp (seconds since 1970-01-01 UTC) to CDF_EPOCH (milliseconds since 0 AD)."""
+    dt_array = np.array([datetime.fromtimestamp(ts, tz=timezone.utc) for ts in posixtime_array])
+    # cdflib.cdfepoch.compute converts datetime objects to CDF_EPOCH
+    return cdflib.cdfepoch.compute(dt_array)
+
+# Define the Astropy equivalency for cdf_epoch <-> posixtime
+cdf_epoch_posixtime = [(
+    cdf_epoch,
+    posixtime,
+    lambda x: cdf_epoch_to_posixtime(x),
+    lambda x: posixtime_to_cdf_epoch(x)
+)]
+
+def datenum_to_cdf_epoch(datenum_array):
+    """
+    Converts MATLAB datenum (days) to CDF_EPOCH (milliseconds) via posixtime.
+    """
+    # 1. Convert datenum to posixtime
+    posix_val = datenum_to_posixtime(datenum_array) # Returns in seconds
+    # 2. Convert posixtime to cdf_epoch
+    cdf_epoch_val = posixtime_to_cdf_epoch(posix_val) # Returns in milliseconds
+    return cdf_epoch_val
+
+def cdf_epoch_to_datenum(cdf_epoch_array):
+    """
+    Converts CDF_EPOCH (milliseconds) to MATLAB datenum (days) via posixtime.
+    """
+    # 1. Convert cdf_epoch to posixtime
+    posix_val = cdf_epoch_to_posixtime(cdf_epoch_array) # Returns in seconds
+    # 2. Convert posixtime to datenum
+    datenum_val = posixtime_to_datenum(posix_val) # Returns in days
+    return datenum_val
+
+# --- Define the new Astropy equivalency ---
+datenum_cdf_epoch = [(
+    datenum,
+    cdf_epoch,
+    lambda x: datenum_to_cdf_epoch(x),
+    lambda x: cdf_epoch_to_datenum(x)
+)]
+
 # Position units
 RE = u.def_unit("RE", R_earth)
 
@@ -99,6 +148,8 @@ u.add_enabled_equivalencies(u.dimensionless_angles())
 u.add_enabled_equivalencies(epoch_tt2000_posixtime)
 u.add_enabled_equivalencies(posixtime_datenum)
 u.add_enabled_equivalencies(tt2000_datenum)
+u.add_enabled_equivalencies(cdf_epoch_posixtime)
+u.add_enabled_equivalencies(datenum_cdf_epoch)
 u.add_enabled_units(RE)
 u.add_enabled_units(posixtime)
 u.add_enabled_units(datenum)

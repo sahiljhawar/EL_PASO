@@ -10,6 +10,7 @@ from tqdm import tqdm
 
 from el_paso import Variable
 
+UPPER_TRHESHOLD_SANITY = 1e10
 
 def steady_state_inside_lc(alpha:float|NDArray[np.float64], alpha_lc:float, z0:float, N:float) -> float|NDArray[np.float64]:
     return N * z0 * iv(0, z0 * alpha / alpha_lc) / iv(1, z0)
@@ -29,7 +30,6 @@ def extrapolate_leo_to_equatorial(pa_eq_obs:Variable,
                                   B_loc:Variable,
                                   B_eq:Variable):
 
-    UPPER_TRHESHOLD_SANITY = 1e10
 
     # calculate loss cone
     pa_eq_obs_rad = np.deg2rad(pa_eq_obs.data)

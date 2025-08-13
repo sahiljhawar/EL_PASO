@@ -13,7 +13,8 @@ if TYPE_CHECKING:
 
     from numpy.typing import NDArray
 
-    from el_paso import SavingStrategy, Variable
+    from el_paso import Variable
+    from el_paso.saving_strategy import SavingStrategy
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +92,7 @@ def _get_data_dict_to_save(target_variables:dict[str,Variable]) -> dict[str,Any]
         metadata_dict[save_name] = {
             "unit": str(variable.metadata.unit),
             "original_cadence_seconds": variable.metadata.original_cadence_seconds,
-            "source_files": [],
+            "source_files": variable.metadata.source_files,
             "description": variable.metadata.description,
             "processing_notes": variable.metadata.processing_notes,
         }

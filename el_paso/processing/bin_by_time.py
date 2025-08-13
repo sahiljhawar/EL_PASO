@@ -20,12 +20,52 @@ def bin_by_time(
     start_time: datetime|None=None,
     end_time: datetime|None=None,
 ) -> ep.Variable:
+    """Bins one or more variables by time according to specified methods and cadence.
 
+    This function takes a time variable and a dictionary of other variables, then
+    bins these variables over time. Each variable can have a specific binning
+    method applied (e.g., mean, median, sum). The binning is performed over
+    defined time intervals (cadence) with a specified alignment.
+
+    Args:
+        time_variable: The master time variable (ep.Variable) that defines the
+            time basis for all other variables. Its data should be in a time
+            unit (e.g., `ep.units.posixtime` or `ep.units.datenum`).
+        variables: A dictionary where keys are variable names (str) and values
+            are the `ep.Variable` objects to be binned.
+        time_bin_method_dict: A dictionary mapping variable names (str) to
+            `ep.TimeBinMethod` enums, specifying how each variable should be
+            binned within each time window. If a variable is not present in
+            this dictionary, it will be skipped.
+        time_binning_cadence: A `datetime.timedelta` object specifying the
+            duration of each time bin.
+        window_alignement: Determines how the time windows are aligned.
+            Defaults to "center".
+            * "center": The time bin represents the center of the window.
+            * "left": The time bin represents the left (start) of the window.
+            * "right": The time bin represents the right (end) of the window.
+        start_time: Optional. A `datetime.datetime` object specifying the
+            start time for binning. If None, the start time of `time_variable`
+            is used.
+        end_time: Optional. A `datetime.datetime` object specifying the end
+            time for binning. If None, the end time of `time_variable` is used.
+
+    Returns:
+        An `ep.Variable` object representing the new binned time axis. The
+        `variables` dictionary passed as an argument is modified in place, with
+        each `ep.Variable` object's data updated to its binned values.
+
+    Raises:
+        ValueError: If the first dimension size of any variable's data does not
+            match the length of the `time_variable` data.
+    """
     logger = logging.getLogger(__name__)
     logger.info("Binning by time...")
 
     start_time = start_time or datenum_to_datetime(time_variable.get_data(ep.units.datenum)[0])
     end_time   = end_time or datenum_to_datetime(time_variable.get_data(ep.units.datenum)[-1])
+
+    original_cadence = float(np.nanmedian(np.diff(time_variable.get_data(ep.units.posixtime))))
 
     binned_time, time_bins = _create_binned_time_and_bins(start_time, end_time, time_binning_cadence, window_alignement)
 
@@ -40,6 +80,7 @@ def bin_by_time(
         # Just repeat in case of no time dependency
         if time_bin_method_dict[key] == ep.TimeBinMethod.Repeat:
             var.set_data(np.repeat(var.get_data()[np.newaxis, ...], len(binned_time), axis=0), "same")
+            var.metadata.original_cadence_seconds = 0
             continue
 
         # check if time variable and data content sizes match
@@ -66,8 +107,10 @@ def bin_by_time(
         # Iterate over unique indices
         for i, unique_index in enumerate(unique_indices):
             bin_data = var.get_data()[indices_separation[i] : indices_separation[i + 1]]
-            if len(bin_data) == 0 or not np.any(np.isfinite(bin_data)):
+            if len(bin_data) == 0:
                 continue  # no data found
+            if bin_data.dtype.kind in {"i", "f"} and not np.any(np.isfinite(bin_data)):
+                continue  # no finite data found
             binned_value = time_bin_method_dict[key](bin_data)
 
             # Update the relevant slice of binned_data
@@ -81,7 +124,9 @@ def bin_by_time(
             var.set_data(np.array(binned_data) , "same")
 
         # update metadata
-        var.metadata.add_processing_note(f"Time binned with method {time_bin_method_dict[key].value} and cadence of {time_binning_cadence.total_seconds()/60} minutes")
+        var.metadata.original_cadence_seconds = original_cadence
+        var.metadata.add_processing_note(f"Time binned with method {time_bin_method_dict[key].value}"
+                                         " and cadence of {time_binning_cadence.total_seconds()/60} minutes")
 
     new_time_var = ep.Variable(data=binned_time, original_unit=ep.units.posixtime)
     new_time_var.metadata.add_processing_note("Created while time binning")
@@ -92,7 +137,8 @@ def bin_by_time(
 def _create_binned_time_and_bins(start_time:datetime,
                                  end_time:datetime,
                                  time_binning_cadence:timedelta,
-                                 window_alignement:Literal["left", "center", "right"]) -> tuple[NDArray[np.floating], list[float]]:
+                                 window_alignement:Literal["left", "center", "right"],
+                                 ) -> tuple[NDArray[np.floating], list[float]]:
 
     binned_time = np.arange(start_time.timestamp(), end_time.timestamp(), time_binning_cadence.total_seconds())
 
@@ -126,7 +172,8 @@ def _create_binned_time_and_bins(start_time:datetime,
     return binned_time, time_bins
 
 
-def _calculate_index_iterables(timestamps: NDArray[np.floating], time_bins: list[float]) -> tuple[NDArray[np.intp], list[int]]:
+def _calculate_index_iterables(timestamps: NDArray[np.floating],
+                               time_bins: list[float]) -> tuple[NDArray[np.intp], list[int]]:
 
     index_set = np.digitize(timestamps, time_bins)
     index_set = index_set - 1  # shift indices by one to match time array
@@ -148,7 +195,7 @@ def _calculate_index_iterables(timestamps: NDArray[np.floating], time_bins: list
 
     indices_separation.append(len(index_set))
     unique_indices = np.delete(
-        unique_indices, np.argwhere((unique_indices == -1) | (unique_indices == len(time_bins) - 1))
+        unique_indices, np.argwhere((unique_indices == -1) | (unique_indices == len(time_bins) - 1)),
     )
 
     return unique_indices, indices_separation
