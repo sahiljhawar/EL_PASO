@@ -136,13 +136,13 @@ def assert_n_dim(var: ep.Variable, n_dims:int, name_in_file:str) -> None:
                "should be {n_dims}, got: {provided}!")
         raise ValueError(msg)
 
-def show_process_bar_for_map_async(map_result:MapResult[Any]) -> None:
-    init = typing.cast("int", map_result._number_left)  # type: ignore[reportUnknownMemberType] # noqa: SLF001
+def show_process_bar_for_map_async(map_result:MapResult[Any], chunksize:int) -> None:
+    init = typing.cast("int", map_result._number_left) * chunksize  # type: ignore[reportUnknownMemberType] # noqa: SLF001
     with tqdm.tqdm(total=init) as t:
         while (True):
             if map_result.ready():
                 break
-            t.n = (init-map_result._number_left)  # type: ignore[reportUnknownMemberType] # noqa: SLF001
+            t.n = (init-map_result._number_left*chunksize)  # type: ignore[reportUnknownMemberType] # noqa: SLF001
             t.refresh()
             time.sleep(1)
 
