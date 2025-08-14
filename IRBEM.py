@@ -31,12 +31,14 @@ import pathlib
 import ctypes
 import shutil
 import datetime
+from typing import Literal, Mapping
 import dateutil.parser
 import warnings
 
 import numpy as np
 import scipy.interpolate
 import scipy.optimize
+from numpy.typing import NDArray
 
 try:
     import pandas as pd
@@ -544,7 +546,7 @@ class MagFields:
                                         'bmin': bmin.value, 'xj': xj.value}
         return self.trace_field_line_output
 
-    def find_magequator(self, X, maginput):
+    def find_magequator(self, X:Mapping[str,datetime.datetime|pd.Timestamp|str|float], maginput:dict[str,NDArray[np.number]]) -> dict[Literal["bmin", "XGEO"], float|NDArray[np.float64]]:
         """
         Find the coordinates of the magnetic equator from tracing the magntic
         field line from the input location.
@@ -583,7 +585,7 @@ class MagFields:
                                           ctypes.byref(x1), ctypes.byref(x2), ctypes.byref(x3), \
                                           ctypes.byref(self.maginput), ctypes.byref(bmin), \
                                           ctypes.byref(XGEO))
-        self.find_magequator_output = {'bmin': bmin.value, 'XGEO': np.array(XGEO)}
+        self.find_magequator_output:dict[Literal["bmin", "XGEO"], float|NDArray[np.float64]] = {'bmin': bmin.value, 'XGEO': np.array(XGEO)}
         return self.find_magequator_output
 
     def get_field_multi(self, X, maginput):
@@ -803,7 +805,7 @@ class MagFields:
                                            fLine['fy'](startInd) ** 2 + fLine['fz'](startInd) ** 2) - 1)
         return self.mirrorAlt
 
-    def _prepTimeLoc(self, X):
+    def _prepTimeLoc(self, X:dict[str, pd.Timestamp|datetime.datetime|str|float]) -> tuple[ctypes.c_int, ctypes.c_int, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]:
         """
         Prepares spacetime inputs.
 
@@ -921,7 +923,7 @@ class MagFields:
             x3[dt] = Xc['x3'][dt]
         return ntime, iyear, idoy, ut, x1, x2, x3
 
-    def _prepMagInput(self, inputDict=None):
+    def _prepMagInput(self, inputDict:dict[str,NDArray[np.number]|float|int|np.float64]=None):
         """
         NAME:  _prepMagInput(self, inputDict)
         USE:   Prepares magnetic field model inputs.

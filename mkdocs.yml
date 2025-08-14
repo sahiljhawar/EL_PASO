@@ -5,16 +5,41 @@ theme:
   name: material
   features:
     - navigation.instant
+    - math
 
 nav:
   - Home: index.md
   - Usage:
     - Getting Started: Usage/getting_started.md
   - API Reference:
-    - API_reference/save_standard.md
-    - API_reference/source_file.md
-    - API_reference/variable.md
+    - API_reference/overview.md
+    - Core Classes:
+      - API_reference/variable.md
+      - API_reference/saving_strategy.md
+    - Core Functions:
+      - API_reference/download.md
+      - API_reference/extract_variables_from_files.md
+      - API_reference/save.md
+    - Processing Functions:
+      - API_reference/bin_by_time.md
+      - API_reference/compute_invariant_K.md
+      - API_reference/compute_invariant_mu.md
+      - API_reference/compute_magnetic_field_variables.md
+      - API_reference/compute_phase_space_density.md
+      - API_reference/fold_pitch_angles_and_flux.md
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true # Enable support for block and inline math
 
 plugins:
 - mkdocstrings:
-    default_handler: python
+    handlers:
+      python:
+        options:
+          docstring_style: google
+          show_root_heading: true
+
+extra_javascript:
+  # Use MathJax for rendering latex equations
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
