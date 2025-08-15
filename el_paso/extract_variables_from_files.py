@@ -37,7 +37,6 @@ class ExtractionInfo:
     dependent_variables: list[str]|None = None
 
 
-@timed_function()
 def extract_variables_from_files(start_time: datetime,
                                  end_time: datetime,
                                  file_cadence: Literal["daily", "monthly", "single_file"],

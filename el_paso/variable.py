@@ -122,6 +122,9 @@ class VariableMetadata:
     processing_notes: str = ""
     standard_name: str = ""
 
+    if ep._release_mode:  # type: ignore[Private] # noqa: SLF001
+        processing_notes += ep._release_msg + "\n" # type: ignore[Private] # noqa: SLF001
+
     def __post_init__(self) -> None:
         """Initializes the processing_steps_counter attribute to 1 after the dataclass has been instantiated.
 
