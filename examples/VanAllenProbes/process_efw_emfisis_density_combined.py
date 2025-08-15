@@ -30,8 +30,8 @@ def process_efw_emfisis_density_combined(start_time:datetime,
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
 
-    efw_variables = _get_efw_variables(start_time, end_time, sat_str, raw_data_path)
-    emfisis_variables = _get_emfisis_variables(start_time, end_time, sat_str, raw_data_path)
+    efw_variables = _get_efw_variables(start_time-timedelta(minutes=10), end_time+timedelta(minutes=10), sat_str, raw_data_path)
+    emfisis_variables = _get_emfisis_variables(start_time-timedelta(minutes=10), end_time+timedelta(minutes=10), sat_str, raw_data_path)
 
     efw_time_bin_methods = {
         "xGSE": ep.TimeBinMethod.NanMean,
@@ -79,8 +79,10 @@ def process_efw_emfisis_density_combined(start_time:datetime,
                                                                               irbem_options = irbem_options,
                                                                               num_cores = num_cores)
 
+    start_time_str = start_time.date().isoformat()
+
     saving_strategy = ep.saving_strategies.SingleFileStrategy(
-        processed_data_path / ("rbsp" + sat_str + "_efw_emfisis_density_combined.h5"))
+        processed_data_path / ("rbsp" + sat_str + "_efw_emfisis_density_combined_" + start_time_str + ".h5"))
 
     variables_to_save = {
         "time": binned_time_variable,
@@ -208,7 +210,7 @@ if __name__ == "__main__":
     dt_start = dateutil.parser.parse(args.start_time)
     dt_end = dateutil.parser.parse(args.end_time)
 
-    with tempfile.TemporaryDirectory() as tmpdir:
-        for sat_str in ["a", "b"]:
-            process_efw_emfisis_density_combined(dt_start, dt_end, sat_str, args.irbem_lib_path, "T89", #type: ignore[reportArgumentType]
-                                                 raw_data_path=tmpdir, processed_data_path=".", num_cores=16)
+#    with tempfile.TemporaryDirectory() as tmpdir:
+    for sat_str in ["a", "b"]:
+        process_efw_emfisis_density_combined(dt_start, dt_end, sat_str, args.irbem_lib_path, "T89", #type: ignore[reportArgumentType]
+                                             raw_data_path="/home/bhaas/el_paso_processing/raw_data/", processed_data_path="/home/bhaas/el_paso_processing/data_processed/density/", num_cores=32)
