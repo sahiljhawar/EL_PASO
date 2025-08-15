@@ -60,7 +60,7 @@ def load_indices_solar_wind_parameters(start_time:datetime,
         msg = "HOME environment variable is not set!"
         raise OSError(msg)
 
-    base_data_path = Path() / ".elpaso"
+    base_data_path = Path(home_path) / ".elpaso"
 
     for requested_output in requested_outputs:
 
