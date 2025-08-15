@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, NamedTuple
 
 import h5py  # type: ignore[reportMissingTypeStubs]
+import netCDF4 as nc
 import numpy as np
 from astropy import units as u  # type: ignore[reportMissingTypeStubs]
 from scipy.io import savemat  # type: ignore[reportMissingTypeStubs]
@@ -60,6 +61,7 @@ class SavingStrategy(ABC):
     """
 
     output_files:list[OutputFile]
+    dependency_dict: dict[str,list[str]]
 
     @abstractmethod
     def get_time_intervals_to_save(self,
@@ -215,7 +217,7 @@ class SavingStrategy(ABC):
 
                     path_parts = path.split("/")
                     groups = path_parts[:-1]
-                    dataset = path_parts[-1]
+                    dataset_name = path_parts[-1]
 
                     curr_hierachy = file
                     for group in groups:
@@ -224,11 +226,62 @@ class SavingStrategy(ABC):
                         else:
                             curr_hierachy = typing.cast("h5py.Group", curr_hierachy[group])
 
-                    data_set = curr_hierachy.create_dataset(dataset, data=value, compression="gzip", shuffle=True) # type: ignore[reportUnknownMemberType]
+                    data_set = curr_hierachy.create_dataset(dataset_name, data=value, compression="gzip", shuffle=True) # type: ignore[reportUnknownMemberType]
 
                     if path in dict_to_save["metadata"]:
                         for key, metadata in dict_to_save["metadata"][path].items():
                             data_set.attrs[key] = metadata
+
+        elif format_name == ".nc":
+            with nc.Dataset(file_path, "w", format="NETCDF4") as file:
+
+                size_time = dict_to_save["time"].shape[0]
+                size_pitch_angle:int = 0
+                size_energy:int = 0
+
+                if "flux/alpha_eq" in dict_to_save and dict_to_save["flux/alpha_eq"].size > 0:
+                    size_pitch_angle = dict_to_save["flux/alpha_eq"].shape[1]
+                elif "flux/alpha_local" in dict_to_save and dict_to_save["flux/alpha_local"].size > 0:
+                    size_pitch_angle = dict_to_save["flux/alpha_local"].shape[1]
+
+                if "flux/energy" in dict_to_save and dict_to_save["flux/energy"].size > 0:
+                    size_energy = dict_to_save["flux/energy"].shape[1]
+
+                file.createDimension("time", size_time)
+                file.createDimension("alpha", size_pitch_angle)
+                file.createDimension("energy", size_energy)
+
+                for path, value in dict_to_save.items():
+
+                    if path == "metadata":
+                        continue
+
+                    path_parts = path.split("/")
+                    groups = path_parts[:-1]
+                    dataset_name = path_parts[-1]
+
+                    curr_hierachy = file
+                    for group in groups:
+                        if group not in curr_hierachy.groups:
+                            curr_hierachy = curr_hierachy.createGroup(group) # type: ignore[reportUnknownVariableType]
+                        else:
+                            curr_hierachy = typing.cast("nc.Group", curr_hierachy[group])
+
+                    data_set = typing.cast("nc.Variable[Any]", curr_hierachy.createVariable( # type: ignore[reportUnknownMemberType]
+                        dataset_name,
+                        "f4",
+                        self.dependency_dict[path],
+                        zlib=True, complevel=5, shuffle=True))
+                    if value.size > 0:
+                        data_set[:,...] = value
+
+                    if path in dict_to_save["metadata"]:
+                        metadata = dict_to_save["metadata"][path]
+                        data_set.units = metadata["unit"]
+                        data_set.source = metadata["source_files"]
+                        data_set.history = metadata["processing_notes"]
+                        data_set.description = metadata["description"]
+
 
         else:
             msg = f"The '{format_name}' format is not implemented."

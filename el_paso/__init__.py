@@ -1,5 +1,3 @@
-from .units import *
-
 # useful custom IRBEM aliases
 IRBEM_SYSAXIS_GDZ = 0
 IRBEM_SYSAXIS_GEO = 1
@@ -9,12 +7,15 @@ IRBEM_SYSAXIS_SM  = 4
 IRBEM_SYSAXIS_GEI = 5
 IRBEM_SYSAXIS_MAG = 6
 
+# package wide variables
+_release_mode = False
+_release_msg:str = ""
 
-# import physics
-# import utils
+from .units import *
 from .variable import TimeBinMethod, Variable
 from . import physics, processing, saving_strategies
 from .save import save
 from .download import download
 from .extract_variables_from_files import extract_variables_from_files, ExtractionInfo
 from .load_indices_solar_wind_parameters import load_indices_solar_wind_parameters
+from .release_mode import activate_release_mode
