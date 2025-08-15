@@ -134,7 +134,8 @@ def _requests_download(current_time:datetime,
 
         if latest_file_name is None:
             msg = f"No file found matching the pattern {file_name_stem} in the response from {url}"
-            raise FileNotFoundError(msg)
+            logger.warn(msg)
+            return
 
         if rename_file_name_stem is None:
             save_file_name = latest_file_name
@@ -152,7 +153,8 @@ def _requests_download(current_time:datetime,
 
         if response.status_code == ERROR_NOT_FOUND:
             msg = f"File not found on server: {url}"
-            raise FileNotFoundError(msg)
+            logger.warn(msg)
+            return
 
         response.raise_for_status()
 

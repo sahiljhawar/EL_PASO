@@ -71,7 +71,7 @@ def submit_jobs_in_chunks(start_time_str:str,
 
         # Construct the sbatch command
         command = [
-            "bash",
+            "sbatch",
             job_script_template,
             chunk_start_str,
             chunk_end_str,
