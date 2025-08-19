@@ -126,7 +126,7 @@ def bin_by_time(
         # update metadata
         var.metadata.original_cadence_seconds = original_cadence
         var.metadata.add_processing_note(f"Time binned with method {time_bin_method_dict[key].value}"
-                                         " and cadence of {time_binning_cadence.total_seconds()/60} minutes")
+                                         f" and cadence of {time_binning_cadence.total_seconds()/60} minutes")
 
     new_time_var = ep.Variable(data=binned_time, original_unit=ep.units.posixtime)
     new_time_var.metadata.add_processing_note("Created while time binning")

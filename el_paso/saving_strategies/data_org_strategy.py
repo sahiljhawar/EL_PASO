@@ -98,7 +98,7 @@ class DataOrgStrategy(SavingStrategy):
                 assert variable.get_data().ndim == 3
             case "InvK":
                 variable.convert_to_unit(u.RE * u.G**0.5)
-                assert variable.get_data().ndim == 3
+                assert variable.get_data().ndim == 2
             case _:
                 msg = f"Encountered invalid name_in_file: {name_in_file}!"
                 raise ValueError(msg)

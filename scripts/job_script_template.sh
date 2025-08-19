@@ -14,4 +14,4 @@ END_TIME=$2
 echo "Processing data from $START_TIME to $END_TIME"
 
 # Replace 'your_program.py' with the path to your data processing script.
-python ../examples/VanAllenProbes/process_efw_emfisis_density_combined.py "$START_TIME" "$END_TIME" "IRBEM/libirbem.so"
+python your_progam.py "$START_TIME" "$END_TIME" "path_to_irbem/libirbem.so"

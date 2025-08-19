@@ -5,16 +5,18 @@ import os
 import re
 import typing
 from datetime import datetime, timedelta
+from functools import cache
 from pathlib import Path
 from typing import Literal
 
 import requests
 
-from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version
+from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version, timed_function
 
 ERROR_NOT_FOUND = 404
 logger = logging.getLogger(__name__)
 
+@timed_function()
 def download(start_time: datetime,
              end_time: datetime,
              save_path: str|Path,
@@ -118,23 +120,17 @@ def _requests_download(current_time:datetime,
     file_name_stem = fill_str_template_with_time(file_name_stem, current_time)
 
     try:
-        response = requests.get(url,
-                                stream=True,
-                                timeout=10,
-                                auth=requests.auth.HTTPDigestAuth(*authentification_info)) #type: ignore[reportUnknownMemberType]
+        response_of_content = _get_page_content(url, authentification_info)
 
-        if response.status_code == ERROR_NOT_FOUND:
-            msg = f"File not found on server: {url}"
-            raise FileNotFoundError(msg)
+        if response_of_content is None:
+            return
 
-        response.raise_for_status()
-
-        found_files = typing.cast("list[str]", re.findall(rf"{file_name_stem}", response.text))
+        found_files = typing.cast("list[str]", re.findall(rf"{file_name_stem}", response_of_content.text))
         latest_file_name = get_file_by_version(found_files, version="latest")
 
         if latest_file_name is None:
             msg = f"No file found matching the pattern {file_name_stem} in the response from {url}"
-            logger.warn(msg)
+            logger.warning(msg)
             return
 
         if rename_file_name_stem is None:
@@ -153,7 +149,7 @@ def _requests_download(current_time:datetime,
 
         if response.status_code == ERROR_NOT_FOUND:
             msg = f"File not found on server: {url}"
-            logger.warn(msg)
+            logger.warning(msg)
             return
 
         response.raise_for_status()
@@ -167,6 +163,22 @@ def _requests_download(current_time:datetime,
     except requests.exceptions.RequestException as e:
         logger.info(f"Error downloading file from {url}: {e}")
 
+@cache
+def _get_page_content(url:str, authentification_info:tuple[str,str]) -> requests.Response | None:
+
+    response_of_content = requests.get(url,
+                                        stream=True,
+                                        timeout=10,
+                                        auth=requests.auth.HTTPDigestAuth(*authentification_info)) #type: ignore[reportUnknownMemberType]
+
+    if response_of_content.status_code == ERROR_NOT_FOUND:
+        msg = f"File not found on server: {url}"
+        logger.warning(msg)
+        return None
+
+    response_of_content.raise_for_status()
+
+    return response_of_content
 
 def _wget_download(current_time:datetime,
                    save_path:Path,

@@ -6,22 +6,24 @@ kext = NewType("kext", int)
 def _magnetic_field_str_to_kext(magnetic_field_str:str) -> kext:
     match magnetic_field_str:
         case "T89":
-            kext = 4
+            mag_kext = kext(4)
         case "T01":
-            kext = 9
+            mag_kext = kext(9)
         case "T01s":
-            kext = 10
+            mag_kext = kext(10)
         case "TS04"|"TS05"|"T04s":
-            kext = 11
+            mag_kext = kext(11)
         case "T96":
-            kext = 7
+            mag_kext = kext(7)
         case "OP77Q":
-            kext = 5
+            mag_kext = kext(5)
+        case "OP77":
+            mag_kext = kext(5)
         case _:
             msg = "Invalid magnetic field model!"
             raise ValueError(msg)
 
-    return kext
+    return mag_kext
 
 class MagneticField(Enum):
     """Enum for magnetic field models."""
@@ -33,6 +35,7 @@ class MagneticField(Enum):
     T04s = "T04s"
     T96 = "T96"
     OP77Q = "OP77Q"
+    OP77 = "OP77"
 
     def kext(self) -> kext:
         """Returns the kext value for the magnetic field model."""

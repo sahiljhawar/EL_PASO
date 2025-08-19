@@ -8,11 +8,10 @@ from typing import Literal
 
 import numpy as np
 from astropy import units as u
+from get_arase_orbit_variables import get_arase_orbit_level_2_variables, get_arase_orbit_level_3_variables
 
 import el_paso as ep
 from IRBEM import Coords
-
-from .get_arase_orbit_variables import get_arase_orbit_level_2_variables, get_arase_orbit_level_3_variables
 
 
 def process_mepe_level_3(start_time:datetime,
@@ -145,17 +144,18 @@ def process_mepe_level_3(start_time:datetime,
 
         irbem_options = [1, 1, 4, 4, 0]
 
-        var_names_to_compute = ["B_local_" + mag_field,
-                                "MLT_" + mag_field,
-                                "B_eq_" + mag_field,
-                                "R_eq_" + mag_field,
-                                "PA_eq_" + mag_field]
-                                # "Lm_" + mag_field]
+        variables_to_compute:ep.processing.VariableRequest = [
+            ("B_local", mag_field),
+            ("MLT", mag_field),
+            ("B_eq", mag_field),
+            ("R_eq", mag_field),
+            ("PA_eq", mag_field),
+        ]
 
         magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
             time_var = binned_time_variable,
             xgeo_var = pos_geo_var,
-            var_names_to_compute = var_names_to_compute,
+            variables_to_compute = variables_to_compute,
             irbem_lib_path = str(irbem_lib_path),
             irbem_options = irbem_options,
             num_cores = num_cores,
@@ -185,7 +185,7 @@ def process_mepe_level_3(start_time:datetime,
         "alpha_eq_model": mepe_variables["Pa_eq"],
         "R0": orb_variables["R0"],
         "MLT": orb_variables["MLT"],
-        # "Lm": orb_variables["Lm"],
+        "Lm": orb_variables["Lm"],
     }
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
@@ -209,5 +209,5 @@ if __name__ == "__main__":
     start_time = datetime(2017, 7, 1, tzinfo=timezone.utc)
     end_time = datetime(2017, 9, 30, 23, 59, tzinfo=timezone.utc)
 
-    process_mepe_level_3(start_time, end_time, "../../IRBEM/libirbem.so", "TS04",
-                         raw_data_path=".", processed_data_path=".", num_cores=16)
+    process_mepe_level_3(start_time, end_time, "../../IRBEM/libirbem.so", "T89",
+                         raw_data_path=".", processed_data_path="/home/bhaas/data/da_data/", num_cores=32)

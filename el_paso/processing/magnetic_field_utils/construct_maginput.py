@@ -1,11 +1,9 @@
 import logging
 from datetime import datetime, timezone
-from io import StringIO
+from functools import cache
 from typing import Literal
 
 import numpy as np
-import pandas as pd
-import requests
 from numpy.typing import NDArray
 
 import el_paso as ep
@@ -61,60 +59,13 @@ MAGINPUT_TO_INDEX:dict[SW_Index, int|list[int]] = {
     "W_params": list(range(10,16)),
 }
 
-def get_W_parameters(timestamps:NDArray[np.float64]) -> dict[str, NDArray[np.float64]]:
-
-    datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
-    years = np.unique([dt.year for dt in datetimes])
-
-    if years[-1] > 2023:
-        msg = "W parameters are only available until 2023!"
-        raise ValueError(msg)
-
-    w_params:dict[str, list[float]] = {"W1":[], "W2":[], "W3":[], "W4":[], "W5":[], "W6":[]}
-
-    for year in years:
-
-        url = f"https://geo.phys.spbu.ru/~tsyganenko/models/ts05/{year:d}_OMNI_5m_with_TS05_variables.dat"
-
-        response = requests.get(url, stream=True, verify=False)
-
-        if response.status_code == 404:
-            msg = f"File not found on server: {url}"
-            raise FileNotFoundError(msg)
-
-        response.raise_for_status()
-
-        df = pd.read_csv(StringIO(response.text), names=["Year", "Day", "Hour", "Min", "W1", "W2", "W3", "W4", "W5", "W6"], usecols=[0,1,2,3,17,18,19,20,21,22], sep="\s+")
-
-        timestamps_data:list[datetime] = []
-
-        for _, row in df.loc[:,["Year","Day","Hour","Min"]].iterrows():
-            year = int(row["Year"])
-            day  = int(row["Day"])
-            hour = int(row["Hour"])
-            minute = int(row["Min"])
-
-            timestamps_data.append(datetime.strptime(f"{year:04d}-{day:03d}-{hour:02d}-{minute:02d}", "%Y-%j-%H-%M").replace(tzinfo=timezone.utc).timestamp())
-
-        # find the timestamps for the current year
-        timestamp_year_begin = datetime(year,1,1,tzinfo=timezone.utc).timestamp()
-        timestamp_year_end = datetime(year,12,31,23,59,59,tzinfo=timezone.utc).timestamp()
-
-        curr_year_idx = (timestamps >= timestamp_year_begin) & (timestamps <= timestamp_year_end)
-
-        for w_str in ["W1", "W2", "W3", "W4", "W5", "W6"]:
-            w_data = np.interp(timestamps[curr_year_idx], timestamps_data, df[w_str].values)
-
-            w_params[w_str] += list(w_data)
-
-    return {key: np.asarray(data).astype(np.float64) for key, data in w_params.items()}
-
 MagInputKeys = Literal["Kp", "Dst", "dens", "velo", "Pdyn", "ByIMF", "BzIMF", "G1", "G2",
                        "G3", "W1", "W2", "W3", "W4", "W5", "W6", "AL"]
 
+@cache
 def construct_maginput(time_var: ep.Variable,
-                       indices_solar_wind: dict[str, ep.Variable]|None=None,
-                       magnetic_field_str:str|None=None) -> dict[MagInputKeys, NDArray[np.float64]]:
+                       magnetic_field:MagneticField,
+                       indices_solar_wind: dict[str, ep.Variable]|None=None) -> dict[MagInputKeys, NDArray[np.float64]]:
     """Construct the basic magnetospheric input parameters array.
 
     This function retrieves all solar wind data from the ACE dataset on CDAWeb, as well as the Kp and Dst indices,
@@ -150,7 +101,7 @@ def construct_maginput(time_var: ep.Variable,
     if indices_solar_wind is None:
         indices_solar_wind = {}
 
-    kext = MagneticField(magnetic_field_str).kext()
+    kext = magnetic_field.kext()
 
     required_inputs = MAGINPUT_REQUIRED_INPUTS[kext]
     clip_ranges = MAGINPUT_CLIP_RANGES[kext]
@@ -159,7 +110,7 @@ def construct_maginput(time_var: ep.Variable,
 
     for req_input in required_inputs:
         if req_input not in indices_solar_wind:
-            logger.info(f"Required input '{req_input}' not found in indices_solar_wind!")
+            logger.debug(f"Required input '{req_input}' not found in indices_solar_wind!")
             indices_solar_wind |= ep.load_indices_solar_wind_parameters(start_time, end_time, [req_input], time_var)
 
         req_input_data = indices_solar_wind[req_input].get_data().astype(np.float64)
