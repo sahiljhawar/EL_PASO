@@ -146,3 +146,12 @@ def show_process_bar_for_map_async(map_result:MapResult[Any], chunksize:int) -> 
             t.refresh()
             time.sleep(1)
 
+class Hashabledict(dict[Any,Any]):
+    def __hash__(self):
+        return hash((frozenset(self), frozenset(self.itervalues())))
+
+def make_dict_hashable(dict_input:dict[Any,Any]|None) -> Hashabledict|None:
+    if dict_input is None:
+        return dict_input
+
+    return Hashabledict(dict_input)

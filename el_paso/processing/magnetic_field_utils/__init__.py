@@ -1,4 +1,4 @@
-from .mag_field_enum import MagneticField, kext
+from .mag_field_enum import kext, MagneticField, MagneticFieldLiteral
 from .construct_maginput import construct_maginput
 from .magnetic_field_functions import (
     IrbemInput,

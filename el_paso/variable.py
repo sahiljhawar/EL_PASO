@@ -10,7 +10,7 @@ import numpy as np
 from astropy import units as u  # type: ignore[reportMissingTypeStubs]
 
 import el_paso as ep
-from el_paso.utils import enforce_utc_timezone
+from el_paso.utils import enforce_utc_timezone, timed_function
 
 if typing.TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -316,3 +316,7 @@ class Variable:
         time_var_data = time_variable.get_data(ep.units.posixtime)
 
         self._data = self._data[(time_var_data >= start_time) & (time_var_data <= end_time)]
+
+    @timed_function("HASHING")
+    def __hash__(self) -> int:
+        return hash(self._data.tobytes())

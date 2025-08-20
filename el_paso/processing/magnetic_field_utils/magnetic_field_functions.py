@@ -83,7 +83,7 @@ def get_magequator(xgeo_var: ep.Variable,
     parallel_func = partial(_get_magequator_parallel, irbem_args, x_geo, datetimes, irbem_input.maginput)
 
     with Pool(processes=irbem_input.num_cores) as pool:
-        chunksize = len(datetimes)//irbem_input.num_cores // 4 # same as default
+        chunksize = max(1, len(datetimes)//irbem_input.num_cores // 4) # same as default
         rs = pool.map_async(parallel_func, range(len(datetimes)), chunksize=chunksize)
         show_process_bar_for_map_async(rs, chunksize)
 
@@ -174,7 +174,7 @@ def get_footpoint_atmosphere(xgeo_var: ep.Variable,
                             irbem_input.maginput)
 
     with Pool(processes=irbem_input.num_cores) as pool:
-        chunksize = len(datetimes)//irbem_input.num_cores // 4 # same as default
+        chunksize = max(1, len(datetimes)//irbem_input.num_cores // 4) # same as default
         rs = pool.map_async(parallel_func, range(len(datetimes)), chunksize=chunksize)
         show_process_bar_for_map_async(rs, chunksize)
 
@@ -349,7 +349,7 @@ def get_mirror_point(xgeo_var: ep.Variable,
     parallel_func = partial(_get_mirror_point_parallel, irbem_args, x_geo, datetimes, irbem_input.maginput, pa_local)
 
     with Pool(processes=irbem_input.num_cores) as pool:
-        chunksize = len(datetimes)//irbem_input.num_cores // 4 # same as default
+        chunksize = max(1, len(datetimes)//irbem_input.num_cores // 4) # same as default
         rs = pool.map_async(parallel_func, range(len(datetimes)), chunksize=chunksize)
         show_process_bar_for_map_async(rs, chunksize)
 
@@ -445,7 +445,7 @@ def get_Lstar(xgeo_var: ep.Variable,
     )
 
     with Pool(processes=irbem_input.num_cores) as pool:
-        chunksize = len(datetimes)//irbem_input.num_cores // 4 # same as default
+        chunksize = max(1, len(datetimes)//irbem_input.num_cores // 4) # same as default
         rs = pool.map_async(parallel_func, range(len(datetimes)), chunksize=chunksize)
         show_process_bar_for_map_async(rs, chunksize)
 
