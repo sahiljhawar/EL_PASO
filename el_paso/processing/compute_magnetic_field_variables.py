@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import typing
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal, NamedTuple
 
@@ -12,9 +13,6 @@ import el_paso as ep
 import el_paso.processing.magnetic_field_utils as mag_utils
 from el_paso import Variable
 from el_paso.utils import timed_function
-
-if typing.TYPE_CHECKING:
-    from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
