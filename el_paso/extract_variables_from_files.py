@@ -16,7 +16,7 @@ import numpy as np
 import pandas as pd
 
 from el_paso import Variable
-from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version, timed_function
+from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -30,10 +30,10 @@ logger = logging.getLogger(__name__)
 class ExtractionInfo:
     """Class to store information about the extraction of variables from a file."""
 
-    result_key: str
     name_or_column: str|int
     unit: u.UnitBase
     is_time_dependent: bool = True
+    result_key: str|None = None
     dependent_variables: list[str]|None = None
 
 
@@ -85,8 +85,16 @@ def extract_variables_from_files(start_time: datetime,
     variables:dict[str, Variable] = {}
 
     for info in extraction_infos:
-        variables[info.result_key] = Variable(original_unit=info.unit, data=variable_data[info.name_or_column])
-        variables[info.result_key].metadata.source_files = [path.name for path in files_list]
+        if info.result_key is None:
+            if isinstance(info.name_or_column, str):
+                dict_key = info.name_or_column
+            else:
+                msg = "Result key cannot be inferred from a integer column! Please provide a result_key!"
+                raise ValueError(msg)
+        else:
+            dict_key = info.result_key
+        variables[dict_key] = Variable(original_unit=info.unit, data=variable_data[info.name_or_column])
+        variables[dict_key].metadata.source_files = [path.name for path in files_list]
 
     return variables
 

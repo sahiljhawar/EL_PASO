@@ -12,11 +12,11 @@ from astropy import units as u  # type: ignore[reportMissingTypeStubs]
 import el_paso as ep
 import el_paso.processing.magnetic_field_utils as mag_utils
 from el_paso import Variable
-from el_paso.utils import timed_function
+from el_paso.utils import make_dict_hashable, timed_function
 
 logger = logging.getLogger(__name__)
 
-VariableRequest = Sequence[tuple[mag_utils.MagFieldVarTypes, str|mag_utils.MagneticField]]
+VariableRequest = Sequence[tuple[mag_utils.MagFieldVarTypes, mag_utils.MagneticFieldLiteral|mag_utils.MagneticField]]
 
 class MagFieldVar(NamedTuple):
     """A named tuple to represent a request for a magnetic field variable.
@@ -140,10 +140,9 @@ def compute_magnetic_field_variables(
         if variable_name in computed_variables:
             continue
 
-        if indices_solar_wind is None:
-            indices_solar_wind = {}
+        indices_solar_wind_hashable = make_dict_hashable(indices_solar_wind)
 
-        maginput = mag_utils.construct_maginput(time_var, mag_field, indices_solar_wind)
+        maginput = mag_utils.construct_maginput(time_var, mag_field, indices_solar_wind_hashable)
 
         irbem_input = mag_utils.IrbemInput(irbem_lib_path, mag_field, maginput, irbem_options, num_cores)
 

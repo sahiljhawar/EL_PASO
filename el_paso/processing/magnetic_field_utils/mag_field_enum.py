@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import NewType
+from typing import Literal, NewType
 
 kext = NewType("kext", int)
 
@@ -24,6 +24,8 @@ def _magnetic_field_str_to_kext(magnetic_field_str:str) -> kext:
             raise ValueError(msg)
 
     return mag_kext
+
+MagneticFieldLiteral = Literal["T89", "T01", "T01s", "TS04", "TS05", "T04s", "T96", "OP77Q", "OP77"]
 
 class MagneticField(Enum):
     """Enum for magnetic field models."""
