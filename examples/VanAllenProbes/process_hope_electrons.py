@@ -115,7 +115,7 @@ def process_hope_electrons(start_time:datetime,
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(time_var = binned_time_variable,
                                                                               xgeo_var = variables["xGEO"],
-                                                                              variabels_to_compute = vars_to_compute,
+                                                                              variables_to_compute = vars_to_compute,
                                                                               irbem_lib_path = str(irbem_lib_path),
                                                                               irbem_options = irbem_options,
                                                                               num_cores = num_cores,

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -209,5 +210,6 @@ if __name__ == "__main__":
     start_time = datetime(2017, 7, 1, tzinfo=timezone.utc)
     end_time = datetime(2017, 9, 30, 23, 59, tzinfo=timezone.utc)
 
-    process_mepe_level_3(start_time, end_time, "../../IRBEM/libirbem.so", "T89",
-                         raw_data_path=".", processed_data_path="/home/bhaas/data/da_data/", num_cores=32)
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        process_mepe_level_3(start_time, end_time, "../../IRBEM/libirbem.so", "T89",
+                             raw_data_path=tmp_dir, processed_data_path="/home/bhaas/data/da_data/", num_cores=32)
