@@ -16,9 +16,15 @@ This section provides a detailed reference for all modules, classes, and functio
 
 ## Utilities
 
-[General utilities](general_utilities.md)
-[Scripts](scripts.md)
-[Units](units.md)
+[General utilities](utilities/general_utilities.md)
+
+[Load geomagnetic indices and solar wind parameters](utilities/load_indices_solar_wind_parameters.md)
+
+[Scripts](utilities/scripts.md)
+
+[Release mode](utilities/release_mode.md)
+
+[Units](utilities/units.md)
 
 ## Processing functions
 
@@ -59,5 +65,7 @@ This section provides a detailed reference for all modules, classes, and functio
 [SingleFileStrategy](saving_strategies/single_file.md)
 
 ## Data Standards
+
+[DataOrgStandard](data_standards/data_org.md)
 
 [PRBEMStandard](data_standards/prbem.md)
