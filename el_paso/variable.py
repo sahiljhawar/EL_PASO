@@ -10,90 +10,10 @@ import numpy as np
 from astropy import units as u  # type: ignore[reportMissingTypeStubs]
 
 import el_paso as ep
-from el_paso.utils import enforce_utc_timezone, timed_function
+from el_paso.utils import enforce_utc_timezone
 
 if typing.TYPE_CHECKING:
     from numpy.typing import NDArray
-
-
-class TimeBinMethod(Enum):
-    """Enum for time binning methods.
-
-    Attributes:
-        Mean (str): Calculates the mean of the data.
-        NanMean (str): Calculates the mean of the data, ignoring NaNs.
-        Median (str): Calculates the median of the data.
-        NanMedian (str): Calculates the median of the data, ignoring NaNs.
-        Merge (str): Concatenates the data.
-        NanMax (str): Calculates the maximum of the data, ignoring NaNs.
-        NanMin (str): Calculates the minimum of the data, ignoring NaNs.
-        NoBinning (str): Applies no binning.
-        Repeat (str): Repeats the data.
-        Unique (str): Returns unique values from the data.
-    """
-
-    Mean = "Mean"
-    NanMean = "NanMean"
-    Median = "Median"
-    NanMedian = "NanMedian"
-    Merge = "Merge"
-    NanMax = "NanMax"
-    NanMin = "NanMin"
-    NoBinning = "NoBinning"
-    Repeat = "Repeat"
-    Unique = "Unique"
-
-    def __call__(self, data:NDArray[np.generic]) -> NDArray[np.generic]:  # noqa: C901
-        """Applies the binning method to the provided data.
-
-        Args:
-            data (NDArray[np.generic]): The input data array to be binned or aggregated.
-
-        Returns:
-            NDArray[np.generic]: The resulting array after applying the selected
-                binning or aggregation method.
-
-        Raises:
-            TypeError: If the selected binning method requires numeric types and the
-                input data is not numeric.
-        """
-        binned_array:NDArray[np.generic]
-
-        if self.value in ["Mean", "NanMean", "Median", "NanMedian", "NanMax", "NanMin"] \
-            and not np.issubdtype(data.dtype, np.number):
-                msg = f"{self.value} time bin method is only supported for numeric types!"
-                raise TypeError(msg)
-
-        match self.value:
-            case "Mean":
-                data = typing.cast("NDArray[np.floating]", data)
-                binned_array = np.mean(data, axis=0)
-            case "NanMean":
-                data = typing.cast("NDArray[np.floating]", data)
-                binned_array = np.nanmean(data, axis=0)
-            case "Median":
-                data = typing.cast("NDArray[np.floating]", data)
-                binned_array = np.nanmedian(data, axis=0)
-            case "NanMedian":
-                data = typing.cast("NDArray[np.floating]", data)
-                binned_array = np.nanmedian(data, axis=0)
-            case "Merge":
-                binned_array = np.concatenate(data, axis=0)
-            case "NanMax":
-                binned_array = np.nanmax(data, axis=0)
-            case "NanMin":
-                binned_array = np.nanmin(data, axis=0)
-            case "NoBinning":
-                binned_array = data
-            case "Repeat":
-                binned_array = data
-            case "Unique":
-                binned_array = np.unique(data, axis=0)
-
-                if data.dtype.kind in {"U", "S"}:
-                    binned_array = np.asarray(["".join(binned_array)])
-
-        return binned_array
 
 
 @dataclass
@@ -122,8 +42,8 @@ class VariableMetadata:
     processing_notes: str = ""
     standard_name: str = ""
 
-    if ep._release_mode:  # type: ignore[Private] # noqa: SLF001
-        processing_notes += ep._release_msg + "\n" # type: ignore[Private] # noqa: SLF001
+    if ep.is_in_release_mode():
+        processing_notes += ep.get_release_msg() + "\n"
 
     def __post_init__(self) -> None:
         """Initializes the processing_steps_counter attribute to 1 after the dataclass has been instantiated.
@@ -317,6 +237,10 @@ class Variable:
 
         self._data = self._data[(time_var_data >= start_time) & (time_var_data <= end_time)]
 
-    @timed_function("HASHING")
     def __hash__(self) -> int:
+        """Computes a hash value for the variable based on its holding data.
+
+        Returns:
+            int: The integer hash value.
+        """
         return hash(self._data.tobytes())

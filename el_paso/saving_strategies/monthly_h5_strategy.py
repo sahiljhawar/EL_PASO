@@ -3,16 +3,40 @@ from __future__ import annotations
 import calendar
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
-
-from astropy import units as u  # type: ignore[reportMissingTypeStubs]
+from typing import TYPE_CHECKING
 
 import el_paso as ep
-from el_paso.saving_strategy import ConsistencyCheck, OutputFile, SavingStrategy
-from el_paso.utils import assert_n_dim
+from el_paso.saving_strategy import OutputFile, SavingStrategy
+
+if TYPE_CHECKING:
+    from el_paso.data_standard import DataStandard
 
 
 class MonthlyH5Strategy(SavingStrategy):
+    """A saving strategy that organizes and saves data into a series of monthly HDF5 files.
+
+    This strategy partitions data by month, with each month's data being saved to
+    a separate HDF5 file. It standardizes variables to a consistent set of units
+    and dimensions before saving and performs consistency checks to ensure data
+    integrity. The file name is constructed from a user-defined stem, a date range,
+    and a magnetic field model identifier.
+
+    Attributes:
+        output_files (list[OutputFile]): Pre-defined list of files to be saved,
+            each containing a comprehensive list of variables to be included.
+        base_data_path (Path): The root directory for all saved `.h5` files.
+        file_name_stem (str): The base name for the output files.
+        mag_field (ep.processing.magnetic_field_utils.MagneticFieldLiteral):
+            A string specifying the magnetic field model used.
+        data_standard (DataStandard): An instance of a data standard class
+            that handles the standardization of variables.
+
+    Methods:
+        __init__: Initializes the strategy with file paths, names, and a magnetic field model.
+        get_time_intervals_to_save: Splits a given time range into a list of monthly intervals.
+        get_file_path: Generates the file path for a monthly HDF5 file.
+        standardize_variable: Standardizes a variable's units, dimensions, and shape.
+    """
 
     output_files:list[OutputFile]
 
@@ -21,11 +45,25 @@ class MonthlyH5Strategy(SavingStrategy):
     def __init__(self,
                  base_data_path:str|Path,
                  file_name_stem:str,
-                 mag_field:Literal["T89", "T96", "TS04"]) -> None:
+                 mag_field:ep.processing.magnetic_field_utils.MagneticFieldLiteral,
+                 data_standard: DataStandard|None = None) -> None:
+        """Initializes the MonthlyH5Strategy.
 
+        Parameters:
+            base_data_path (str | Path): The base directory for saving all data.
+            file_name_stem (str): The base name for the output files.
+            mag_field (ep.processing.magnetic_field_utils.MagneticFieldLiteral):
+                The magnetic field model used, e.g., 'TS04'.
+            data_standard (DataStandard | None): An optional data standard instance.
+                If `None`, `ep.data_standards.PRBEMStandard` is used by default.
+        """
         self.base_data_path = Path(base_data_path)
         self.file_name_stem = file_name_stem
         self.mag_field = mag_field
+
+        if data_standard is None:
+            data_standard = ep.data_standards.PRBEMStandard()
+        self.data_standard = data_standard
 
         self.output_files = [
             OutputFile("full", ["time",
@@ -38,11 +76,24 @@ class MonthlyH5Strategy(SavingStrategy):
             ], save_incomplete=True),
         ]
 
-        self.consistency_check = ConsistencyCheck()
-
     def get_time_intervals_to_save(self,
                                    start_time:datetime|None,
                                    end_time:datetime|None) -> list[tuple[datetime, datetime]]:
+        """Splits the provided time range into a list of full-month intervals.
+
+        This method generates a list of (start_datetime, end_datetime) tuples, where each tuple
+        represents a single calendar month.
+
+        Parameters:
+            start_time (datetime | None): The start time of the data range.
+            end_time (datetime | None): The end time of the data range.
+
+        Returns:
+            list[tuple[datetime, datetime]]: A list of tuples, each defining a monthly interval.
+
+        Raises:
+            ValueError: If either `start_time` or `end_time` is not provided.
+        """
         time_intervals:list[tuple[datetime, datetime]] = []
 
         if start_time is None or end_time is None:
@@ -58,117 +109,42 @@ class MonthlyH5Strategy(SavingStrategy):
             month_start = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
             month_end = datetime(year, month, eom_day, 23, 59, 59, tzinfo=timezone.utc)
             time_intervals.append((month_start, month_end))
-            current_time = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if month == 12 else datetime(year, month + 1, 1, tzinfo=timezone.utc)
+            current_time = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if month == 12 else \
+                datetime(year, month + 1, 1, tzinfo=timezone.utc)  # noqa: PLR2004
 
         return time_intervals
 
-    def get_file_path(self, interval_start:datetime, interval_end:datetime, output_file:OutputFile) -> Path:
+    def get_file_path(self, interval_start:datetime, interval_end:datetime, output_file:OutputFile) -> Path:  # noqa: ARG002
+        """Generates a structured file path for the HDF5 file.
 
+        The file name is constructed from a predefined stem, the date range, and the magnetic
+        field model, with a `.h5` extension.
+
+        Parameters:
+            interval_start (datetime): The start of the time interval.
+            interval_end (datetime): The end of the time interval.
+            output_file (OutputFile): The configuration for the output file. (ignored)
+
+        Returns:
+            Path: The full file path for the HDF5 file.
+        """
         start_year_month_day = interval_start.strftime("%Y%m%d")
         end_year_month_day = interval_end.strftime("%Y%m%d")
 
-        file_name = f"{self.file_name_stem}_{start_year_month_day}to{end_year_month_day}.h5"
+        file_name = f"{self.file_name_stem}_{start_year_month_day}to{end_year_month_day}_{self.mag_field}.h5"
 
         return self.base_data_path / file_name
 
     def standardize_variable(self, variable: ep.Variable, name_in_file: str) -> ep.Variable:
+        """Standardizes a variable's units and dimensions by delegating to a DataStandard instance.
 
-        if name_in_file in ["flux/FEDU"]:
-            variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1)) # type: ignore[reportUnknownArgumentType]
+        This method acts as a wrapper, passing the variable and its file name to the
+        `standardize_variable` method of the `data_standard` attribute.
+        Parameters:
+            variable (ep.Variable): The variable instance to be standardized.
+            name_in_file (str): The name of the variable as it appears in the file.
 
-            assert_n_dim(variable, 3, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[2], name_in_file)
-
-        elif name_in_file == "flux/FEDO":
-            variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1)) # type: ignore[reportUnknownArgumentType]
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-
-        elif name_in_file in ["flux/alpha_local", "flux/alpha_eq"]:
-            variable.convert_to_unit(u.deg)
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[1], name_in_file)
-
-        elif name_in_file == "flux/energy":
-            variable.convert_to_unit(u.MeV)
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-
-        elif name_in_file == "position/xGEO":
-            variable.convert_to_unit(ep.units.RE)
-
-            assert_n_dim(variable, 2, name_in_file)
-            self.consistency_check.check_time_size(variable.get_data().shape[0], name_in_file)
-
-        elif name_in_file == f"position/{self.mag_field}/MLT":
-            variable.convert_to_unit(u.hour)
-
-            assert_n_dim(variable, 1, name_in_file)
-            self.consistency_check.check_time_size(variable.get_data().shape[0], name_in_file)
-
-        elif name_in_file == f"position/{self.mag_field}/R0":
-            variable.convert_to_unit(ep.units.RE)
-
-            assert_n_dim(variable, 1, name_in_file)
-            self.consistency_check.check_time_size(variable.get_data().shape[0], name_in_file)
-
-        elif name_in_file in [f"position/{self.mag_field}/Lstar", f"position/{self.mag_field}/Lm"]:
-            variable.convert_to_unit(u.dimensionless_unscaled)
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[1], name_in_file)
-
-        elif name_in_file in [f"mag_field/{self.mag_field}/B_eq", f"mag_field/{self.mag_field}/B_local"]:
-            variable.convert_to_unit(u.nT)
-
-            assert_n_dim(variable, 1, name_in_file)
-            self.consistency_check.check_time_size(variable.get_data().shape[0], name_in_file)
-
-        elif name_in_file == "psd/PSD":
-            variable.convert_to_unit((u.m * u.kg * u.m / u.s)**(-3)) # type: ignore[reportUnknownArgumentType]
-
-            assert_n_dim(variable, 3, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[2], name_in_file)
-
-        elif name_in_file == f"psd/{self.mag_field}/inv_mu":
-            variable.convert_to_unit(u.MeV/u.G) # type: ignore[reportUnknownArgumentType]
-
-            assert_n_dim(variable, 3, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[2], name_in_file)
-
-        elif name_in_file == f"psd/{self.mag_field}/inv_K":
-            variable.convert_to_unit(u.RE * u.G**0.5) # type: ignore[reportUnknownArgumentType]
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[2], name_in_file)
-
-        elif name_in_file in ["density/density_local", f"density/{self.mag_field}/density_eq"]:
-            variable.convert_to_unit(u.cm**(-3))
-
-            assert_n_dim(variable, 1, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-
-        return variable
+        Returns:
+            ep.Variable: The standardized variable.
+        """
+        return self.data_standard.standardize_variable(name_in_file, variable)

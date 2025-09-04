@@ -2,21 +2,37 @@ from __future__ import annotations
 
 import logging
 import typing
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any
 
-import netCDF4 as nc
-from astropy import units as u  # type: ignore[reportMissingTypeStubs]
+import netCDF4 as nC
 
 import el_paso as ep
 from el_paso.saving_strategies.monthly_h5_strategy import MonthlyH5Strategy
-from el_paso.saving_strategy import ConsistencyCheck, OutputFile
-from el_paso.utils import assert_n_dim
+from el_paso.saving_strategy import OutputFile
+
+if typing.TYPE_CHECKING:
+    from datetime import datetime
+
+    from el_paso.data_standard import DataStandard
+    from el_paso.processing.magnetic_field_utils import MagneticFieldLiteral
 
 logger = logging.getLogger(__name__)
 
 class MonthlyNetCDFStrategy(MonthlyH5Strategy):
+    """A saving strategy that saves data to monthly NetCDF files.
+
+    This strategy organizes and saves processed scientific data into a series of
+    NetCDF files, partitioned by month. It inherits from `MonthlyH5Strategy` but
+    overrides the file saving logic to use the NetCDF format, which is widely used
+    in climate and earth science for storing array-oriented scientific data.
+
+    The strategy standardizes variables based on a provided `DataStandard` and
+    structures the output files with a consistent naming convention that includes
+    the file stem, date range, and magnetic field models used. It supports
+    multiple magnetic field models and automatically configures the output files
+    and their dependencies.
+    """
 
     output_files:list[OutputFile]
 
@@ -26,14 +42,29 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
     def __init__(self,
                  base_data_path:str|Path,
                  file_name_stem:str,
-                 mag_field:Literal["T89", "T96", "TS04"]|list[Literal["T89", "T96", "TS04"]]) -> None:
+                 mag_field:MagneticFieldLiteral|list[MagneticFieldLiteral],
+                 data_standard:DataStandard|None = None) -> None:
+        """Initializes the monthly NetCDF saving strategy.
 
+        Parameters:
+            base_data_path (str | Path): The base directory where the output NetCDF files will be saved.
+            file_name_stem (str): The base name for the output files (e.g., "my_data").
+            mag_field (MagneticFieldLiteral | list[MagneticFieldLiteral]):
+                A string or list of strings specifying the magnetic field models used.
+            data_standard (DataStandard | None):
+                An optional `DataStandard` instance to use for standardizing variables.
+                If `None`, `ep.data_standards.PRBEMStandard` is used by default.
+        """
         if not isinstance(mag_field, list):
             mag_field = [mag_field]
+
+        if data_standard is None:
+            data_standard = ep.data_standards.PRBEMStandard()
 
         self.base_data_path = Path(base_data_path)
         self.file_name_stem = file_name_stem
         self.mag_field = mag_field
+        self.standard = data_standard
 
         output_file_entries = ["time", "flux/FEDU", "flux/FEDO", "flux/alpha_eq", "flux/energy", "flux/alpha_local",
                                "position/xGEO", "density/density_local"]
@@ -48,7 +79,6 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             OutputFile("full", output_file_entries, save_incomplete=True),
         ]
 
-        self.consistency_check = ConsistencyCheck()
 
         self.dependency_dict = {
             "time": ["time"],
@@ -75,134 +105,65 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                 f"density/{single_mag_field}/density_eq": ["time"],
             }
 
-    def get_file_path(self, interval_start:datetime, interval_end:datetime, output_file:OutputFile) -> Path:
+    def get_file_path(self, interval_start:datetime, interval_end:datetime, output_file:OutputFile) -> Path:  # noqa: ARG002
+        """Generates the file path for a monthly NetCDF file.
 
+        The file name is constructed from the `file_name_stem`, the date range of the interval,
+        and the specified magnetic field models, with a `.nc` extension.
+
+        Parameters:
+            interval_start (datetime): The start of the time interval.
+            interval_end (datetime): The end of the time interval.
+            output_file (OutputFile): The configuration for the output file.
+
+        Returns:
+            Path: The full file path for the NetCDF file.
+        """
         start_year_month_day = interval_start.strftime("%Y%m%d")
         end_year_month_day = interval_end.strftime("%Y%m%d")
 
-        file_name = f"{self.file_name_stem}_{start_year_month_day}to{end_year_month_day}.nc"
+        file_name = f"{self.file_name_stem}_{start_year_month_day}to{end_year_month_day}"
+
+        for mag_field in self.mag_field:
+            file_name += f"_{mag_field}"
+
+        file_name += ".nc"
 
         return self.base_data_path / file_name
 
     def standardize_variable(self, variable: ep.Variable, name_in_file: str) -> ep.Variable:
+        """Standardizes a variable based on the configured `DataStandard`.
 
-        if name_in_file in ["flux/FEDU"]:
-            variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1)) # type: ignore[reportUnknownArgumentType]
-
-            assert_n_dim(variable, 3, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[2], name_in_file)
-
-        elif name_in_file == "flux/FEDO":
-            variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1)) # type: ignore[reportUnknownArgumentType]
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-
-        elif name_in_file in ["flux/alpha_local", "flux/alpha_eq"]:
-            variable.convert_to_unit(u.deg)
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[1], name_in_file)
-
-        elif name_in_file == "flux/energy":
-            variable.convert_to_unit(u.MeV)
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-
-        elif name_in_file == "position/xGEO":
-            variable.convert_to_unit(ep.units.RE)
-
-            assert_n_dim(variable, 2, name_in_file)
-            self.consistency_check.check_time_size(variable.get_data().shape[0], name_in_file)
-
-        elif name_in_file == f"position/{self.mag_field}/MLT":
-            variable.convert_to_unit(u.hour)
-
-            assert_n_dim(variable, 1, name_in_file)
-            self.consistency_check.check_time_size(variable.get_data().shape[0], name_in_file)
-
-        elif "R0" in name_in_file:
-            variable.convert_to_unit(ep.units.RE)
-
-            assert_n_dim(variable, 1, name_in_file)
-            self.consistency_check.check_time_size(variable.get_data().shape[0], name_in_file)
-
-        elif "Lstar" in name_in_file or "lm" in name_in_file:
-            variable.convert_to_unit(u.dimensionless_unscaled)
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[1], name_in_file)
-
-        elif "B_eq" in name_in_file or "B_local" in name_in_file:
-            variable.convert_to_unit(u.nT)
-
-            assert_n_dim(variable, 1, name_in_file)
-            self.consistency_check.check_time_size(variable.get_data().shape[0], name_in_file)
-
-        elif name_in_file == "psd/PSD":
-            variable.convert_to_unit((u.m * u.kg * u.m / u.s)**(-3)) # type: ignore[reportUnknownArgumentType]
-
-            assert_n_dim(variable, 3, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[2], name_in_file)
-
-        elif "inv_mu" in name_in_file:
-            variable.convert_to_unit(u.MeV/u.G) # type: ignore[reportUnknownArgumentType]
-
-            assert_n_dim(variable, 3, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_energy_size(shape[1], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[2], name_in_file)
-
-        elif "inv_K" in name_in_file:
-            variable.convert_to_unit(u.RE * u.G**0.5) # type: ignore[reportUnknownArgumentType]
-
-            assert_n_dim(variable, 2, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-            self.consistency_check.check_pitch_angle_size(shape[1], name_in_file)
-
-        elif "density" in name_in_file:
-            variable.convert_to_unit(u.cm**(-3))
-
-            assert_n_dim(variable, 1, name_in_file)
-            shape = variable.get_data().shape
-            self.consistency_check.check_time_size(shape[0], name_in_file)
-
-        return variable
-
-    def save_single_file(self, file_path:Path, dict_to_save:dict[str,Any], *, append:bool=False) -> None:  # noqa: C901
-        """Saves variable data to a single file in one of the supported formats (.mat, .pickle, .h5).
+        This method delegates the standardization process to a `DataStandard` instance,
+        ensuring that the variable's units and dimensions are consistent with the
+        defined standard.
 
         Parameters:
-            file_path (Path): The path to the file where the dictionary will be saved.
-                              The file extension determines the format.
-            dict_to_save (dict[str, Any]): The dictionary containing variable data to save.
-            append (bool, optional): If True and the file exists, appends data to the existing file (if supported).
-                                     Defaults to False.
+            variable (ep.Variable): The variable instance to be standardized.
+            name_in_file (str): The name of the variable as it will appear in the file.
 
-        Raises:
-            NotImplementedError: If the file format specified by the file extension is not supported.
+        Returns:
+            ep.Variable: The standardized variable.
+        """
+        return self.standard.standardize_variable(name_in_file, variable)
 
-        Supported formats:
-            - .mat: Saves using scipy.io.savemat.
-            - .pickle: Saves using pickle.dump.
-            - .h5: Saves using h5py, with each key as a dataset (excluding "metadata").
+    def save_single_file(self, file_path:Path, dict_to_save:dict[str,Any], *, append:bool=False) -> None:  # noqa: C901
+        """Saves a dictionary of variables to a single NetCDF file.
+
+        This method creates a new NetCDF4 file, defines dimensions based on the data,
+        and writes each variable as a dataset. It also attaches metadata as attributes
+        to the datasets.
+
+        Parameters:
+            file_path (Path): The path to the file where the data will be saved.
+            dict_to_save (dict[str, Any]): The dictionary containing variable data.
+            append (bool, optional): If `True`, attempts to append data to an existing file.
+                Currently, this functionality is not fully implemented for NetCDF,
+                so it defaults to creating a new file.
+
+        Note:
+            This method only supports creating new files (`append=False`) and does not
+            handle appending to an existing NetCDF file.
         """
         logger.info(f"Saving file {file_path.name}...")
 
@@ -211,7 +172,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
         if file_path.exists() and append:
             dict_to_save = self.append_data(file_path, dict_to_save)
 
-        with nc.Dataset(file_path, "w", format="NETCDF4") as file:
+        with nC.Dataset(file_path, "w", format="NETCDF4") as file:
 
             size_time = dict_to_save["time"].shape[0]
             size_pitch_angle:int = 0
@@ -237,6 +198,9 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                 if path == "metadata":
                     continue
 
+                if value.size == 0:
+                    continue
+
                 path_parts = path.split("/")
                 groups = path_parts[:-1]
                 dataset_name = path_parts[-1]
@@ -246,15 +210,15 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                     if group not in curr_hierachy.groups:
                         curr_hierachy = curr_hierachy.createGroup(group) # type: ignore[reportUnknownVariableType]
                     else:
-                        curr_hierachy = typing.cast("nc.Group", curr_hierachy[group])
+                        curr_hierachy = typing.cast("nC.Group", curr_hierachy[group])
 
-                data_set = typing.cast("nc.Variable[Any]", curr_hierachy.createVariable( # type: ignore[reportUnknownMemberType]
+                data_set = typing.cast("nC.Variable[Any]", curr_hierachy.createVariable( # type: ignore[reportUnknownMemberType]
                     dataset_name,
                     "f4",
                     self.dependency_dict[path],
                     zlib=True, complevel=5, shuffle=True))
-                if value.size > 0:
-                    data_set[:,...] = value
+
+                data_set[:,...] = value
 
                 if path in dict_to_save["metadata"]:
                     metadata = dict_to_save["metadata"][path]

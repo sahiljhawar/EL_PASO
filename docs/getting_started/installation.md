@@ -1,8 +1,6 @@
-# ELaborative Particle Analysis from Satellite Observations (EL PASO)
+# Installation
 
-## Installation
-
-### Installing EL-PASO
+## Installing EL-PASO
 
 After cloning the repository, the main package can be installed using a virtual environment and pip. Make sure your current directory is set to the EL-PASO repository:
 
@@ -12,7 +10,7 @@ source venv/bin/activate
 pip install .
 ```
 
-### Preparing and installing IRBEM
+## Preparing and installing IRBEM
 
 The [IRBEM library](https://github.com/PRBEM/IRBEM) is the backend for magnetic field calculations. It is already included as a submodule and can be cloned by calling:
 
@@ -41,20 +39,10 @@ Now we can install the wrapper:
 ```bash
 pip install python/
 ```
-### Validation of installation
+## Validation of installation
 
 You can validate your installation by running the minimal example located in *examples*:
 
 ```bash
 python3 examples/minimal_example.py
 ```
-
-## Viewing the documentation
-
-EL-PASO uses `mkdocs` for building its documentation. If you have EL-PASO installed, you can see the documentation by running
-
-```bash
-mkdocs serve
-```
-
-and viewing it in your browser under the address http://127.0.0.1:8000/.

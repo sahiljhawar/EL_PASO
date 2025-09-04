@@ -14,14 +14,27 @@ This section provides a detailed reference for all modules, classes, and functio
 
 [save](save.md)
 
+## Utilities
+
+[General utilities](general_utilities.md)
+[Scripts](scripts.md)
+[Units](units.md)
+
 ## Processing functions
 
-[bin_by_time](bin_by_time.md)
-[compute_invariank_K](compute_invariant_K.md)
-[compute_invariank_mu](compute_invariant_mu.md)
-[compute_magnetic_field_variables](compute_magnetic_field_variables.md)
-[compute_phase_space_density](compute_phase_space_density.md)
-[fold_pitch_angles_and_flux](fold_pitch_angles_and_flux.md)
+[bin_by_time](processing/bin_by_time.md)
+
+[compute_invariank_K](processing/compute_invariant_K.md)
+
+[compute_invariank_mu](processing/compute_invariant_mu.md)
+
+[compute_magnetic_field_variables](processing/compute_magnetic_field_variables.md)
+
+[compute_phase_space_density](processing/compute_phase_space_density.md)
+
+[fold_pitch_angles_and_flux](processing/fold_pitch_angles_and_flux.md)
+
+[convert_string_to_datetime](processing/convert_string_to_datetime.md)
 
 <!-- ::: el_paso.processing.compute_equatorial_plasmaspheric_density
 
@@ -34,3 +47,17 @@ This section provides a detailed reference for all modules, classes, and functio
 ::: el_paso.processing.get_real_time_tipsod
 
 ::: el_paso.processing.magnetic_field_functions -->
+
+## Saving standards
+
+[DataOrgStrategy](saving_strategies/data_org.md)
+
+[MonthlyH5Strategy](saving_strategies/monthly_h5.md)
+
+[MonthlyNetCDFStrategy](saving_strategies/monthly_netcdf.md)
+
+[SingleFileStrategy](saving_strategies/single_file.md)
+
+## Data Standards
+
+[PRBEMStandard](data_standards/prbem.md)

@@ -145,7 +145,8 @@ def _requests_download(current_time:datetime,
         response = requests.get(f"{url}/{latest_file_name}",
                                 stream=True,
                                 timeout=10,
-                                auth=requests.auth.HTTPDigestAuth(*authentification_info)) #type: ignore[reportUnknownMemberType]
+                                auth=requests.auth.HTTPDigestAuth(*authentification_info),
+                                verify=False) #type: ignore[reportUnknownMemberType]
 
         if response.status_code == ERROR_NOT_FOUND:
             msg = f"File not found on server: {url}"

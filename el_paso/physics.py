@@ -64,4 +64,5 @@ def en2pc(energy:float|NDArray[np.number], species:ParticleLiteral="electron") -
     """
     mc2 = rest_energy(species)
     # Calculate the relativistic energy
+
     return np.sqrt((energy / mc2 + 1) ** 2 - 1) * mc2

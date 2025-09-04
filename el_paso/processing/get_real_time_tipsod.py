@@ -2,26 +2,38 @@ from datetime import datetime
 from datetime import timezone as tz
 
 import numpy as np
-from astropy import units as u
-from sscws.sscws import CoordinateSystem, SscWs
+from astropy import units as u  # type: ignore[reportMissingTypeStubs]
+from numpy.typing import NDArray
+from sscws.sscws import CoordinateSystem, SscWs  # type: ignore[reportMissingTypeStubs]
 
 import el_paso as ep
 
 
-def get_real_time_tipsod(timestamps:np.ndarray, sat_name:str, coord_system:str="GEO") -> ep.Variable:
-    """
-    Return xGEO to be used in the adiabatic invariant calculation.
+def get_real_time_tipsod(timestamps:NDArray[np.floating], sat_name:str, coord_system:str="GEO") -> ep.Variable:
+    """Gets real-time satellite position data from the TIPSOD service.
+
+    This function queries the TIPSOD (Tool For Interactive Plotting, Sonification, and 3D Orbit Display)
+    web service to retrieve the satellite's position (X, Y, Z) in a specified coordinate
+    system at a given set of timestamps. The function then bins the retrieved data and
+    computes the median position for each bin.
 
     Args:
-        datetimes (numpy.ndarray): The array of datetimes for which the xGEO values are to be calculated.
-                                    Can be a list of datetime objects or strings.
-        sat_name (str): The name of the satellite.
-        coord_system (str): The coordinate system in which the xGEO values are to be calculated. Default is "GEO".
+        timestamps (NDArray[np.floating]): An array of timestamps in Unix time
+            for which to retrieve satellite data. At least two timestamps are
+            required to determine the time interval for data retrieval.
+        sat_name (str): The name of the satellite (e.g., 'LANL-01A', 'GOES-15').
+        coord_system (str, optional): The coordinate system for the returned data.
+            Defaults to "GEO". Supported systems include "GEO", "GSE", "GSM", and "SM".
 
     Returns:
-        numpy.ndarray: The xGEO (x, y, z) values for the given datetimes.
-    """
+        ep.Variable: A variable containing the satellite's median position
+            (X, Y, Z) for each time interval, converted to Earth Radii (RE).
 
+    Raises:
+        ValueError: If fewer than two timestamps are provided, as the time interval
+                    cannot be determined.
+        ValueError: If the SSCWS query fails or returns an unexpected format.
+    """
     minimum_datetimes = 2
 
     if len(timestamps) < minimum_datetimes:
@@ -30,7 +42,7 @@ def get_real_time_tipsod(timestamps:np.ndarray, sat_name:str, coord_system:str="
 
     datetimes = [datetime.fromtimestamp(t, tz=tz.utc) for t in timestamps]
 
-    def _convert_to_sscws_compatible_time(dt: datetime) -> datetime:
+    def _convert_to_sscws_compatible_time(dt: datetime) -> str:
         """Add milliseconds to the datetime objects.
 
         Args:

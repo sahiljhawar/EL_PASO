@@ -1,6 +1,7 @@
 import logging
 import typing
 from datetime import datetime, timedelta
+from enum import Enum
 from typing import Literal
 
 import numpy as np
@@ -10,15 +11,104 @@ import el_paso as ep
 from el_paso.utils import datenum_to_datetime, timed_function
 
 
+class TimeBinMethod(Enum):
+    """Enum for time binning methods.
+
+    Attributes:
+        Mean (str): Calculates the mean of the data.
+        NanMean (str): Calculates the mean of the data, ignoring NaNs.
+        Median (str): Calculates the median of the data.
+        NanMedian (str): Calculates the median of the data, ignoring NaNs.
+        Merge (str): Concatenates the data.
+        NanMax (str): Calculates the maximum of the data, ignoring NaNs.
+        NanMin (str): Calculates the minimum of the data, ignoring NaNs.
+        NoBinning (str): Applies no binning.
+        Repeat (str): Repeats the data.
+        Unique (str): Returns unique values from the data.
+    """
+
+    Mean = "Mean"
+    NanMean = "NanMean"
+    Median = "Median"
+    NanMedian = "NanMedian"
+    Merge = "Merge"
+    NanMax = "NanMax"
+    NanMin = "NanMin"
+    NoBinning = "NoBinning"
+    Repeat = "Repeat"
+    Unique = "Unique"
+
+    def __call__(self, data:NDArray[np.generic], drop_percent:float=0) -> NDArray[np.generic]:  # noqa: C901, PLR0912
+        """Applies the binning method to the provided data.
+
+        Args:
+            data (NDArray[np.generic]): The input data array to be binned or aggregated.
+            drop_percent (float, optional): The percentage of the lowest and highest
+                values to drop before performing a statistical aggregation.
+                Defaults to 0.
+
+        Returns:
+            NDArray[np.generic]: The resulting array after applying the selected
+                binning or aggregation method.
+
+        Raises:
+            TypeError: If the selected binning method requires numeric types and the
+                input data is not numeric.
+        """
+        binned_array:NDArray[np.generic]
+
+        if self.value in ["Mean", "NanMean", "Median", "NanMedian", "NanMax", "NanMin"] \
+            and not np.issubdtype(data.dtype, np.number):
+                msg = f"{self.value} time bin method is only supported for numeric types!"
+                raise TypeError(msg)
+
+        num_to_remove = int(len(data) * drop_percent / 100)
+        if num_to_remove > 0 and np.issubdtype(data.dtype, np.number):
+            data = np.sort(data, axis=0)
+            data = data[num_to_remove:-num_to_remove]
+
+        match self.value:
+            case "Mean":
+                data = typing.cast("NDArray[np.floating]", data)
+                binned_array = np.mean(data, axis=0)
+            case "NanMean":
+                data = typing.cast("NDArray[np.floating]", data)
+                binned_array = np.nanmean(data, axis=0)
+            case "Median":
+                data = typing.cast("NDArray[np.floating]", data)
+                binned_array = np.nanmedian(data, axis=0)
+            case "NanMedian":
+                data = typing.cast("NDArray[np.floating]", data)
+                binned_array = np.nanmedian(data, axis=0)
+            case "Merge":
+                binned_array = np.concatenate(data, axis=0)
+            case "NanMax":
+                binned_array = np.nanmax(data, axis=0)
+            case "NanMin":
+                binned_array = np.nanmin(data, axis=0)
+            case "NoBinning":
+                binned_array = data
+            case "Repeat":
+                binned_array = data
+            case "Unique":
+                binned_array = np.unique(data, axis=0)
+
+                if data.dtype.kind in {"U", "S"}:
+                    binned_array = np.asarray(["".join(binned_array)])
+
+        return binned_array
+
+
 @timed_function()
-def bin_by_time(
+def bin_by_time(  # noqa: C901
     time_variable: ep.Variable,
     variables: dict[str, ep.Variable],
-    time_bin_method_dict: dict[str, ep.TimeBinMethod],
+    time_bin_method_dict: dict[str, TimeBinMethod],
     time_binning_cadence: timedelta,
     window_alignement: Literal["center", "left", "right"] = "center",
     start_time: datetime|None=None,
     end_time: datetime|None=None,
+    drop_percent: float = 0,
 ) -> ep.Variable:
     """Bins one or more variables by time according to specified methods and cadence.
 
@@ -28,32 +118,35 @@ def bin_by_time(
     defined time intervals (cadence) with a specified alignment.
 
     Args:
-        time_variable: The master time variable (ep.Variable) that defines the
+        time_variable (ep.Variable): The master time variable that defines the
             time basis for all other variables. Its data should be in a time
             unit (e.g., `ep.units.posixtime` or `ep.units.datenum`).
-        variables: A dictionary where keys are variable names (str) and values
+        variables (dict[str, ep.Variable]): A dictionary where keys are variable names (str) and values
             are the `ep.Variable` objects to be binned.
-        time_bin_method_dict: A dictionary mapping variable names (str) to
+        time_bin_method_dict (dict[str, ep.TimeBinMethod]): A dictionary mapping variable names (str) to
             `ep.TimeBinMethod` enums, specifying how each variable should be
             binned within each time window. If a variable is not present in
             this dictionary, it will be skipped.
-        time_binning_cadence: A `datetime.timedelta` object specifying the
+        time_binning_cadence (timedelta): A `datetime.timedelta` object specifying the
             duration of each time bin.
-        window_alignement: Determines how the time windows are aligned.
+        window_alignement (Literal["center", "left", "right"]): Determines how the time windows are aligned.
             Defaults to "center".
             * "center": The time bin represents the center of the window.
             * "left": The time bin represents the left (start) of the window.
             * "right": The time bin represents the right (end) of the window.
-        start_time: Optional. A `datetime.datetime` object specifying the
+        start_time (datetime | None): Optional. A `datetime.datetime` object specifying the
             start time for binning. If None, the start time of `time_variable`
             is used.
-        end_time: Optional. A `datetime.datetime` object specifying the end
+        end_time (datetime | None): Optional. A `datetime.datetime` object specifying the end
             time for binning. If None, the end time of `time_variable` is used.
+        drop_percent (float): Optional. The percentage of the lowest and highest values to
+            drop from each time bin before calculating statistical aggregates
+            like mean or median. Defaults to 0.
 
     Returns:
-        An `ep.Variable` object representing the new binned time axis. The
+        ep.Variable: An `ep.Variable` object representing the new binned time axis. The
         `variables` dictionary passed as an argument is modified in place, with
-        each `ep.Variable` object's data updated to its binned values.
+        each variables's data updated to its binned values.
 
     Raises:
         ValueError: If the first dimension size of any variable's data does not
@@ -84,7 +177,6 @@ def bin_by_time(
             continue
 
         # check if time variable and data content sizes match
-
         if var.get_data().shape[0] != len(time_variable.get_data()):
             msg = f"Variable {key}: size of dimension 0 does not match length of time variable!"
             raise ValueError(msg)
@@ -101,7 +193,7 @@ def bin_by_time(
         if var.get_data().dtype.kind in {"U", "S", "O"}:  # Check if the data is string or object type
             binned_data = np.full((len(binned_time),), "", dtype=var.get_data().dtype)
         else:
-            binned_data_shape = (len(binned_time),) + var.get_data().shape[1:]
+            binned_data_shape = (len(binned_time), *var.get_data().shape[1:])
             binned_data = np.full(binned_data_shape, np.nan)
 
         # Iterate over unique indices
@@ -111,7 +203,7 @@ def bin_by_time(
                 continue  # no data found
             if bin_data.dtype.kind in {"i", "f"} and not np.any(np.isfinite(bin_data)):
                 continue  # no finite data found
-            binned_value = time_bin_method_dict[key](bin_data)
+            binned_value = time_bin_method_dict[key](bin_data, drop_percent=drop_percent)
 
             # Update the relevant slice of binned_data
             binned_data[unique_index, ...] = binned_value
@@ -129,7 +221,7 @@ def bin_by_time(
                                          f" and cadence of {time_binning_cadence.total_seconds()/60} minutes")
 
     new_time_var = ep.Variable(data=binned_time, original_unit=ep.units.posixtime)
-    new_time_var.metadata.add_processing_note("Created while time binning")
+    new_time_var.metadata.add_processing_note("Created while time binning.")
 
     return new_time_var
 
@@ -199,4 +291,3 @@ def _calculate_index_iterables(timestamps: NDArray[np.floating],
     )
 
     return unique_indices, indices_separation
-
