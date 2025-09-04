@@ -1,3 +1,5 @@
+# ruff: noqa: INP001, T201
+
 import argparse
 import calendar
 import subprocess
@@ -7,7 +9,7 @@ from enum import Enum
 import dateutil
 
 
-class ChunkType(Enum):
+class ChunkType(Enum):  # noqa: D101
     DAILY = "daily"
     MONTHLY = "monthly"
     YEARLY = "yearly"
@@ -47,14 +49,31 @@ def _get_time_intervals(start_time:datetime,
 
     return time_intervals
 
-def submit_jobs_in_chunks(start_time_str:str,
+def submit_slurm_jobs_in_chunks(start_time_str:str,
                           end_time_str:str,
-                          chunk_type:ChunkType):
-    """Submits a job for each time chunk to an HPC cluster using sbatch."""
-    # Define the path to your job script template
-    # Make sure this path is correct for your system.
-    job_script_template = "job_script_template.sh"
+                          chunk_type:ChunkType,
+                          job_script_path:str = "job_script_template.sh") -> None:
+    """Submits HPC jobs in time-based chunks.
 
+    This function divides a specified time range into smaller intervals (daily,
+    monthly, or yearly) and submits a separate job for each interval to an HPC
+    cluster using the `sbatch` command. It assumes a job script template named
+    `job_script_template.sh` exists in the same directory. The chunk start and
+    end times are passed to the job script as command-line arguments.
+
+    Parameters:
+        start_time_str (str): The start of the time range, in a format parsable
+                              by `dateutil.parser`. Example: '2023-01-01T00:00:00'.
+        end_time_str (str): The end of the time range, in a format parsable
+                            by `dateutil.parser`. Example: '2023-03-31T23:59:59'.
+        chunk_type (ChunkType): The type of time chunk to use for job submission.
+                                Valid options are `ChunkType.DAILY`, `ChunkType.MONTHLY`,
+                                or `ChunkType.YEARLY`.
+
+    Raises:
+        subprocess.CalledProcessError: If an `sbatch` command fails to execute
+                                        with a non-zero exit code.
+    """
     # Convert string times to datetime objects
     start_time = dateutil.parser.parse(start_time_str).replace(tzinfo=timezone.utc)
     end_time = dateutil.parser.parse(end_time_str).replace(tzinfo=timezone.utc)
@@ -72,14 +91,14 @@ def submit_jobs_in_chunks(start_time_str:str,
         # Construct the sbatch command
         command = [
             "sbatch",
-            job_script_template,
+            job_script_path,
             chunk_start_str,
             chunk_end_str,
         ]
 
         try:
             # Execute the sbatch command and check for errors
-            subprocess.run(command, check=True)
+            subprocess.run(command, check=True)  # noqa: S603
         except subprocess.CalledProcessError as e:
             print(f"Error submitting job: {e}")
             break
@@ -103,6 +122,15 @@ if __name__ == "__main__":
         type=str,
         help="Chunk type either daily|monthly|yearly.",
     )
+    parser.add_argument(
+        "job_script_path",
+        type=str,
+        help="Path towards the job script.",
+        default="job_script_template.sh",
+    )
 
     args = parser.parse_args()
-    submit_jobs_in_chunks(args.start_time, args.end_time, ChunkType[args.chunk_type.upper()])
+    submit_slurm_jobs_in_chunks(args.start_time,
+                                args.end_time,
+                                ChunkType[args.chunk_type.upper()],
+                                job_script_path=args.job_script_path)

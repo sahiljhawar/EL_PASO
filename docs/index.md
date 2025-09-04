@@ -1,17 +1,17 @@
-# Welcome to MkDocs
+# ELaborative Particle Analysis from Satellite Observations (EL-PASO)
 
-For full documentation visit [mkdocs.org](https://www.mkdocs.org).
+`el_paso` is a framework for downloading, processing, and saving particle observations from satellite missions.
+Its main goal is providing a framework for saving satellite data in a standardized way useful for radiation belt modelling.
 
-## Commands
+It was developed as an Incubator Project funded by NFDI4Earth.
 
-* `mkdocs new [dir-name]` - Create a new project.
-* `mkdocs serve` - Start the live-reloading docs server.
-* `mkdocs build` - Build the documentation site.
-* `mkdocs -h` - Print help message and exit.
+## Features
 
-## Project layout
+- Capable of handling different input formats (cdf, netcdf, h5, ascii, json)
+- Processing functions most commonly used for analyzing particle measurements are available
+- Metadata associating with the processing are storred alongside data
+- Saving processed data in different standards (e.g. PRBEM) to enable easy loading of processed data
 
-    mkdocs.yml    # The configuration file.
-    docs/
-        index.md  # The documentation homepage.
-        ...       # Other markdown pages, images and other files.
+## Examples
+
+Examples can be found in the *examples* folder and include processing scripts for Van Allen Probes, Arase, and POES.

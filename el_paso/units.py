@@ -1,156 +1,161 @@
-from astropy import units as u
-from astropy.constants import R_earth
-import cdflib
+from __future__ import annotations
+
 from datetime import datetime, timezone
+from typing import TYPE_CHECKING
 
+import cdflib
+import cdflib.epochs_astropy
 import numpy as np
+from astropy import units as u
+from astropy.constants import R_earth  # type:ignore [reportAttributeAccessIssue]
 
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
-# Time units
+# -----------------------------------------------------------------------------
+# 1. Custom Unit Definitions
+# -----------------------------------------------------------------------------
+
+# Time units for scientific data formats
 cdf_epoch = u.def_unit("cdf_epoch")
 tt2000 = u.def_unit("tt2000")
 posixtime = u.def_unit("posixtime")
 datenum = u.def_unit("datenum")
 
-# custom conversions
-epoch_tt2000_posixtime = [(
+# Position units
+RE = u.def_unit("RE", R_earth)
+
+# -----------------------------------------------------------------------------
+# 2. Time Conversion Functions
+# -----------------------------------------------------------------------------
+
+
+def posixtime_to_datenum(posixtime_array: NDArray[np.floating]) -> NDArray[np.floating]:
+    """Converts an array of POSIX timestamps to MATLAB datenums.
+
+    The MATLAB datenum format is the number of days since 0000-01-01 plus 1.
+    This function handles the time zone and reference date differences.
+
+    Parameters:
+        posixtime_array (NDArray[np.floating]): An array of POSIX timestamps (seconds since 1970-01-01 UTC).
+
+    Returns:
+        NDArray[np.floating]: An array of MATLAB datenums.
+    """
+    posixtime_array = np.atleast_1d(posixtime_array)
+    dt_array = [datetime.fromtimestamp(posixtime, tz=timezone.utc) for posixtime in posixtime_array]
+    matlab_datenum_offset = 366  # Difference between MATLAB's and Python's reference dates
+    return np.array([
+        dt.toordinal() + dt.hour / 24 + dt.minute / 1440 + dt.second / 86400 + matlab_datenum_offset
+        for dt in dt_array
+    ])
+
+
+def datenum_to_posixtime(datenum_array: NDArray[np.floating]) -> NDArray[np.floating]:
+    """Converts an array of MATLAB datenums to POSIX timestamps.
+
+    Parameters:
+        datenum_array (NDArray[np.floating]): An array of MATLAB datenums.
+
+    Returns:
+        NDArray[np.floating]: An array of POSIX timestamps (seconds since 1970-01-01 UTC).
+    """
+    return (datenum_array - 719529) * 24*60*60  # 719529 is the datenum for 1970-01-01
+
+
+def tt2000_to_datenum(tt2000_val: NDArray[np.floating]) -> NDArray[np.floating]:
+    """Converts tt2000 nanoseconds to MATLAB datenum days via POSIX time."""
+    posix_val = cdflib.cdfepoch.unixtime(tt2000_val.astype(np.int64))
+    return posixtime_to_datenum(posix_val) # type: ignore[reportArgumentType]
+
+
+def datenum_to_tt2000(datenum_val: NDArray[np.floating]) -> NDArray[np.floating]:
+    """Converts MATLAB datenum days to tt2000 nanoseconds via POSIX time."""
+    posix_val = datenum_to_posixtime(datenum_val)
+    return cdflib.cdfepoch.timestamp_to_tt2000(posix_val)
+
+def datenum_to_cdf_epoch(datenum_array: NDArray[np.floating]) -> NDArray[np.floating]:
+    """Converts MATLAB datenum days to CDF_EPOCH milliseconds via POSIX time."""
+    posix_val = datenum_to_posixtime(datenum_array)
+    return cdflib.cdfepoch.timestamp_to_cdfepoch(posix_val)
+
+
+def cdf_epoch_to_datenum(cdf_epoch_array: NDArray[np.floating]) -> NDArray[np.floating]:
+    """Converts CDF_EPOCH milliseconds to MATLAB datenum days via POSIX time."""
+    posix_val = np.atleast_1d(cdflib.cdfepoch.unixtime(cdf_epoch_array))
+    return posixtime_to_datenum(posix_val)
+
+
+
+# -----------------------------------------------------------------------------
+# 3. Astropy Equivalencies
+# -----------------------------------------------------------------------------
+
+# Equivalency: TT2000 <-> POSIX
+tt2000_posixtime_equiv = [(
     tt2000,
     posixtime,
     lambda x: cdflib.cdfepoch.unixtime(x.astype(np.int64)),
-    lambda x: cdflib.cdfepoch.posixtime_to_tt2000(x)
+    lambda x: cdflib.cdfepoch.timestamp_to_tt2000(x),
 )]
 
-def posixtime_to_datenum(posixtime_array):
-    # MATLAB's datenum is the number of days since 0000-01-01, plus 1
-    # Python's datetime's toordinal() gives the number of days since 0001-01-01
-
-    dt_array = [datetime.fromtimestamp(posixtime, tz=timezone.utc) for posixtime in posixtime_array]
-
-    matlab_datenum_offset = 366  # Difference between MATLAB and Python's reference dates
-    return np.array([dt.toordinal() + dt.hour / 24 + dt.minute / 1440 + dt.second / 86400 + matlab_datenum_offset
-                        for dt in dt_array])
-
-def datenum_to_posixtime(datenum_array):
-    """
-    Converts a MATLAB datenum array to POSIX timestamps.
-    """
-    posix_timestamps = []
-    for dn in np.atleast_1d(datenum_array): # Ensure it works with single values or arrays
-
-        dt_parts = cdflib.cdfepoch.breaktime(dn, epoch=cdflib.cdfepoch.EPOCH_TO_DATENUM)
-
-        # Reconstruct datetime object from parts
-        dt_obj = datetime(dt_parts[0], dt_parts[1], dt_parts[2],
-                          dt_parts[3], dt_parts[4], dt_parts[5],
-                          dt_parts[6] * 1000 + dt_parts[7], # milliseconds to microseconds
-                          tzinfo=timezone.utc)
-
-        posix_timestamps.append(dt_obj.timestamp())
-    return np.array(posix_timestamps)
-
-posixtime_datenum = [(
+# Equivalency: POSIX <-> DATENUM
+posixtime_datenum_equiv = [(
     posixtime,
     datenum,
     lambda x: posixtime_to_datenum(x),
     lambda x: datenum_to_posixtime(x),
 )]
 
-
-def tt2000_to_datenum(tt2000_val):
-    """
-    Converts tt2000 (ns) to MATLAB datenum (days) via posixtime.
-    This function will be used directly in the new equivalency.
-    """
-    # 1. Convert tt2000 to posixtime
-    posix_val = cdflib.cdfepoch.unixtime(tt2000_val.astype(np.int64)) # Returns in seconds
-    # 2. Convert posixtime to datenum
-    datenum_val = posixtime_to_datenum(posix_val) # Returns in days
-    return datenum_val
-
-def datenum_to_tt2000(datenum_val):
-    """
-    Converts MATLAB datenum (days) to tt2000 (ns) via posixtime.
-    This function will be used directly in the new equivalency.
-    """
-    # 1. Convert datenum to posixtime
-    posix_val = datenum_to_posixtime(datenum_val) # Returns in seconds
-    # 2. Convert posixtime to tt2000
-    tt2000_val = cdflib.cdfepoch.posixtime_to_tt2000(posix_val) # Returns in nanoseconds
-    return tt2000_val
-
-tt2000_datenum = [(
+# Equivalency: TT2000 <-> DATENUM
+tt2000_datenum_equiv = [(
     tt2000,
     datenum,
     lambda x: tt2000_to_datenum(x),
-    lambda x: datenum_to_tt2000(x)
+    lambda x: datenum_to_tt2000(x),
 )]
 
-def cdf_epoch_to_posixtime(cdf_epoch_array):
-    """Converts CDF_EPOCH (milliseconds since 0 AD) to POSIX timestamp (seconds since 1970-01-01 UTC)."""
-    # cdflib.cdfepoch.to_datetime converts CDF_EPOCH to datetime objects
-    return cdflib.cdfepoch.unixtime(cdf_epoch_array)
-    # datetime.timestamp() returns POSIX timestamp (seconds)
-
-def posixtime_to_cdf_epoch(posixtime_array):
-    """Converts POSIX timestamp (seconds since 1970-01-01 UTC) to CDF_EPOCH (milliseconds since 0 AD)."""
-    dt_array = np.array([datetime.fromtimestamp(ts, tz=timezone.utc) for ts in posixtime_array])
-    # cdflib.cdfepoch.compute converts datetime objects to CDF_EPOCH
-    return cdflib.cdfepoch.compute(dt_array)
-
-# Define the Astropy equivalency for cdf_epoch <-> posixtime
-cdf_epoch_posixtime = [(
+# Equivalency: CDF_EPOCH <-> POSIX
+cdf_epoch_posixtime_equiv = [(
     cdf_epoch,
     posixtime,
-    lambda x: cdf_epoch_to_posixtime(x),
-    lambda x: posixtime_to_cdf_epoch(x)
+    cdflib.cdfepoch.unixtime,
+    cdflib.cdfepoch.timestamp_to_cdfepoch,
 )]
 
-def datenum_to_cdf_epoch(datenum_array):
-    """
-    Converts MATLAB datenum (days) to CDF_EPOCH (milliseconds) via posixtime.
-    """
-    # 1. Convert datenum to posixtime
-    posix_val = datenum_to_posixtime(datenum_array) # Returns in seconds
-    # 2. Convert posixtime to cdf_epoch
-    cdf_epoch_val = posixtime_to_cdf_epoch(posix_val) # Returns in milliseconds
-    return cdf_epoch_val
-
-def cdf_epoch_to_datenum(cdf_epoch_array):
-    """
-    Converts CDF_EPOCH (milliseconds) to MATLAB datenum (days) via posixtime.
-    """
-    # 1. Convert cdf_epoch to posixtime
-    posix_val = cdf_epoch_to_posixtime(cdf_epoch_array) # Returns in seconds
-    # 2. Convert posixtime to datenum
-    datenum_val = posixtime_to_datenum(posix_val) # Returns in days
-    return datenum_val
-
-# --- Define the new Astropy equivalency ---
-datenum_cdf_epoch = [(
+# Equivalency: DATENUM <-> CDF_EPOCH
+datenum_cdf_epoch_equiv = [(
     datenum,
     cdf_epoch,
     lambda x: datenum_to_cdf_epoch(x),
-    lambda x: cdf_epoch_to_datenum(x)
+    lambda x: cdf_epoch_to_datenum(x),
 )]
 
-# Position units
-RE = u.def_unit("RE", R_earth)
+# Equivalency: CDF_EPOCH <-> CDF_TT2000
+cdf_epoch_cdf_tt2000_equiv = [(
+    cdf_epoch,
+    tt2000,
+    lambda x: cdflib.cdfepoch.compute_tt2000(cdflib.cdfepoch.breakdown_epoch(x)),
+    lambda x: cdflib.cdfepoch.compute_epoch(cdflib.cdfepoch.breakdown_tt2000(x)),
+)]
 
-# we are adding all custom units to the module, so we can access them like built-in units
-# e.g., u.RE
-setattr(u, "RE", RE)
-setattr(u, "tt2000", tt2000)
-setattr(u, "posixtime", posixtime)
-setattr(u, "datenum", datenum)
 
-# Adding conversion from degree to radians
-u.add_enabled_equivalencies(u.dimensionless_angles())
-u.add_enabled_equivalencies(epoch_tt2000_posixtime)
-u.add_enabled_equivalencies(posixtime_datenum)
-u.add_enabled_equivalencies(tt2000_datenum)
-u.add_enabled_equivalencies(cdf_epoch_posixtime)
-u.add_enabled_equivalencies(datenum_cdf_epoch)
+# -----------------------------------------------------------------------------
+# 4. Enable Custom Units and Conversions
+# -----------------------------------------------------------------------------
+
+# Add custom units to the astropy.units namespace for direct access (e.g., u.RE)
 u.add_enabled_units(RE)
+u.add_enabled_units(tt2000)
 u.add_enabled_units(posixtime)
 u.add_enabled_units(datenum)
-u.add_enabled_units(tt2000)
+u.add_enabled_units(cdf_epoch)
+
+# Add custom equivalencies for seamless unit conversions
+u.add_enabled_equivalencies(u.dimensionless_angles())
+u.add_enabled_equivalencies(tt2000_posixtime_equiv)
+u.add_enabled_equivalencies(posixtime_datenum_equiv)
+u.add_enabled_equivalencies(tt2000_datenum_equiv)
+u.add_enabled_equivalencies(cdf_epoch_posixtime_equiv)
+u.add_enabled_equivalencies(datenum_cdf_epoch_equiv)
+u.add_enabled_equivalencies(cdf_epoch_cdf_tt2000_equiv)

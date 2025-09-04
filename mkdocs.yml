@@ -1,16 +1,39 @@
-site_name: ELoberative Particle Analysis from Particle Observations (EL PASO)
+site_name: ELaborative Particle Analysis from Particle Observations (EL PASO)
 site_url: https://example.com
+site_author: Bernhard Haas, Mátyás Szabó-Roberts
 
 theme:
   name: material
+  repo_url: https://github.com/GFZ/EL_PASO
   features:
     - navigation.instant
+    - naviagation.indexes
+    - navigation.tabs
     - math
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue
+      accent: blue
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to dark mode
+
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: blue
+      toggle:
+        icon: material/weather-night
+        name: Switch to light mode
+
 
 nav:
   - Home: index.md
-  - Usage:
-    - Getting Started: Usage/getting_started.md
+  - Getting started:
+    - Installation: getting_started/installation.md
+    - Basic Workflow: getting_started/basic_workflow.md
+    - Tutorials: getting_started/tutorials.md
   - API Reference:
     - API_reference/overview.md
     - Core Classes:
@@ -21,14 +44,28 @@ nav:
       - API_reference/extract_variables_from_files.md
       - API_reference/save.md
     - Processing Functions:
-      - API_reference/bin_by_time.md
-      - API_reference/compute_invariant_K.md
-      - API_reference/compute_invariant_mu.md
-      - API_reference/compute_magnetic_field_variables.md
-      - API_reference/compute_phase_space_density.md
-      - API_reference/fold_pitch_angles_and_flux.md
+      - API_reference/processing/bin_by_time.md
+      - API_reference/processing/compute_invariant_K.md
+      - API_reference/processing/compute_invariant_mu.md
+      - API_reference/processing/compute_magnetic_field_variables.md
+      - API_reference/processing/compute_phase_space_density.md
+      - API_reference/processing/convert_string_to_datetime.md
+      - API_reference/processing/fold_pitch_angles_and_flux.md
+    - Utilities:
+      - Units: API_reference/units.md
+      - General Utilities: API_reference/general_utilities.md
+      - Scripts: API_reference/scripts.md
+    - Saving Strategies:
+      - DataOrg Strategy: API_reference/saving_strategies/data_org.md
+      - Monthly H5 Strategy: API_reference/saving_strategies/monthly_h5.md
+      - Monthly NetCDF Strategy: API_reference/saving_strategies/monthly_netcdf.md
+      - Single File Strategy: API_reference/saving_strategies/single_file.md
+    - Data Standards:
+      - PRBEM Standard: API_reference/data_standards/prbem.md
+      - DataOrg Standard: API_reference/data_standards/data_org.md
 
 markdown_extensions:
+  - admonition
   - pymdownx.arithmatex:
       generic: true # Enable support for block and inline math
 
@@ -39,6 +76,11 @@ plugins:
         options:
           docstring_style: google
           show_root_heading: true
+          show_signature: false
+- search
+# - to-pdf:
+#     output_path: docs/el_paso_documentation.pdf
+#     toc_level: 3
 
 extra_javascript:
   # Use MathJax for rendering latex equations

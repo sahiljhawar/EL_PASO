@@ -162,7 +162,7 @@ def compute_magnetic_field_variables(
         if var_name in var_names_to_compute
     }
 
-    return computed_variables  # noqa: RET504
+    return computed_variables
 
 def _get_result(var_type: mag_utils.MagFieldVarTypes,  # noqa: PLR0911
                 xgeo_var: Variable,

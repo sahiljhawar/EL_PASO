@@ -14,7 +14,27 @@ def activate_release_mode(user_name:str,
                           el_paso_repository_path:str|Path,
                           *,
                           dirty_ok:bool=False) -> None:
+    """Activates the package's release mode and validates the repository state.
 
+    This function enables a special mode for data processing that records key
+    information about the execution environment. It checks if the package is
+    installed and validates that the Git repository is in a clean state (no
+    uncommitted changes) unless `dirty_ok` is set to `True`. Upon successful
+    activation, it stores metadata about the user, version, and commit hash.
+    This information is appended to the metadata of any processed variables.
+
+    Args:
+        user_name (str): The name of the user activating release mode.
+        email_address (str): The email address of the user.
+        el_paso_repository_path (str | Path): The path to the EL-PASO Git repository.
+        dirty_ok (bool, optional): If `True`, allows activation even if the
+            repository has uncommitted changes. Defaults to `False`.
+
+    Raises:
+        importlib.metadata.PackageNotFoundError: If the 'el_paso' package is not
+            found in the Python environment, indicating it's not properly installed.
+        ValueError: If the Git repository is not clean and `dirty_ok` is `False`.
+    """
     try:
         el_paso_version = importlib.metadata.version("el_paso")
     except importlib.metadata.PackageNotFoundError:
@@ -43,3 +63,22 @@ def activate_release_mode(user_name:str,
     )
 
     ep._release_mode = True  # noqa: SLF001 # type: ignore[Private]
+
+def is_in_release_mode() -> bool:
+    """Checks if the package's release mode is currently active.
+
+    Returns:
+        bool: `True` if release mode is active, `False` otherwise.
+    """
+    return ep._release_mode  # noqa: SLF001 # type: ignore[Private]
+
+def get_release_msg() -> str:
+    """Retrieves the message associated with the package's release mode.
+
+    This message contains metadata about the execution environment, including
+    user information, version, and commit hash, if release mode is active.
+
+    Returns:
+        str: The release mode message if active, otherwise an empty string.
+    """
+    return ep._release_msg  # noqa: SLF001 # type: ignore[Private]

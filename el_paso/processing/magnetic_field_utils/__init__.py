@@ -1,14 +1,31 @@
-from .mag_field_enum import kext, MagneticField, MagneticFieldLiteral
-from .construct_maginput import construct_maginput
-from .magnetic_field_functions import (
+from el_paso.processing.magnetic_field_utils.construct_maginput import construct_maginput
+from el_paso.processing.magnetic_field_utils.mag_field_enum import MagneticField, MagneticFieldLiteral, kext
+from el_paso.processing.magnetic_field_utils.magnetic_field_functions import (
     IrbemInput,
     IrbemOutput,
+    MagFieldVarTypes,
+    create_var_name,
     get_footpoint_atmosphere,
     get_local_B_field,
     get_Lstar,
     get_magequator,
     get_mirror_point,
     get_MLT,
-    create_var_name,
-    MagFieldVarTypes,
 )
+
+__all__ = [
+    "IrbemInput",
+    "IrbemOutput",
+    "MagFieldVarTypes",
+    "MagneticField",
+    "MagneticFieldLiteral",
+    "construct_maginput",
+    "create_var_name",
+    "get_Lstar",
+    "get_MLT",
+    "get_footpoint_atmosphere",
+    "get_local_B_field",
+    "get_magequator",
+    "get_mirror_point",
+    "kext",
+]

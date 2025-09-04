@@ -6,15 +6,15 @@ import numpy as np
 import pytest
 from astropy import units as u
 from matplotlib import pyplot as plt
+from swvo.io import RBMDataSet
 
 import el_paso as ep
-from data_management.io import RBMDataSet
 from examples.VanAllenProbes.process_hope_electrons import process_hope_electrons
 
 # ruff: noqa: D103, S101, PLR2004
 
-sat_str_list = ["a"]
-mag_field_list = ["TS04"]
+sat_str_list = ["a", "b"]
+mag_field_list = ["TS04", "T89"]
 
 @pytest.mark.parametrize("sat_str", sat_str_list)
 @pytest.mark.parametrize("mag_field", mag_field_list)

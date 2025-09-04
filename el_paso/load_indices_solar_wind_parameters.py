@@ -10,10 +10,10 @@ import numpy as np
 import pandas as pd
 import requests
 import scipy as sp
+import swvo.io as swvo_io
 from astropy import units as u
 from numpy.typing import NDArray
 
-import data_management.io as dm_io
 import el_paso as ep
 from el_paso.utils import enforce_utc_timezone
 
@@ -67,8 +67,8 @@ def load_indices_solar_wind_parameters(start_time:datetime,
         match requested_output:
 
             case "Kp":
-                kp_model_order = [dm_io.kp.KpOMNI(base_data_path / "OMNI_low_res"), dm_io.kp.KpNiemegk(base_data_path/"KpNiemegk")]
-                output_df = dm_io.kp.read_kp_from_multiple_models(start_time, end_time, model_order=kp_model_order, download=True)
+                kp_model_order = [swvo_io.kp.KpOMNI(base_data_path / "OMNI_low_res"), swvo_io.kp.KpNiemegk(base_data_path/"KpNiemegk")]
+                output_df = swvo_io.kp.read_kp_from_multiple_models(start_time, end_time, model_order=kp_model_order, download=True)
 
                 result = _create_variables_from_data_frame(output_df,
                                                            "kp",
@@ -77,21 +77,21 @@ def load_indices_solar_wind_parameters(start_time:datetime,
                                                            "previous")
 
             case "Dst":
-                output_df = dm_io.dst.DSTOMNI(base_data_path / "OMNI_low_res").read(start_time, end_time, download=True)
+                output_df = swvo_io.dst.DSTOMNI(base_data_path / "OMNI_low_res").read(start_time, end_time, download=True)
 
                 result = _create_variables_from_data_frame(output_df, "dst", u.nT, target_time_variable, "linear")
 
             case "Pdyn":
-                sw_model_order = [dm_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
-                output_df = dm_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1), end_time+timedelta(hours=1), model_order=sw_model_order, download=True)
+                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
+                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1), end_time+timedelta(hours=1), model_order=sw_model_order, download=True)
                 output_df["pdyn"] = output_df["pdyn"].interpolate(method="spline", order=3).ffill().bfill()
 
                 result = _create_variables_from_data_frame(output_df, "pdyn", u.nPa, target_time_variable, "linear")
 
             case "IMF_Bz":
-                sw_model_order = [dm_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
+                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
                 # we request two additional hours for interpolation 
-                output_df = dm_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1),
+                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1),
                                                                                   end_time+timedelta(hours=1),
                                                                                   model_order=sw_model_order,
                                                                                   download=True)
@@ -101,8 +101,8 @@ def load_indices_solar_wind_parameters(start_time:datetime,
 
             case "IMF_By":
                 # we request two additional hours for interpolation
-                sw_model_order = [dm_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
-                output_df = dm_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1),
+                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
+                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1),
                                                                                   end_time+timedelta(hours=1),
                                                                                   model_order=sw_model_order,
                                                                                   download=True)
@@ -112,8 +112,8 @@ def load_indices_solar_wind_parameters(start_time:datetime,
 
             case "SW_speed":
                 # we request two additional hours for interpolation
-                sw_model_order = [dm_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
-                output_df = dm_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1),
+                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
+                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1),
                                                                                   end_time+timedelta(hours=1),
                                                                                   model_order=sw_model_order,
                                                                                   download=True)
@@ -127,8 +127,8 @@ def load_indices_solar_wind_parameters(start_time:datetime,
 
             case "SW_density":
                 # we request two additional hours for interpolation
-                sw_model_order = [dm_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
-                output_df = dm_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1),
+                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
+                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(start_time-timedelta(hours=1),
                                                                                   end_time+timedelta(hours=1),
                                                                                   model_order=sw_model_order,
                                                                                   download=True)
