@@ -38,14 +38,53 @@ def load_indices_solar_wind_parameters(start_time:datetime,
                                        w_parameter_method:Literal["TsyWebsite", "Calculation"] = "Calculation",
                                        ) -> dict[SW_Index, ep.Variable]: ...
 
-def load_indices_solar_wind_parameters(start_time:datetime,
+def load_indices_solar_wind_parameters(start_time:datetime,  # noqa: C901, PLR0912, PLR0915
                                        end_time:datetime,
                                        requested_outputs:Iterable[SW_Index],
                                        target_time_variable:ep.Variable|None=None,
                                        *,
                                        w_parameter_method:Literal["TsyWebsite", "Calculation"] = "Calculation",
                                     ) -> dict[SW_Index, tuple[ep.Variable, ep.Variable]] | dict[SW_Index, ep.Variable]:
+    """Loads a variety of space weather indices and solar wind parameters.
 
+    This function fetches and processes data for several common space weather
+    and solar wind indices, including Kp, Dst, solar wind plasma properties,
+    and Tsyganenko model parameters (G1, G2, G3, W_params).
+
+    Data is downloaded and cached locally to a `.elpaso` directory in the user's home
+    directory. The function can either return the data with its original timestamps
+    or interpolate the data to a new set of timestamps provided by a `target_time_variable`.
+
+    Parameters:
+        start_time (datetime): The start time for the data retrieval.
+        end_time (datetime): The end time for the data retrieval.
+        requested_outputs (Iterable[SW_Index]): A list of space weather indices to load.
+                                                Supported values are defined by the `SW_Index` Literal.
+        target_time_variable (ep.Variable | None): An optional `ep.Variable` containing the
+                                                    target timestamps for interpolation. If `None`,
+                                                    the raw data and its timestamps are returned.
+        w_parameter_method ('TsyWebsite' | 'Calculation'): The method to use for obtaining
+                                                            W_params. 'TsyWebsite' fetches data from
+                                                            the Tsyganenko website (only available until 2023),
+                                                            while 'Calculation' computes them from other
+                                                            solar wind data. Defaults to 'Calculation'.
+
+    Returns:
+        dict[SW_Index, ep.Variable | tuple[ep.Variable, ep.Variable]]: A dictionary where each key
+                                                                        is a requested index and the value
+                                                                        is the corresponding `ep.Variable`
+                                                                        object(s). If `target_time_variable`
+                                                                        is provided, the value is a single
+                                                                        `ep.Variable`. Otherwise, it is a
+                                                                        tuple of `(data_variable, time_variable)`.
+
+    Raises:
+        TypeError: If `requested_outputs` is not an iterable of strings.
+        OSError: If the HOME environment variable is not set.
+        ValueError: If a requested output is not a supported `SW_Index` or if
+                    an unsupported method is requested.
+        FileNotFoundError: If the data file from the Tsyganenko website is not found.
+    """
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
 

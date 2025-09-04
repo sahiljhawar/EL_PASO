@@ -52,9 +52,11 @@ nav:
       - API_reference/processing/convert_string_to_datetime.md
       - API_reference/processing/fold_pitch_angles_and_flux.md
     - Utilities:
-      - Units: API_reference/units.md
-      - General Utilities: API_reference/general_utilities.md
-      - Scripts: API_reference/scripts.md
+      - General Utilities: API_reference/utilities/general_utilities.md
+      - Loading Geomagnetic Indices and Solar Wind Parameters: API_reference/utilities/load_indices_solar_wind_parameters.md
+      - Release mode: API_reference/utilities/release_mode.md
+      - Scripts: API_reference/utilities/scripts.md
+      - Units: API_reference/utilities/units.md
     - Saving Strategies:
       - DataOrg Strategy: API_reference/saving_strategies/data_org.md
       - Monthly H5 Strategy: API_reference/saving_strategies/monthly_h5.md
