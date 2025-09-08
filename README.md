@@ -1,18 +1,45 @@
-# ELaborative Particle Analysis from Satellite Observations (EL PASO)
+# ELaborative Particle Analysis from Satellite Observations (EL-PASO)
 
-## Installation
+`EL-PASO` is a Python framework designed to streamline the download, processing, and saving of satellite particle observation data.
 
-### Installing EL-PASO
+Its primary purpose is to prepare and standardize particle data for use in radiation belt modeling.
 
-After cloning the repository, the main package can be installed using a virtual environment and pip. Make sure your current directory is set to the EL-PASO repository:
+## Features
+
+- **Format Flexibility:** Capable of handling different input formats including `cdf`, `netcdf`, `h5`, `ascii`, and `json`
+- **Integrated Processing:** Provides a comprehensive set of functions for common particle data analysis tasks
+- **Supports Metadata:** Stores all processing and metadata alongside the data, ensuring full traceability and reproducibility.
+- **Standardized output files:** Saving processed data in different standards (e.g. PRBEM) to enable easy loading and sharing of processed data
+
+## Installation Guide
+
+### Step 1: Clone the Repository
+
+Begin by cloning the EL-PASO repository and navigating into its directory.
+
+```bash
+git clone https://github.com/GFZ/EL_PASO.git
+cd el_paso
+```
+
+### Step 2: Set up a Python Virtual Environment
+
+It is highly recommended to use a virtual environment to manage dependencies.
 
 ```bash
 python3 -m venv venv
 source venv/bin/activate
+```
+
+### Step 3: Install the EL PASO Package
+
+Install the core EL-PASO package using pip.
+
+```bash
 pip install .
 ```
 
-### Preparing and installing IRBEM
+### Step 4: Prepare and Install the IRBEM Library
 
 The [IRBEM library](https://github.com/PRBEM/IRBEM) is the backend for magnetic field calculations. It is already included as a submodule and can be cloned by calling:
 
@@ -41,7 +68,7 @@ Now we can install the wrapper:
 ```bash
 pip install python/
 ```
-### Validation of installation
+### Verifying the Installation
 
 You can validate your installation by running the minimal example located in *examples*:
 
@@ -51,10 +78,16 @@ python3 examples/minimal_example.py
 
 ## Viewing the documentation
 
-EL-PASO uses `mkdocs` for building its documentation. If you have EL-PASO installed, you can see the documentation by running
+EL-PASO uses `mkdocs` for building its documentation. To view it locally in your browser, run the following command from the root of the repository:
 
 ```bash
 mkdocs serve
 ```
 
-and viewing it in your browser under the address http://127.0.0.1:8000/.
+You can then access the documentation at `http://127.0.0.1:8000/`.
+
+## Acknowledgements
+
+EL-PASO was initially developed as an Incubator Project funded by NFDI4Earth in 2025.
+
+The authors acknowledge the work of Mátyás Szabó-Roberts who led the foundation for the EL-PASO framework.
