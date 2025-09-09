@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache 2.0
+
 from __future__ import annotations
 
 import logging
@@ -29,6 +34,7 @@ def download(start_time: datetime,
              authentification_info:tuple[str,str]=("",""),
              rename_file_name_stem: str|None = None,
              *,
+             sort_raw_files_by_time: bool = True,
              skip_existing: bool = True) -> None:
     """Download satellite data files within a specified time range and cadence.
 
@@ -79,7 +85,8 @@ def download(start_time: datetime,
                                     file_name_stem,
                                     authentification_info,
                                     rename_file_name_stem,
-                                    skip_existing=skip_existing)
+                                    skip_existing=skip_existing,
+                                    sort_raw_files_by_time)
             case "wget":
                 _wget_download(curr_time,
                                 save_path,
@@ -111,7 +118,8 @@ def _requests_download(current_time:datetime,
                        authentification_info:tuple[str,str],
                        rename_file_name_stem: str|None,
                        *,
-                       skip_existing:bool) -> None:
+                       skip_existing:bool,
+                       sort_raw_files_by_time:str) -> None:
     """Download a file using the requests library."""
     save_path = Path(fill_str_template_with_time(str(save_path), current_time))
     save_path.mkdir(exist_ok=True, parents=True)
@@ -138,6 +146,9 @@ def _requests_download(current_time:datetime,
         else:
             save_file_name = fill_str_template_with_time(rename_file_name_stem, current_time)
 
+        if sort_raw_files_by_time:
+            fill_str_template_with_time("YYYY/MM/", current_time)
+
         if skip_existing and (save_path / save_file_name).exists():
             logger.info(f"File already exists, skipping download: {save_path / save_file_name}")
             return
@@ -145,8 +156,7 @@ def _requests_download(current_time:datetime,
         response = requests.get(f"{url}/{latest_file_name}",
                                 stream=True,
                                 timeout=10,
-                                auth=requests.auth.HTTPDigestAuth(*authentification_info),
-                                verify=False) #type: ignore[reportUnknownMemberType]
+                                auth=requests.auth.HTTPDigestAuth(*authentification_info)) #type: ignore[reportUnknownMemberType]
 
         if response.status_code == ERROR_NOT_FOUND:
             msg = f"File not found on server: {url}"

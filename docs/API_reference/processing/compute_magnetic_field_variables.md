@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+SPDX-FileContributor: Bernhard Haas
+
+SPDX-License-Identifier: Apache 2.0
+-->
+
 # Compute magnetic field variables
 
 This function serves as a wrapper to calculate a suite of magnetic field and related invariants (like L-star, MLT, B_local, B_eq, invariant Mu,

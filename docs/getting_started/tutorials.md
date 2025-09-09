@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+SPDX-FileContributor: Bernhard Haas
+
+SPDX-License-Identifier: Apache 2.0
+-->
+
 # Tutorials
 
 The tutorials located in *tutorials* serve as a starting point for new users to get familiar with the workflow of EL-PASO.

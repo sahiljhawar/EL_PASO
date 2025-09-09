@@ -1,3 +1,11 @@
+<!--
+SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+
+SPDX-License-Identifier: Apache 2.0
+-->
+
+![REUSE Compliance](https://img.shields.io/reuse/compliance/:remote)
+
 # ELaborative Particle Analysis from Satellite Observations (EL-PASO)
 
 `EL-PASO` is a Python framework designed to streamline the download, processing, and saving of satellite particle observation data.

@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache 2.0
+
 # ruff: noqa: E402
 
 import logging
@@ -6,7 +11,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from astropy import units as u
-
 
 logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
 logging.getLogger().setLevel(logging.INFO)

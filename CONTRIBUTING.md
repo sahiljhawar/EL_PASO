@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+SPDX-FileContributor: Bernhard Haas
+
+SPDX-License-Identifier: Apache 2.0
+-->
+
 # Contributing to EL-PASO
 
 Thank you for your interest in contributing to `EL-PASO`! 
