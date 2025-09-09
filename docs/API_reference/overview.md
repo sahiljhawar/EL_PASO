@@ -1,3 +1,10 @@
+<!--
+SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+SPDX-FileContributor: Bernhard Haas
+
+SPDX-License-Identifier: Apache 2.0
+-->
+
 # Overview
 
 This section provides a detailed reference for all modules, classes, and functions in `el_paso`.

@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache 2.0
+
 from el_paso.processing import magnetic_field_utils
 from el_paso.processing.bin_by_time import TimeBinMethod, bin_by_time
 from el_paso.processing.compute_equatorial_plasmaspheric_density import compute_equatorial_plasmaspheric_density

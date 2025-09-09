@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache 2.0
+
 #ruff: noqa: D103, INP001, S101
 
 from datetime import datetime, timedelta, timezone

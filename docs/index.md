@@ -1,9 +1,17 @@
+<!--
+SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+SPDX-FileContributor: Bernhard Haas
+
+SPDX-License-Identifier: Apache 2.0
+-->
+
 # ELaborative Particle Analysis from Satellite Observations (EL-PASO)
 
-`el_paso` is a framework for downloading, processing, and saving particle observations from satellite missions.
-Its main goal is providing a framework for saving satellite data in a standardized way useful for radiation belt modelling.
+`el_paso` is a Python framework designed to streamline the download, processing, and saving of satellite particle observation data.
 
-It was developed as an Incubator Project funded by NFDI4Earth.
+Its primary purpose is to prepare and standardize particle data for use in radiation belt modeling.
+
+It was initially developed as an Incubator Project funded by NFDI4Earth in 2025.
 
 ## Features
 

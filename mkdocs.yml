@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache 2.0
+
 site_name: ELaborative Particle Analysis from Particle Observations (EL PASO)
 site_url: https://example.com
 site_author: Bernhard Haas, Mátyás Szabó-Roberts

@@ -1,10 +1,14 @@
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache 2.0
+
 import logging
 import pickle
 import typing
 import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, NamedTuple
@@ -171,7 +175,7 @@ class SavingStrategy(ABC):
 
         return target_variables
 
-    def save_single_file(self, file_path:Path, dict_to_save:dict[str,Any], *, append:bool=False) -> None:  # noqa: C901
+    def save_single_file(self, file_path:Path, dict_to_save:dict[str,Any], *, append:bool=False) -> None:  # noqa: C901, PLR0912
         """Saves variable data to a single file in one of the supported formats (.mat, .pickle, .h5).
 
         Parameters:
