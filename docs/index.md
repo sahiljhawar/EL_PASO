@@ -11,7 +11,7 @@ SPDX-License-Identifier: Apache 2.0
 
 Its primary purpose is to prepare and standardize particle data for use in radiation belt modeling.
 
-It was initially developed as an Incubator Project funded by NFDI4Earth in 2025.
+This work has been funded by the German Research Foundation (NFDI4Earth, DFG project no. 460036893, https://www.nfdi4earth.de/).
 
 ## Features
 

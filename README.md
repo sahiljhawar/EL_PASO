@@ -96,6 +96,5 @@ You can then access the documentation at `http://127.0.0.1:8000/`.
 
 ## Acknowledgements
 
-EL-PASO was initially developed as an Incubator Project funded by NFDI4Earth in 2025.
-
+This work has been funded by the German Research Foundation (NFDI4Earth, DFG project no. 460036893, https://www.nfdi4earth.de/).
 The authors acknowledge the work of Mátyás Szabó-Roberts who led the foundation for the EL-PASO framework.
