@@ -19,6 +19,8 @@ Its primary purpose is to prepare and standardize particle data for use in radia
 - **Supports Metadata:** Stores all processing and metadata alongside the data, ensuring full traceability and reproducibility.
 - **Standardized output files:** Saving processed data in different standards (e.g. PRBEM) to enable easy loading and sharing of processed data
 
+Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest/).
+
 ## Installation Guide
 
 ### Step 1: Clone the Repository
@@ -83,16 +85,6 @@ You can validate your installation by running the minimal example located in *ex
 ```bash
 python3 examples/minimal_example.py
 ```
-
-## Viewing the documentation
-
-EL-PASO uses `mkdocs` for building its documentation. To view it locally in your browser, run the following command from the root of the repository:
-
-```bash
-mkdocs serve
-```
-
-You can then access the documentation at `http://127.0.0.1:8000/`.
 
 ## Acknowledgements
 
