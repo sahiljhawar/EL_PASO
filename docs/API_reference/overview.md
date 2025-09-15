@@ -10,9 +10,11 @@ SPDX-License-Identifier: Apache 2.0
 This section provides a detailed reference for all modules, classes, and functions in `el_paso`.
 
 ## Core classes
-[Variable](variable.md)
+[DataStandard](data_standard.md)
 
 [SavingStrategy](saving_strategy.md)
+
+[Variable](variable.md)
 
 ## Core functions
 [download](download.md)

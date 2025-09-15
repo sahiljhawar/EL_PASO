@@ -68,8 +68,8 @@ class SavingStrategy(ABC):
 
     @abstractmethod
     def get_time_intervals_to_save(self,
-                                   start_time:datetime|None,
-                                   end_time:datetime|None) -> list[tuple[datetime, datetime]]:
+                                   start_time:datetime,
+                                   end_time:datetime) -> list[tuple[datetime, datetime]]:
         """Generates a list of time intervals to save between the specified start and end times.
 
         Args:
