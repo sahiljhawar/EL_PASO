@@ -85,8 +85,8 @@ def download(start_time: datetime,
                                     file_name_stem,
                                     authentification_info,
                                     rename_file_name_stem,
-                                    skip_existing,
-                                    sort_raw_files_by_time)
+                                    skip_existing=skip_existing,
+                                    sort_raw_files_by_time=sort_raw_files_by_time)
             case "wget":
                 _wget_download(curr_time,
                                 save_path,

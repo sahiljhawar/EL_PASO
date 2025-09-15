@@ -42,8 +42,9 @@ nav:
   - API Reference:
     - API_reference/overview.md
     - Core Classes:
-      - API_reference/variable.md
+      - API_reference/data_standard.md
       - API_reference/saving_strategy.md
+      - API_reference/variable.md
     - Core Functions:
       - API_reference/download.md
       - API_reference/extract_variables_from_files.md

@@ -89,22 +89,20 @@ ep.processing.fold_pitch_angles_and_flux(variables["FEDU"],    # fold around 90 
 
 
 irbem_options = [1, 1, 4, 4, 0]
+irbem_lib_path = Path(__file__).parent / ".." / "IRBEM" / "libirbem.so"
 mag_field = "T89" # other options include: "TS04", "T96", "OP77", ...
 
 variables_to_compute:ep.processing.VariableRequest = [
     ("B_eq", mag_field),
     ("MLT", mag_field),
     ("PA_eq", mag_field),
-    ("Lstar", mag_field),
-    ("Lm", mag_field),
     ("invMu", mag_field),
-    ("invK", mag_field),
 ]
 
 magnetic_field_variables = ep.processing.compute_magnetic_field_variables(time_var = binned_time_variable,
                                                                           xgeo_var = variables["xGEO"],
                                                                           variables_to_compute = variables_to_compute,
-                                                                          irbem_lib_path = "../IRBEM/libirbem.so",
+                                                                          irbem_lib_path = irbem_lib_path,
                                                                           irbem_options = irbem_options,
                                                                           num_cores = 8,
                                                                           pa_local_var = variables["Pitch_angle"],
@@ -118,8 +116,6 @@ variables_to_save = {
     "flux/alpha_local": variables["Pitch_angle"],
     "flux/alpha_eq": magnetic_field_variables["PA_eq_" + mag_field],
     f"position/{mag_field}/MLT": magnetic_field_variables["MLT_" + mag_field],
-    f"position/{mag_field}/Lm": magnetic_field_variables["Lm_" + mag_field],
-    f"position/{mag_field}/Lstar": magnetic_field_variables["Lstar_" + mag_field],
     f"mag_field/{mag_field}/B_eq": magnetic_field_variables["B_eq_" + mag_field],
     "position/xGEO": variables["xGEO"],
 }

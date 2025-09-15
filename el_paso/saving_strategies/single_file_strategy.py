@@ -49,8 +49,8 @@ class SingleFileStrategy(SavingStrategy):
         self.map_standard_name = {}
 
     def get_time_intervals_to_save(self,
-                                   start_time: datetime|None,
-                                   end_time: datetime|None) -> list[tuple[datetime, datetime]]:
+                                   start_time: datetime,
+                                   end_time: datetime) -> list[tuple[datetime, datetime]]:
         """Returns the entire time range as a single interval.
 
         This strategy does not split data by time; it saves everything in one go.
@@ -62,13 +62,12 @@ class SingleFileStrategy(SavingStrategy):
         Returns:
             list[tuple[datetime, datetime]]: A list containing a single tuple with the start and end times.
         """
-        if start_time is None or end_time is None:
-            msg = "Both start_time and end_time must be provided."
-            raise ValueError(msg)
-
         return [(start_time, end_time)]
 
-    def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:
+    def get_file_path(self,
+                      interval_start: datetime,  # noqa: ARG002
+                      interval_end: datetime,  # noqa: ARG002
+                      output_file: OutputFile) -> Path:  # noqa: ARG002
         """Returns the pre-defined single file path, ignoring the interval.
 
         This method ensures all data is saved to the same file, regardless of the time interval.
@@ -83,7 +82,7 @@ class SingleFileStrategy(SavingStrategy):
         """
         return self.file_path
 
-    def standardize_variable(self, variable: Variable, name_in_file: str) -> Variable:
+    def standardize_variable(self, variable: Variable, name_in_file: str) -> Variable:  # noqa: ARG002
         """Does not modify the variable.
 
         This strategy does not perform any specific standardization on the variables before saving.

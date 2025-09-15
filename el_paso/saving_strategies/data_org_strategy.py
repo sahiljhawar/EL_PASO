@@ -7,16 +7,20 @@ from __future__ import annotations
 
 import calendar
 import pickle
+import typing
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
 import numpy as np
-from astropy import units as u
 
-from el_paso import Variable
 from el_paso.data_standards import DataOrgStandard
 from el_paso.saving_strategy import OutputFile, SavingStrategy
+
+if typing.TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from el_paso import Variable
 
 
 class DataOrgStrategy(SavingStrategy):
@@ -99,18 +103,20 @@ class DataOrgStrategy(SavingStrategy):
     def standardize_variable(self, variable: Variable, name_in_file: str) -> Variable:
         """Standardizes a variable's units and dimensions based on its predefined name.
 
-        This method uses a `match` statement to apply specific unit conversions and
-        dimension checks for a known set of variable names.
+        This method acts as a proxy, delegating the actual standardization logic
+        to the `DataOrgStandard` instance. It ensures that data conforms to the
+        specified standard before it is saved.
 
         Parameters:
             variable (Variable): The variable instance to be standardized.
-            name_in_file (str): The predefined name of the variable to use for standardization rules.
+            name_in_file (str): The predefined name of the variable to use for
+                determining the standardization rules.
 
         Returns:
             Variable: The standardized variable instance.
 
         Raises:
-            ValueError: If an unknown `name_in_file` is encountered.
+            ValueError: If an unknown `name_in_file` is encountered..
         """
         return self.data_standard.standardize_variable(name_in_file, variable)
 
@@ -170,7 +176,8 @@ class DataOrgStrategy(SavingStrategy):
         start_year_month_day = interval_start.strftime("%Y%m%d")
         end_year_month_day = interval_end.strftime("%Y%m%d")
 
-        file_name = f"{self.satellite.lower()}_{self.instrument.lower()}_{start_year_month_day}to{end_year_month_day}_{output_file.name}"
+        file_name = (f"{self.satellite.lower()}_{self.instrument.lower()}_"
+                     f"{start_year_month_day}to{end_year_month_day}_{output_file.name}")
 
         if output_file.name in ["alpha_and_energy", "lstar", "lm", "invmu_and_invk", "mlt", "bfield", "R0"]:
             file_name += f"_n4_4_{self.kext}"
@@ -203,7 +210,7 @@ class DataOrgStrategy(SavingStrategy):
             time_1 = np.squeeze(data_dict_old["time"])
             time_2 = np.squeeze(data_dict_to_save["time"])
 
-            idx_to_insert = np.searchsorted(time_1, time_2[0])
+            idx_to_insert = typing.cast("int", np.searchsorted(time_1, time_2[0]))
 
             time_1_in_2 = np.squeeze(np.isin(time_1, time_2))
 
@@ -214,7 +221,7 @@ class DataOrgStrategy(SavingStrategy):
                     raise ValueError(msg)
 
                 if isinstance(value_1, np.ndarray):
-                    value_1_truncated = value_1[~time_1_in_2]
+                    value_1_truncated = typing.cast("NDArray[np.floating]", value_1[~time_1_in_2])
 
                     value_2 = data_dict_to_save[key]
 

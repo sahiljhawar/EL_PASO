@@ -26,34 +26,36 @@ logger = logging.getLogger(__name__)
 @timed_function()
 def save(variables_dict: dict[str, Variable],
          saving_strategy: SavingStrategy,
-         start_time: datetime|None=None,
-         end_time: datetime|None=None,
+         start_time: datetime,
+         end_time: datetime,
          time_var: Variable|None=None,
          *,
          append:bool=False) -> None:
     """Saves variables to files based on the specified saving strategy and time intervals.
 
-    Args:
-        variables_dict (dict[str, Variable]):
-            Dictionary mapping variable names to Variable objects to be saved.
-        saving_strategy (SavingStrategy):
-        start_time (datetime):
-        end_time (datetime):
-        time_var (Variable):
-        append (bool, optional):
-            Whether to append to existing files if possible. Defaults to False.
+    This function iterates through defined time intervals, calling the saving strategy
+    to save a set of variables to corresponding files. It handles variable filtering
+    and includes a check for missing data.
 
-    Returns:
-        None
+    Args:
+        variables_dict (dict[str, Variable]): A dictionary mapping variable names to their
+            `Variable` objects to be saved.
+        saving_strategy (SavingStrategy): The strategy object that defines how to
+            organize, standardize, and save the data (e.g., file paths, formats).
+        start_time (datetime): The start of the overall time range for which data
+            should be saved.
+        end_time (datetime): The end of the overall time range.
+        time_var (Variable, optional): The variable representing time. If not provided,
+            the saving strategy must handle time internally. Defaults to None.
+        append (bool, optional): If `True`, data will be appended to existing files
+            rather than overwriting them. Defaults to `False`.
 
     Raises:
-        UserWarning:
-            If saving is attempted but some required variables for an output file are missing.
-
+        UserWarning: If the saving process is attempted for an output file but one
+            or more of its required variables are missing from `variables_dict`.
     """
-    if start_time is not None and end_time is not None:
-        start_time = enforce_utc_timezone(start_time)
-        end_time = enforce_utc_timezone(end_time)
+    start_time = enforce_utc_timezone(start_time)
+    end_time = enforce_utc_timezone(end_time)
 
     time_intervals_to_save = saving_strategy.get_time_intervals_to_save(start_time, end_time)
 
@@ -73,26 +75,39 @@ def save(variables_dict: dict[str, Variable],
                     stacklevel=2,
                 )
             else:
-                data_dict =_get_data_dict_to_save(target_variables)
+                data_dict = _get_data_dict_to_save(target_variables)
                 saving_strategy.save_single_file(file_path, data_dict, append=append)
 
-def _get_data_dict_to_save(target_variables:dict[str,Variable]) -> dict[str,Any]:
+def _get_data_dict_to_save(target_variables: dict[str, Variable]) -> dict[str, Any]:
+    """Generates a dictionary of data and metadata for saving.
 
-    data_dict:dict[str,NDArray[np.generic]|dict[str,Any]] = {}
-    metadata_dict:dict[Any,Any] = {}
+    This internal function iterates through a dictionary of variables, extracts their
+    data and metadata, and formats them into a single dictionary suitable for
+    persistence. It also sanitizes the metadata to handle `None` values.
+
+    Args:
+        target_variables (dict[str, Variable]): A dictionary of variables to be prepared
+            for saving.
+
+    Returns:
+        dict[str, Any]: The formatted dictionary containing all variable data and
+            associated metadata.
+    """
+    data_dict: dict[str, NDArray[np.generic] | dict[str, Any]] = {}
+    metadata_dict: dict[Any, Any] = {}
 
     for save_name, variable in target_variables.items():
-        # Save the data_content into a field named by save_name
-
-        data_dict[save_name] = variable.get_data()
-
         data_content = variable.get_data()
+
         if data_content.size == 0:
             warnings.warn(f"Variable {save_name} does not hold any content! Skipping ...", stacklevel=2)
             continue
         if data_content.ndim == 1:
             data_content = data_content.reshape(-1, 1)
+
+        # Save the data_content into a field named by save_name
         data_dict[save_name] = data_content
+
         # Create metadata for each variable
         metadata_dict[save_name] = {
             "unit": str(variable.metadata.unit),
@@ -107,22 +122,27 @@ def _get_data_dict_to_save(target_variables:dict[str,Variable]) -> dict[str,Any]
 
     return data_dict
 
-def _sanitize_metadata_dict(metadata_dict:dict[Any,Any]) -> dict[Any,Any]:
-    """Sanitize the metadata dictionary by replacing None type objects with empty arrays.
+def _sanitize_metadata_dict(metadata_dict: dict[Any, Any]) -> dict[Any, Any]:
+    """Recursively sanitizes a metadata dictionary by replacing `None` with empty NumPy arrays.
+
+    This function ensures that the metadata dictionary is free of `None` values,
+    which can cause issues with certain serialization formats (e.g., MAT files).
+    It traverses the dictionary and its nested dictionaries to replace any `None`
+    instance with an empty `numpy.ndarray`.
 
     Args:
-        metadata_dict (dict): The dictionary of dictionaries to be sanitized.
+        metadata_dict (dict): The dictionary to be sanitized. It can contain nested
+            dictionaries.
 
     Returns:
-        dict: The sanitized dictionary.
-
+        dict: The sanitized dictionary with `None` values replaced.
     """
-    sanitized_dict:dict[Any,Any] = {}
+    sanitized_dict: dict[Any, Any] = {}
 
     for key, value in metadata_dict.items():
         if isinstance(value, dict):
             # Recursively sanitize nested dictionaries
-            sanitized_dict[key] = _sanitize_metadata_dict(value) # type: ignore[reportUnknownArgumentType]
+            sanitized_dict[key] = _sanitize_metadata_dict(value)  # type: ignore[reportUnknownArgumentType]
         elif value is None:
             # Replace None with an empty numpy array
             sanitized_dict[key] = np.array([])

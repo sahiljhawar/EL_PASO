@@ -41,7 +41,7 @@ class DataOrgStandard(DataStandard):
         """
         match standard_name:
             case "time":
-                variable.convert_to_unit(u.datenum) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit(ep.units.datenum)
                 assert_n_dim(variable, 1, standard_name)
             case "Flux":
                 variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV)**(-1)) # type: ignore[reportUnknownArgumentType]
@@ -83,7 +83,7 @@ class DataOrgStandard(DataStandard):
                 self.consistency_check.check_pitch_angle_size(shape[1], standard_name)
 
             case "xGEO":
-                variable.convert_to_unit(u.RE) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit(ep.units.RE)
                 assert_n_dim(variable, 2, standard_name)
                 self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
 
@@ -94,7 +94,7 @@ class DataOrgStandard(DataStandard):
                 self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
 
             case "R0":
-                variable.convert_to_unit(u.RE) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit(ep.units.RE)
 
                 assert_n_dim(variable, 1, standard_name)
                 self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
@@ -123,7 +123,7 @@ class DataOrgStandard(DataStandard):
                 self.consistency_check.check_pitch_angle_size(shape[2], standard_name)
 
             case "InvK":
-                variable.convert_to_unit(u.RE * u.G**0.5) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit(ep.units.RE * u.G**0.5) # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 2, standard_name)
                 shape = variable.get_data().shape
