@@ -2,7 +2,7 @@
 SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
 SPDX-FileContributor: Bernhard Haas
 
-SPDX-License-Identifier: Apache 2.0
+SPDX-License-Identifier: Apache-2.0
 -->
 
 For publishing a data product, a release mode ensures reproducibility by associating the product with a specific Git commit hash. This commit hash serves as a unique identifier for the exact version of the EL-PASO code used to generate the data.

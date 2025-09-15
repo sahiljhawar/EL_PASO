@@ -1,10 +1,11 @@
 <!--
 SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+SPDX-FileContributor: Bernhard Haas
 
-SPDX-License-Identifier: Apache 2.0
+SPDX-License-Identifier: Apache-2.0
 -->
 
-![REUSE Compliance](https://img.shields.io/reuse/compliance/:remote)
+[![REUSE status](https://api.reuse.software/badge/github.com/GFZ/EL_PASO)](https://api.reuse.software/info/github.com/GFZ/EL_PASO)
 
 # ELaborative Particle Analysis from Satellite Observations (EL-PASO)
 
