@@ -3,7 +3,7 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
 #
-# SPDX-License-Identifier: Apache 2.0
+# SPDX-License-Identifier: Apache-2.0
 
 #SBATCH --job-name=data_processing
 #SBATCH --nodes=1

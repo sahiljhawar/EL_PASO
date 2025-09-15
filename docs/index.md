@@ -2,7 +2,7 @@
 SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
 SPDX-FileContributor: Bernhard Haas
 
-SPDX-License-Identifier: Apache 2.0
+SPDX-License-Identifier: Apache-2.0
 -->
 
 # ELaborative Particle Analysis from Satellite Observations (EL-PASO)

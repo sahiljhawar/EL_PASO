@@ -1,3 +1,9 @@
+# SPDX-FileCopyrightText: 2022 Mykhaylo Shumko
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+#
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-License-Identifier: LGPL-3.0-only
+
 __author__ = 'Mykhaylo Shumko'
 __last_modified__ = '2022-06-16'
 __credit__ = 'IRBEM-LIB development team'

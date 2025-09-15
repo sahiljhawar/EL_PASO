@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
 #
-# SPDX-License-Identifier: Apache 2.0
+# SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
 
@@ -119,7 +119,7 @@ def _requests_download(current_time:datetime,
                        rename_file_name_stem: str|None,
                        *,
                        skip_existing:bool,
-                       sort_raw_files_by_time:str) -> None:
+                       sort_raw_files_by_time:bool) -> None:
     """Download a file using the requests library."""
     save_path = Path(fill_str_template_with_time(str(save_path), current_time))
     save_path.mkdir(exist_ok=True, parents=True)
