@@ -44,7 +44,7 @@ class DataOrgStandard(DataStandard):
                 variable.convert_to_unit(ep.units.datenum)
                 assert_n_dim(variable, 1, standard_name)
             case "Flux":
-                variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV)**(-1)) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1))  # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 3, standard_name)
                 shape = variable.get_data().shape
@@ -52,8 +52,8 @@ class DataOrgStandard(DataStandard):
                 self.consistency_check.check_energy_size(shape[1], standard_name)
                 self.consistency_check.check_pitch_angle_size(shape[2], standard_name)
 
-            case "alpha_local"|"alpha_eq_model":
-                variable.convert_to_unit(u.radian) # type: ignore[reportUnknownArgumentType]
+            case "alpha_local" | "alpha_eq_model":
+                variable.convert_to_unit(u.radian)  # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 2, standard_name)
                 shape = variable.get_data().shape
@@ -61,7 +61,7 @@ class DataOrgStandard(DataStandard):
                 self.consistency_check.check_pitch_angle_size(shape[1], standard_name)
 
             case "energy_channels":
-                variable.convert_to_unit(u.MeV) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit(u.MeV)  # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 2, standard_name)
                 shape = variable.get_data().shape
@@ -69,12 +69,12 @@ class DataOrgStandard(DataStandard):
                 self.consistency_check.check_energy_size(shape[1], standard_name)
 
             case "MLT":
-                variable.convert_to_unit(u.hour) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit(u.hour)  # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 1, standard_name)
                 self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
 
-            case "Lstar"|"Lm":
+            case "Lstar" | "Lm":
                 variable.convert_to_unit(u.dimensionless_unscaled)
 
                 assert_n_dim(variable, 2, standard_name)
@@ -87,8 +87,8 @@ class DataOrgStandard(DataStandard):
                 assert_n_dim(variable, 2, standard_name)
                 self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
 
-            case "B_eq"|"B_local":
-                variable.convert_to_unit(u.nT) # type: ignore[reportUnknownArgumentType]
+            case "B_eq" | "B_local":
+                variable.convert_to_unit(u.nT)  # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 1, standard_name)
                 self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
@@ -100,12 +100,12 @@ class DataOrgStandard(DataStandard):
                 self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
 
             case "density":
-                variable.convert_to_unit(u.cm**(-3)) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit(u.cm ** (-3))  # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 1, standard_name)
                 self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
             case "PSD":
-                variable.convert_to_unit((u.m * u.kg * u.m / u.s)**(-3)) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit((u.m * u.kg * u.m / u.s) ** (-3))  # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 3, standard_name)
                 shape = variable.get_data().shape
@@ -114,7 +114,7 @@ class DataOrgStandard(DataStandard):
                 self.consistency_check.check_pitch_angle_size(shape[2], standard_name)
 
             case "InvMu":
-                variable.convert_to_unit(u.MeV / u.G) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit(u.MeV / u.G)  # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 3, standard_name)
                 shape = variable.get_data().shape
@@ -123,7 +123,7 @@ class DataOrgStandard(DataStandard):
                 self.consistency_check.check_pitch_angle_size(shape[2], standard_name)
 
             case "InvK":
-                variable.convert_to_unit(ep.units.RE * u.G**0.5) # type: ignore[reportUnknownArgumentType]
+                variable.convert_to_unit(ep.units.RE * u.G**0.5)  # type: ignore[reportUnknownArgumentType]
 
                 assert_n_dim(variable, 2, standard_name)
                 shape = variable.get_data().shape

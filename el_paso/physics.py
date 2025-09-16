@@ -10,7 +10,8 @@ from numpy.typing import NDArray
 
 ParticleLiteral = Literal["electron", "proton", "helium", "oxygen"]
 
-def rest_energy(species:ParticleLiteral) -> float:
+
+def rest_energy(species: ParticleLiteral) -> float:
     """Return the rest energy for the input species.
 
     Args:
@@ -35,21 +36,20 @@ def rest_energy(species:ParticleLiteral) -> float:
         mc2 = rest_energies[species.lower()]
     else:
         msg = f"Unknown species '{species}'. Valid options are 'electron', 'proton', 'helium', 'oxygen'."
-        raise ValueError(
-            msg)
+        raise ValueError(msg)
 
     return mc2
 
 
 @overload
-def en2pc(energy:float, species:ParticleLiteral="electron") -> float:
-    ...
+def en2pc(energy: float, species: ParticleLiteral = "electron") -> float: ...
+
 
 @overload
-def en2pc(energy:NDArray[np.number], species:ParticleLiteral="electron") -> NDArray[np.number]:
-    ...
+def en2pc(energy: NDArray[np.number], species: ParticleLiteral = "electron") -> NDArray[np.number]: ...
 
-def en2pc(energy:float|NDArray[np.number], species:ParticleLiteral="electron") -> float|NDArray[np.number]:
+
+def en2pc(energy: float | NDArray[np.number], species: ParticleLiteral = "electron") -> float | NDArray[np.number]:
     r"""Calculate the relativistic momentum (p*c) for a given total energy.
 
     This function calculates the relativistic energy using the formula:

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 FORTRAN_BAD_VALUE = np.float64(-1.0e31)
 
-MAGINPUT_CLIP_RANGES:dict[kext, dict[SW_Index, tuple[float, float]]] = {
+MAGINPUT_CLIP_RANGES: dict[kext, dict[SW_Index, tuple[float, float]]] = {
     MagneticField.T01.kext(): {
         "Dst": (-50, 20),
         "Pdyn": (0.5, 5),
@@ -41,7 +41,7 @@ MAGINPUT_CLIP_RANGES:dict[kext, dict[SW_Index, tuple[float, float]]] = {
     MagneticField.T04s.kext(): {},
 }
 
-MAGINPUT_REQUIRED_INPUTS:dict[kext, list[SW_Index]] = {
+MAGINPUT_REQUIRED_INPUTS: dict[kext, list[SW_Index]] = {
     MagneticField.T89.kext(): ["Kp"],
     MagneticField.T96.kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz"],
     MagneticField.T01.kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz", "SW_speed", "SW_density", "G1", "G2"],
@@ -50,7 +50,7 @@ MAGINPUT_REQUIRED_INPUTS:dict[kext, list[SW_Index]] = {
     MagneticField.OP77Q.kext(): [],
 }
 
-MAGINPUT_TO_INDEX:dict[SW_Index, int|list[int]] = {
+MAGINPUT_TO_INDEX: dict[SW_Index, int | list[int]] = {
     "Kp": 0,
     "Dst": 1,
     "SW_density": 2,
@@ -61,16 +61,18 @@ MAGINPUT_TO_INDEX:dict[SW_Index, int|list[int]] = {
     "G1": 7,
     "G2": 8,
     "G3": 9,
-    "W_params": list(range(10,16)),
+    "W_params": list(range(10, 16)),
 }
 
-MagInputKeys = Literal["Kp", "Dst", "dens", "velo", "Pdyn", "ByIMF", "BzIMF", "G1", "G2",
-                       "G3", "W1", "W2", "W3", "W4", "W5", "W6", "AL"]
+MagInputKeys = Literal[
+    "Kp", "Dst", "dens", "velo", "Pdyn", "ByIMF", "BzIMF", "G1", "G2", "G3", "W1", "W2", "W3", "W4", "W5", "W6", "AL"
+]
+
 
 @cache
-def construct_maginput(time_var: ep.Variable,
-                       magnetic_field:MagneticField,
-                       indices_solar_wind: dict[str, ep.Variable]|None=None) -> dict[MagInputKeys, NDArray[np.float64]]:
+def construct_maginput(
+    time_var: ep.Variable, magnetic_field: MagneticField, indices_solar_wind: dict[str, ep.Variable] | None = None
+) -> dict[MagInputKeys, NDArray[np.float64]]:
     """Construct the basic magnetospheric input parameters array.
 
     This function retrieves all solar wind data from the ACE dataset on CDAWeb, as well as the Kp and Dst indices,
@@ -88,16 +90,14 @@ def construct_maginput(time_var: ep.Variable,
     18-25: fill with NaN
 
     Args:
-        newtime (array-like): Array of new time points for interpolation.
-        sw_path (str, optional): Path to the solar wind data directory.
-                                Defaults to environment Variable 'FC_ACE_REALTIME_PROCESSED_DATA_DIR'.
-        kp_path (str, optional): Path to the Kp data directory.
-                                Defaults to environment Variable 'RT_KP_PROC_DIR'.
-        kp_type (str, optional): Type of Kp to read using data_management.
-                                Defaults to 'niemegk'.
+        time_var (ep.Variable): Array of new time points for interpolation.
+        magnetic_field (MagneticField): The magnetic field model used to determine the required inputs.
+        indices_solar_wind (dict[str, ep.Variable] | None, optional): A dictionary of pre-loaded solar
+                                                                    wind variables. Defaults to None.
 
     Returns:
-        np.ndarray: Array of interpolated magnetospheric input parameters.
+        dict[MagInputKeys, NDArray[np.float64]]: A dictionary containing the interpolated magnetospheric
+                                                input parameters.
     """
     time = time_var.get_data(ep.units.posixtime).astype(np.float64)
     start_time = datetime.fromtimestamp(time[0], tz=timezone.utc)
@@ -121,8 +121,10 @@ def construct_maginput(time_var: ep.Variable,
         req_input_data = indices_solar_wind[req_input].get_data().astype(np.float64)
 
         if len(req_input_data) != len(time):
-            msg = (f"Encountered size missmatch for {req_input}: len of {req_input} data: "
-                   f"{len(req_input_data)}, requested len: {len(time)}")
+            msg = (
+                f"Encountered size missmatch for {req_input}: len of {req_input} data: "
+                f"{len(req_input_data)}, requested len: {len(time)}"
+            )
             raise ValueError(msg)
 
         if req_input in clip_ranges:
@@ -131,7 +133,7 @@ def construct_maginput(time_var: ep.Variable,
 
         maginput[:, MAGINPUT_TO_INDEX[req_input]] = np.asarray(req_input_data, dtype=np.float64)
 
-    maginput_dict:dict[MagInputKeys, NDArray[np.float64]] = {
+    maginput_dict: dict[MagInputKeys, NDArray[np.float64]] = {
         "Kp": maginput[:, 0],
         "Dst": maginput[:, 1],
         "dens": maginput[:, 2],

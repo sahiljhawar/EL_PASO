@@ -22,6 +22,7 @@ from el_paso import Variable
 
 logger = logging.getLogger(__name__)
 
+
 class OutputFile(NamedTuple):
     """Represents an output file with its name and a list of variable names to save.
 
@@ -30,9 +31,11 @@ class OutputFile(NamedTuple):
         names_to_save (list[str]): List of variable names to be saved in the output file.
         save_incomplete (bool): If True, allows saving even if some variables are missing.
     """
+
     name: str
     names_to_save: list[str]
-    save_incomplete:bool = False
+    save_incomplete: bool = False
+
 
 class SavingStrategy(ABC):
     """Abstract base class for defining strategies to save output files with specific time intervals and variables.
@@ -63,13 +66,11 @@ class SavingStrategy(ABC):
             Abstract method to append data to an existing file; must be implemented by subclasses.
     """
 
-    output_files:list[OutputFile]
-    dependency_dict: dict[str,list[str]]
+    output_files: list[OutputFile]
+    dependency_dict: dict[str, list[str]]
 
     @abstractmethod
-    def get_time_intervals_to_save(self,
-                                   start_time:datetime,
-                                   end_time:datetime) -> list[tuple[datetime, datetime]]:
+    def get_time_intervals_to_save(self, start_time: datetime, end_time: datetime) -> list[tuple[datetime, datetime]]:
         """Generates a list of time intervals to save between the specified start and end times.
 
         Args:
@@ -84,10 +85,7 @@ class SavingStrategy(ABC):
         """
 
     @abstractmethod
-    def get_file_path(self,
-                      interval_start:datetime,
-                      interval_end:datetime,
-                      output_file:OutputFile) -> Path:
+    def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:
         """Generates a file path for saving variables based on the provided interval and output file information.
 
         Args:
@@ -101,7 +99,7 @@ class SavingStrategy(ABC):
         """
 
     @abstractmethod
-    def standardize_variable(self, variable:Variable, name_in_file:str) -> Variable:
+    def standardize_variable(self, variable: Variable, name_in_file: str) -> Variable:
         """Standardizes the given variable according to the specified name in the file.
 
         Standardization may include checking of units, dimensions, and size consistency.
@@ -114,12 +112,14 @@ class SavingStrategy(ABC):
             Variable: The standardized variable instance.
         """
 
-    def get_target_variables(self,
-                             output_file:OutputFile,
-                             variables_dict:dict[str,Variable],
-                             time_var:Variable|None,
-                             start_time:datetime|None,
-                             end_time:datetime|None) -> dict[str,Variable]|None:
+    def get_target_variables(
+        self,
+        output_file: OutputFile,
+        variables_dict: dict[str, Variable],
+        time_var: Variable | None,
+        start_time: datetime | None,
+        end_time: datetime | None,
+    ) -> dict[str, Variable] | None:
         """Retrieves and processes target variables for saving based on the specified output file.
 
         Parameters:
@@ -140,7 +140,7 @@ class SavingStrategy(ABC):
             - Each variable is standardized using the `standardize_variable` method.
             - If a requested variable name is not found, a warning is issued and None is returned.
         """
-        target_variables:dict[str,Variable] = {}
+        target_variables: dict[str, Variable] = {}
 
         # if no variables have been specified, we save all of them
         if len(output_file.names_to_save) == 0:
@@ -156,7 +156,6 @@ class SavingStrategy(ABC):
             return target_variables
 
         for name_to_save in output_file.names_to_save:
-
             if name_to_save in variables_dict:
                 var_to_save = deepcopy(variables_dict[name_to_save])
 
@@ -175,7 +174,7 @@ class SavingStrategy(ABC):
 
         return target_variables
 
-    def save_single_file(self, file_path:Path, dict_to_save:dict[str,Any], *, append:bool=False) -> None:  # noqa: C901, PLR0912
+    def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:  # noqa: C901, PLR0912
         """Saves variable data to a single file in one of the supported formats (.mat, .pickle, .h5).
 
         Parameters:
@@ -206,15 +205,12 @@ class SavingStrategy(ABC):
             savemat(str(file_path), dict_to_save)
 
         elif format_name == ".pickle":
-
             with file_path.open("wb") as file:
                 pickle.dump(dict_to_save, file)
 
         elif format_name == ".h5":
             with h5py.File(file_path, "w") as file:
-
                 for path, value in dict_to_save.items():
-
                     if path == "metadata":
                         continue
 
@@ -225,26 +221,28 @@ class SavingStrategy(ABC):
                     curr_hierachy = file
                     for group in groups:
                         if group not in curr_hierachy:
-                            curr_hierachy = curr_hierachy.create_group(group) # type: ignore[reportUnknownVariableType]
+                            curr_hierachy = curr_hierachy.create_group(group)  # type: ignore[reportUnknownVariableType]
                         else:
                             curr_hierachy = typing.cast("h5py.Group", curr_hierachy[group])
 
-                    data_set = curr_hierachy.create_dataset(dataset_name, data=value, compression="gzip", shuffle=True) # type: ignore[reportUnknownMemberType]
+                    data_set = curr_hierachy.create_dataset(dataset_name, data=value, compression="gzip", shuffle=True)  # type: ignore[reportUnknownMemberType]
 
                     if path in dict_to_save["metadata"]:
                         for key, metadata in dict_to_save["metadata"][path].items():
                             data_set.attrs[key] = metadata
 
         elif format_name == ".nc":
-            msg = ("Encountered format netCDF (.nc). This format has to be implemented by "
-                   "each subclass as no general writer exists for it!")
+            msg = (
+                "Encountered format netCDF (.nc). This format has to be implemented by "
+                "each subclass as no general writer exists for it!"
+            )
             raise NotImplementedError(msg)
 
         else:
             msg = f"The '{format_name}' format is not implemented."
             raise NotImplementedError(msg)
 
-    def append_data(self, file_path:Path, data_dict_to_save:dict[str,Any]) -> dict[str,Any]:
+    def append_data(self, file_path: Path, data_dict_to_save: dict[str, Any]) -> dict[str, Any]:
         """Appends variable data from the specified file to the provided dictionary.
 
         Args:

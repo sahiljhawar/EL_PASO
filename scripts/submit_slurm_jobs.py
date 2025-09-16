@@ -19,10 +19,11 @@ class ChunkType(Enum):  # noqa: D101
     MONTHLY = "monthly"
     YEARLY = "yearly"
 
-def _get_time_intervals(start_time:datetime,
-                        end_time:datetime,
-                        chunk_type:ChunkType) -> list[tuple[datetime, datetime]]:
-    time_intervals:list[tuple[datetime, datetime]] = []
+
+def _get_time_intervals(
+    start_time: datetime, end_time: datetime, chunk_type: ChunkType
+) -> list[tuple[datetime, datetime]]:
+    time_intervals: list[tuple[datetime, datetime]] = []
 
     current_time = start_time.replace(day=1)
     while current_time <= end_time:
@@ -41,8 +42,11 @@ def _get_time_intervals(start_time:datetime,
                 month_start = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
                 month_end = datetime(year, month, eom_day, 23, 59, 59, tzinfo=timezone.utc)
                 time_intervals.append((month_start, month_end))
-                current_time = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if month == 12 \
-                               else datetime(year, month + 1, 1, tzinfo=timezone.utc)  # noqa: PLR2004
+                current_time = (
+                    datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+                    if month == 12  # noqa: PLR2004
+                    else datetime(year, month + 1, 1, tzinfo=timezone.utc)
+                )
 
             case ChunkType.YEARLY:
                 year = current_time.year
@@ -54,10 +58,10 @@ def _get_time_intervals(start_time:datetime,
 
     return time_intervals
 
-def submit_slurm_jobs_in_chunks(start_time_str:str,
-                          end_time_str:str,
-                          chunk_type:ChunkType,
-                          job_script_path:str = "job_script_template.sh") -> None:
+
+def submit_slurm_jobs_in_chunks(
+    start_time_str: str, end_time_str: str, chunk_type: ChunkType, job_script_path: str = "job_script_template.sh"
+) -> None:
     """Submits HPC jobs in time-based chunks.
 
     This function divides a specified time range into smaller intervals (daily,
@@ -85,8 +89,7 @@ def submit_slurm_jobs_in_chunks(start_time_str:str,
 
     time_intervals = _get_time_intervals(start_time, end_time, chunk_type)
 
-    for (start_interval, end_interval) in time_intervals:
-
+    for start_interval, end_interval in time_intervals:
         # Format the times for the command line arguments
         chunk_start_str = start_interval.strftime("%Y-%m-%dT%H:%M:%S")
         chunk_end_str = end_interval.strftime("%Y-%m-%dT%H:%M:%S")
@@ -108,10 +111,9 @@ def submit_slurm_jobs_in_chunks(start_time_str:str,
             print(f"Error submitting job: {e}")
             break
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-        description="Submit HPC jobs in time-based chunks."
-    )
+    parser = argparse.ArgumentParser(description="Submit HPC jobs in time-based chunks.")
     parser.add_argument(
         "start_time",
         type=str,
@@ -135,7 +137,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    submit_slurm_jobs_in_chunks(args.start_time,
-                                args.end_time,
-                                ChunkType[args.chunk_type.upper()],
-                                job_script_path=args.job_script_path)
+    submit_slurm_jobs_in_chunks(
+        args.start_time, args.end_time, ChunkType[args.chunk_type.upper()], job_script_path=args.job_script_path
+    )

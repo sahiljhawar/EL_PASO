@@ -10,13 +10,13 @@ IRBEM_SYSAXIS_GDZ = 0
 IRBEM_SYSAXIS_GEO = 1
 IRBEM_SYSAXIS_GSM = 2
 IRBEM_SYSAXIS_GSE = 3
-IRBEM_SYSAXIS_SM  = 4
+IRBEM_SYSAXIS_SM = 4
 IRBEM_SYSAXIS_GEI = 5
 IRBEM_SYSAXIS_MAG = 6
 
 # package wide variables
 _release_mode = False
-_release_msg:str = ""
+_release_msg: str = ""
 
 from el_paso.release_mode import activate_release_mode, get_release_msg, is_in_release_mode
 from el_paso.variable import Variable

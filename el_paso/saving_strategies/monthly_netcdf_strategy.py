@@ -24,6 +24,7 @@ if typing.TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 class MonthlyNetCDFStrategy(MonthlyH5Strategy):
     """A saving strategy that saves data to monthly NetCDF files.
 
@@ -39,16 +40,18 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
     and their dependencies.
     """
 
-    output_files:list[OutputFile]
+    output_files: list[OutputFile]
 
-    file_path:Path
-    dependency_dict: dict[str,list[str]]
+    file_path: Path
+    dependency_dict: dict[str, list[str]]
 
-    def __init__(self,
-                 base_data_path:str|Path,
-                 file_name_stem:str,
-                 mag_field:MagneticFieldLiteral|list[MagneticFieldLiteral],
-                 data_standard:DataStandard|None = None) -> None:
+    def __init__(
+        self,
+        base_data_path: str | Path,
+        file_name_stem: str,
+        mag_field: MagneticFieldLiteral | list[MagneticFieldLiteral],
+        data_standard: DataStandard | None = None,
+    ) -> None:
         """Initializes the monthly NetCDF saving strategy.
 
         Parameters:
@@ -71,19 +74,34 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
         self.mag_field = mag_field
         self.standard = data_standard
 
-        output_file_entries = ["time", "flux/FEDU", "flux/FEDO", "flux/alpha_eq", "flux/energy", "flux/alpha_local",
-                               "position/xGEO", "density/density_local"]
+        output_file_entries = [
+            "time",
+            "flux/FEDU",
+            "flux/FEDO",
+            "flux/alpha_eq",
+            "flux/energy",
+            "flux/alpha_local",
+            "position/xGEO",
+            "density/density_local",
+        ]
 
         for single_mag_field in mag_field:
-            output_file_entries.extend([f"position/{single_mag_field}/MLT", f"position/{single_mag_field}/R0",
-                                        f"position/{single_mag_field}/Lstar", f"position/{single_mag_field}/Lm",
-                                        f"mag_field/{single_mag_field}/B_eq", f"mag_field/{single_mag_field}/B_local",
-                                        f"psd/{single_mag_field}/inv_mu", f"psd/{single_mag_field}/inv_K",
-                                        f"density/{single_mag_field}/density_eq"])
+            output_file_entries.extend(
+                [
+                    f"position/{single_mag_field}/MLT",
+                    f"position/{single_mag_field}/R0",
+                    f"position/{single_mag_field}/Lstar",
+                    f"position/{single_mag_field}/Lm",
+                    f"mag_field/{single_mag_field}/B_eq",
+                    f"mag_field/{single_mag_field}/B_local",
+                    f"psd/{single_mag_field}/inv_mu",
+                    f"psd/{single_mag_field}/inv_K",
+                    f"density/{single_mag_field}/density_eq",
+                ]
+            )
         self.output_files = [
             OutputFile("full", output_file_entries, save_incomplete=True),
         ]
-
 
         self.dependency_dict = {
             "time": ["time"],
@@ -110,7 +128,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                 f"density/{single_mag_field}/density_eq": ["time"],
             }
 
-    def get_file_path(self, interval_start:datetime, interval_end:datetime, output_file:OutputFile) -> Path:  # noqa: ARG002
+    def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:  # noqa: ARG002
         """Generates the file path for a monthly NetCDF file.
 
         The file name is constructed from the `file_name_stem`, the date range of the interval,
@@ -152,7 +170,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
         """
         return self.standard.standardize_variable(name_in_file, variable)
 
-    def save_single_file(self, file_path:Path, dict_to_save:dict[str,Any], *, append:bool=False) -> None:  # noqa: C901
+    def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:  # noqa: C901
         """Saves a dictionary of variables to a single NetCDF file.
 
         This method creates a new NetCDF4 file, defines dimensions based on the data,
@@ -178,10 +196,9 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             dict_to_save = self.append_data(file_path, dict_to_save)
 
         with nC.Dataset(file_path, "w", format="NETCDF4") as file:
-
             size_time = dict_to_save["time"].shape[0]
-            size_pitch_angle:int = 0
-            size_energy:int = 0
+            size_pitch_angle: int = 0
+            size_energy: int = 0
 
             if "flux/alpha_eq" in dict_to_save and dict_to_save["flux/alpha_eq"].size > 0:
                 size_pitch_angle = dict_to_save["flux/alpha_eq"].shape[1]
@@ -199,7 +216,6 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                 file.createDimension("xGEO_components", 3)
 
             for path, value in dict_to_save.items():
-
                 if path == "metadata":
                     continue
 
@@ -213,17 +229,18 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                 curr_hierachy = file
                 for group in groups:
                     if group not in curr_hierachy.groups:
-                        curr_hierachy = curr_hierachy.createGroup(group) # type: ignore[reportUnknownVariableType]
+                        curr_hierachy = curr_hierachy.createGroup(group)  # type: ignore[reportUnknownVariableType]
                     else:
                         curr_hierachy = typing.cast("nC.Group", curr_hierachy[group])
 
-                data_set = typing.cast("nC.Variable[Any]", curr_hierachy.createVariable( # type: ignore[reportUnknownMemberType]
-                    dataset_name,
-                    "f4",
-                    self.dependency_dict[path],
-                    zlib=True, complevel=5, shuffle=True))
+                data_set = typing.cast(
+                    "nC.Variable[Any]",
+                    curr_hierachy.createVariable(  # type: ignore[reportUnknownMemberType]
+                        dataset_name, "f4", self.dependency_dict[path], zlib=True, complevel=5, shuffle=True
+                    ),
+                )
 
-                data_set[:,...] = value
+                data_set[:, ...] = value
 
                 if path in dict_to_save["metadata"]:
                     metadata = dict_to_save["metadata"][path]

@@ -31,25 +31,27 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass(frozen=True, slots=True, eq=False)
 class ExtractionInfo:
     """Class to store information about the extraction of variables from a file."""
 
-    name_or_column: str|int
+    name_or_column: str | int
     unit: u.UnitBase
     is_time_dependent: bool = True
-    result_key: str|None = None
-    dependent_variables: list[str]|None = None
+    result_key: str | None = None
+    dependent_variables: list[str] | None = None
 
 
-def extract_variables_from_files(start_time: datetime,
-                                 end_time: datetime,
-                                 file_cadence: Literal["daily", "monthly", "single_file"],
-                                 data_path: Path|str,
-                                 file_name_stem: str,
-                                 extraction_infos: Iterable[ExtractionInfo],
-                                 pd_read_csv_kwargs: dict[str, Any]|None=None,
-                                 ) -> dict[str, Variable]:
+def extract_variables_from_files(
+    start_time: datetime,
+    end_time: datetime,
+    file_cadence: Literal["daily", "monthly", "single_file"],
+    data_path: Path | str,
+    file_name_stem: str,
+    extraction_infos: Iterable[ExtractionInfo],
+    pd_read_csv_kwargs: dict[str, Any] | None = None,
+) -> dict[str, Variable]:
     """Extract variable data from files with any file format.
 
     Args:
@@ -87,7 +89,7 @@ def extract_variables_from_files(start_time: datetime,
     variable_data = _extract_data_from_files(files_list, extraction_infos, pd_read_csv_kwargs)
 
     # create variables based on the extraction_infos
-    variables:dict[str, Variable] = {}
+    variables: dict[str, Variable] = {}
 
     for info in extraction_infos:
         if info.result_key is None:
@@ -104,34 +106,34 @@ def extract_variables_from_files(start_time: datetime,
     return variables
 
 
-def _construct_file_list(start_time: datetime,
-                         end_time: datetime,
-                         file_cadence:Literal["daily", "monthly", "single_file"],
-                         file_path:Path) -> tuple[list[Path], list[tuple[datetime,datetime]]]:
-
-    file_paths:list[Path] = []
-    time_intervals:list[tuple[datetime,datetime]] = []
+def _construct_file_list(
+    start_time: datetime, end_time: datetime, file_cadence: Literal["daily", "monthly", "single_file"], file_path: Path
+) -> tuple[list[Path], list[tuple[datetime, datetime]]]:
+    file_paths: list[Path] = []
+    time_intervals: list[tuple[datetime, datetime]] = []
 
     match file_cadence:
-
         case "daily":
             current_time = start_time
             while current_time <= end_time:
-
                 file_path_current = _fill_file_name_and_check_version(current_time, file_path)
                 if file_path_current is None:
                     logger.warning(
-                        (f"No file found for {current_time.strftime('%Y-%m-%d')} under path: {file_path}."
-                        "Skipping this day."),
+                        (
+                            f"No file found for {current_time.strftime('%Y-%m-%d')} under path: {file_path}."
+                            "Skipping this day."
+                        ),
                         stacklevel=2,
                     )
                 else:
                     file_paths.append(file_path_current)
 
-                    day_start = datetime(current_time.year, current_time.month, current_time.day, 0, 0, 0,
-                                         tzinfo=timezone.utc)
-                    day_end = datetime(current_time.year, current_time.month, current_time.day, 23, 59, 59,
-                                       tzinfo=timezone.utc)
+                    day_start = datetime(
+                        current_time.year, current_time.month, current_time.day, 0, 0, 0, tzinfo=timezone.utc
+                    )
+                    day_end = datetime(
+                        current_time.year, current_time.month, current_time.day, 23, 59, 59, tzinfo=timezone.utc
+                    )
                     time_intervals.append((day_start, day_end))
 
                 current_time += timedelta(days=1)
@@ -151,17 +153,19 @@ def _construct_file_list(start_time: datetime,
 
     return file_paths, time_intervals
 
-def _extract_data_from_files(files_list:list[Path],  # noqa: C901
-                             extraction_infos:Iterable[ExtractionInfo],
-                             pd_read_csv_kwargs:dict[str, Any]|None) -> dict[str | int, NDArray[np.generic]]:
 
+def _extract_data_from_files(  # noqa: C901
+    files_list: list[Path],
+    extraction_infos: Iterable[ExtractionInfo],
+    pd_read_csv_kwargs: dict[str, Any] | None,
+) -> dict[str | int, NDArray[np.generic]]:
     variable_data = {info.name_or_column: np.array([]) for info in extraction_infos}
 
     for file_path in files_list:
         match file_path.suffix:
             case ".cdf":
                 new_data = _extract_data_from_cdf(str(file_path), tuple(extraction_infos))
-            case ".txt"|".asc"|".csv"|".tab":
+            case ".txt" | ".asc" | ".csv" | ".tab":
                 new_data = _extract_data_from_ascii(str(file_path), tuple(extraction_infos), pd_read_csv_kwargs)
             case ".nc":
                 msg = "NetCDF reading is not supported yet!"
@@ -188,7 +192,8 @@ def _extract_data_from_files(files_list:list[Path],  # noqa: C901
 
     return variable_data
 
-def _fill_file_name_and_check_version(time: datetime, file_path:Path) -> Path|None:
+
+def _fill_file_name_and_check_version(time: datetime, file_path: Path) -> Path | None:
     file_path = Path(fill_str_template_with_time(str(file_path), time))
 
     file_names_all_versions = _find_files_with_regex(file_path.parent, file_path.name)
@@ -197,37 +202,40 @@ def _fill_file_name_and_check_version(time: datetime, file_path:Path) -> Path|No
 
     if file_path_latest is None:
         warnings.warn(
-            (f"No file found under path: {file_path.parent}! Have you called download()?"
-             "Check your download_path argument."),
+            (
+                f"No file found under path: {file_path.parent}! Have you called download()?"
+                "Check your download_path argument."
+            ),
             stacklevel=2,
         )
 
     return file_path_latest
 
-def _extract_data_from_ascii(file_path: str,
-                             extraction_infos: tuple[ExtractionInfo,...],
-                             pd_read_csv_kwargs: dict[str, Any]|None) -> dict[str|int, NDArray[np.generic]]:
 
+def _extract_data_from_ascii(
+    file_path: str, extraction_infos: tuple[ExtractionInfo, ...], pd_read_csv_kwargs: dict[str, Any] | None
+) -> dict[str | int, NDArray[np.generic]]:
     pd_read_csv_kwargs = pd_read_csv_kwargs if pd_read_csv_kwargs is not None else {}
 
-    file_df = pd.read_csv(file_path, **pd_read_csv_kwargs) # type: ignore[reportUnknownMemberType]
+    file_df = pd.read_csv(file_path, **pd_read_csv_kwargs)  # type: ignore[reportUnknownMemberType]
 
-    data:dict[str|int, NDArray[np.generic]] = {}
+    data: dict[str | int, NDArray[np.generic]] = {}
 
     for info in extraction_infos:
         if isinstance(info.name_or_column, int):
-            data[info.name_or_column] = file_df.iloc[:, info.name_or_column].to_numpy() # type: ignore[reportUnknownMemberType]
-        elif isinstance(info.name_or_column, str): # type: ignore[reportUnnecessaryIsInstance]
-            data[info.name_or_column] = file_df.loc[:, info.name_or_column].to_numpy() # type: ignore[reportUnknownMemberType]
+            data[info.name_or_column] = file_df.iloc[:, info.name_or_column].to_numpy()  # type: ignore[reportUnknownMemberType]
+        elif isinstance(info.name_or_column, str):  # type: ignore[reportUnnecessaryIsInstance]
+            data[info.name_or_column] = file_df.loc[:, info.name_or_column].to_numpy()  # type: ignore[reportUnknownMemberType]
         else:
             msg = f"Encountered invalid name_or_column value: {info.name_or_column}! Must be int or str!"
             raise TypeError(msg)
 
     return data
 
-def _extract_data_from_json(file_path: str,
-                            extraction_infos: tuple[ExtractionInfo,...]) -> dict[str|int, NDArray[np.generic]]:
 
+def _extract_data_from_json(
+    file_path: str, extraction_infos: tuple[ExtractionInfo, ...]
+) -> dict[str | int, NDArray[np.generic]]:
     warnings.warn("Enountered JSON file. Please specify your dependent variables!", stacklevel=2)
 
     with Path(file_path).open("r") as f:
@@ -235,18 +243,16 @@ def _extract_data_from_json(file_path: str,
 
     json_df = pd.DataFrame(data)
 
-    data:dict[str|int, NDArray[np.generic]] = {}
+    data: dict[str | int, NDArray[np.generic]] = {}
 
     for info in extraction_infos:
         if info.name_or_column in json_df:
-
             if info.dependent_variables is None:
-                data[info.name_or_column] = np.array(pd.unique(json_df[info.name_or_column])) # type: ignore[reportUnknownMemberType]
+                data[info.name_or_column] = np.array(pd.unique(json_df[info.name_or_column]))  # type: ignore[reportUnknownMemberType]
             else:
+                dependent_data = [json_df[dep_var_name] for dep_var_name in info.dependent_variables]  # type: ignore[reportUnknownMemberType]
 
-                dependent_data = [json_df[dep_var_name] for dep_var_name in info.dependent_variables] # type: ignore[reportUnknownMemberType]
-
-                unique_values:list[NDArray[np.generic]] = [pd.unique(dep) for dep in dependent_data] # type: ignore[reportUnknownMemberType]
+                unique_values: list[NDArray[np.generic]] = [pd.unique(dep) for dep in dependent_data]  # type: ignore[reportUnknownMemberType]
                 shape = tuple(len(uq) for uq in unique_values)
 
                 # Determine the correct dtype for the data_array based on the column data type
@@ -254,13 +260,12 @@ def _extract_data_from_json(file_path: str,
 
                 data_array = np.full(shape, np.nan, dtype=dtype)
 
-
                 for indices in np.ndindex(*shape):
                     mask = np.ones(len(json_df), dtype=bool)
                     for i, idx in enumerate(indices):
                         mask &= dependent_data[i] == unique_values[i][idx]
                     if mask.any():
-                        data_array[indices] = json_df[info.name_or_column][mask].to_numpy()[0] # type: ignore[reportUnknownMemberType]
+                        data_array[indices] = json_df[info.name_or_column][mask].to_numpy()[0]  # type: ignore[reportUnknownMemberType]
 
                 data[info.name_or_column] = data_array
         else:
@@ -270,18 +275,20 @@ def _extract_data_from_json(file_path: str,
 
     return data
 
-def _extract_data_from_cdf(file_path: str,
-                           extraction_infos: tuple[ExtractionInfo,...]) -> dict[str|int, NDArray[np.generic]]:
+
+def _extract_data_from_cdf(
+    file_path: str, extraction_infos: tuple[ExtractionInfo, ...]
+) -> dict[str | int, NDArray[np.generic]]:
     # Open the CDF file
     cdf_file = cdflib.CDF(file_path)
     cdfinfo = cdf_file.cdf_info()
-    variable_data:dict[str|int, NDArray[np.generic]] = {}
+    variable_data: dict[str | int, NDArray[np.generic]] = {}
 
     # Extract data for each variable in self.variables
     for info in extraction_infos:
         if info.name_or_column in cdfinfo.zVariables:
             # Retrieve data corresponding to the variable name from the CDF file
-            var_content = cdf_file.varget(info.name_or_column) # type: ignore[reportUnknownMemberType]
+            var_content = cdf_file.varget(info.name_or_column)  # type: ignore[reportUnknownMemberType]
             if isinstance(var_content, str):
                 # If the content is a string, convert it to a numpy array
                 var_content = np.array([var_content])
@@ -291,17 +298,18 @@ def _extract_data_from_cdf(file_path: str,
 
     return variable_data
 
-def _extract_data_from_h5(file_path: str,
-                          extraction_infos: tuple[ExtractionInfo,...]) -> dict[str|int, NDArray[np.generic]]:
+
+def _extract_data_from_h5(
+    file_path: str, extraction_infos: tuple[ExtractionInfo, ...]
+) -> dict[str | int, NDArray[np.generic]]:
     # Open the h5 file
-    variable_data:dict[str|int, NDArray[np.generic]] = {}
+    variable_data: dict[str | int, NDArray[np.generic]] = {}
 
     with h5py.File(file_path) as file:
-        entries:list[str] = list(file.keys())
+        entries: list[str] = list(file.keys())
 
         # Extract data for each variable in self.variables
         for info in extraction_infos:
-            # TODO @Bernhard: group and datasets
             if info.name_or_column in entries:
                 entry_data = file[info.name_or_column]
                 if isinstance(entry_data, h5py.Datatype):
@@ -318,13 +326,19 @@ def _extract_data_from_h5(file_path: str,
                     var_content = np.array([var_content])
                 variable_data[info.name_or_column] = var_content
             else:
-                logger.warning((f"Data with name {info.name_or_column} was not found in file {file_path}!"
-                                "Available entries: {entries}"), stacklevel=2)
+                logger.warning(
+                    (
+                        f"Data with name {info.name_or_column} was not found in file {file_path}!"
+                        "Available entries: {entries}"
+                    ),
+                    stacklevel=2,
+                )
 
         return variable_data
 
-def _find_files_with_regex(directory:Path, regex_pattern:str) -> list[Path]:
+
+def _find_files_with_regex(directory: Path, regex_pattern: str) -> list[Path]:
     """Find files in a directory that match a given regex pattern."""
-    compiled_regex = re.compile(regex_pattern) # Compile for efficiency
+    compiled_regex = re.compile(regex_pattern)  # Compile for efficiency
 
     return [file for file in directory.glob("*") if compiled_regex.search(str(file))]

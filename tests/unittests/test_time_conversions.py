@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-#ruff: noqa: INP001, S101
 
 from datetime import datetime, timezone
 
@@ -20,12 +19,14 @@ REF_DATETIME = datetime(2023, 10, 27, 10, 0, 0, tzinfo=timezone.utc)
 # Create Astropy quantities for the reference time in each unit
 REF_POSIXTIME_QUANTITY = u.Quantity(REF_DATETIME.timestamp(), ep.units.posixtime)
 REF_TT2000_QUANTITY = u.Quantity(
-    cdflib.cdfepoch.timestamp_to_tt2000(REF_POSIXTIME_QUANTITY.value), ep.units.tt2000,
+    cdflib.cdfepoch.timestamp_to_tt2000(REF_POSIXTIME_QUANTITY.value),
+    ep.units.tt2000,
 )
 REF_CDF_EPOCH_QUANTITY = u.Quantity(
-    cdflib.cdfepoch.timestamp_to_cdfepoch(REF_POSIXTIME_QUANTITY.value), ep.units.cdf_epoch,
+    cdflib.cdfepoch.timestamp_to_cdfepoch(REF_POSIXTIME_QUANTITY.value),
+    ep.units.cdf_epoch,
 )
-REF_DATENUM_QUANTITY = u.Quantity(7.391864166666666e+05, ep.units.datenum) # calcualted using Matlab
+REF_DATENUM_QUANTITY = u.Quantity(7.391864166666666e05, ep.units.datenum)  # calcualted using Matlab
 
 # Parameterized test data for circular conversions
 # Each tuple is: (start_quantity, target_unit_1, target_unit_2)
@@ -36,11 +37,13 @@ test_data = [
     (REF_DATENUM_QUANTITY, ep.units.cdf_epoch, ep.units.tt2000),
 ]
 
+
+@pytest.mark.basic
 @pytest.mark.parametrize(
     ("start_q", "target_unit_1", "target_unit_2"),
     test_data,
 )
-def test_circular_conversion_astropy(start_q: u.Quantity, target_unit_1:u.UnitBase, target_unit_2:u.UnitBase) -> None:
+def test_circular_conversion_astropy(start_q: u.Quantity, target_unit_1: u.UnitBase, target_unit_2: u.UnitBase) -> None:
     """Tests a circular conversion path using Astropy quantities.
 
     This test verifies that converting a quantity through a sequence of units

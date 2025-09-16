@@ -29,6 +29,8 @@ This section provides a detailed reference for all modules, classes, and functio
 
 [Load geomagnetic indices and solar wind parameters](utilities/load_indices_solar_wind_parameters.md)
 
+[Magnetic field utilities](utilities/magnetic_field_utilities.md)
+
 [Scripts](utilities/scripts.md)
 
 [Release mode](utilities/release_mode.md)
@@ -46,6 +48,8 @@ This section provides a detailed reference for all modules, classes, and functio
 [compute_magnetic_field_variables](processing/compute_magnetic_field_variables.md)
 
 [compute_phase_space_density](processing/compute_phase_space_density.md)
+
+[construct_pitch_angle_distribution](processing/construct_pitch_angle_distribution.md)
 
 [fold_pitch_angles_and_flux](processing/fold_pitch_angles_and_flux.md)
 

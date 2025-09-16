@@ -17,22 +17,24 @@ if typing.TYPE_CHECKING:
     from datetime import datetime
 
 
-def get_arase_orbit_level_2_variables(start_time:datetime,
-                                      end_time:datetime,
-                                      raw_data_path:str|Path = ".") -> dict[str, ep.Variable]:
-
+def get_arase_orbit_level_2_variables(
+    start_time: datetime, end_time: datetime, raw_data_path: str | Path = "."
+) -> dict[str, ep.Variable]:
     raw_data_path = Path(raw_data_path)
 
     file_name_stem = "erg_orb_l2_YYYYMMDD_.{3}.cdf"
     url = "https://ergsc.isee.nagoya-u.ac.jp/data/ergsc/satellite/erg/orb/def/YYYY/"
 
-    ep.download(start_time, end_time,
-                save_path=raw_data_path,
-                download_url=url,
-                file_name_stem=file_name_stem,
-                file_cadence="daily",
-                method="request",
-                skip_existing=True)
+    ep.download(
+        start_time,
+        end_time,
+        save_path=raw_data_path,
+        download_url=url,
+        file_name_stem=file_name_stem,
+        file_cadence="daily",
+        method="request",
+        skip_existing=True,
+    )
 
     extraction_infos = [
         ep.ExtractionInfo(
@@ -47,17 +49,23 @@ def get_arase_orbit_level_2_variables(start_time:datetime,
         ),
     ]
 
-    variables = ep.extract_variables_from_files(start_time, end_time, "daily",
-                                                data_path=raw_data_path, file_name_stem=file_name_stem,
-                                                extraction_infos=extraction_infos)
+    variables = ep.extract_variables_from_files(
+        start_time,
+        end_time,
+        "daily",
+        data_path=raw_data_path,
+        file_name_stem=file_name_stem,
+        extraction_infos=extraction_infos,
+    )
     return variables
 
 
-def get_arase_orbit_level_3_variables(start_time:datetime,
-                                      end_time:datetime,
-                                      mag_field:Literal["OP77Q", "T89", "TS04"],
-                                      raw_data_path:str|Path = ".") -> dict[str, ep.Variable]:
-
+def get_arase_orbit_level_3_variables(
+    start_time: datetime,
+    end_time: datetime,
+    mag_field: Literal["OP77Q", "T89", "TS04"],
+    raw_data_path: str | Path = ".",
+) -> dict[str, ep.Variable]:
     raw_data_path = Path(raw_data_path)
 
     match mag_field:
@@ -77,13 +85,16 @@ def get_arase_orbit_level_3_variables(start_time:datetime,
         mag_field_label = "op"
     file_name_stem = "erg_orb_l3_" + mag_field_label + "_YYYYMMDD_.{3}.cdf"
 
-    ep.download(start_time, end_time,
-                save_path=raw_data_path,
-                download_url=url,
-                file_name_stem=file_name_stem,
-                file_cadence="daily",
-                method="request",
-                skip_existing=True)
+    ep.download(
+        start_time,
+        end_time,
+        save_path=raw_data_path,
+        download_url=url,
+        file_name_stem=file_name_stem,
+        file_cadence="daily",
+        method="request",
+        skip_existing=True,
+    )
 
     match mag_field:
         case "OP77Q":
@@ -129,9 +140,14 @@ def get_arase_orbit_level_3_variables(start_time:datetime,
         ),
     ]
 
-    variables = ep.extract_variables_from_files(start_time, end_time, "daily",
-                                                data_path=raw_data_path, file_name_stem=file_name_stem,
-                                                extraction_infos=extraction_infos)
+    variables = ep.extract_variables_from_files(
+        start_time,
+        end_time,
+        "daily",
+        data_path=raw_data_path,
+        file_name_stem=file_name_stem,
+        extraction_infos=extraction_infos,
+    )
 
     for key in variables:
         if key == "Epoch":
@@ -139,8 +155,8 @@ def get_arase_orbit_level_3_variables(start_time:datetime,
         variables[key].truncate(variables["Epoch"], start_time, end_time)
     variables["Epoch"].truncate(variables["Epoch"], start_time, end_time)
 
-    mlt_data = variables["pos_eq"].get_data()[:,1]
-    R_data = variables["pos_eq"].get_data()[:,0]
+    mlt_data = variables["pos_eq"].get_data()[:, 1]
+    R_data = variables["pos_eq"].get_data()[:, 0]
 
     variables["MLT"] = ep.Variable(data=mlt_data, original_unit=u.hour)
     variables["R0"] = ep.Variable(data=R_data, original_unit=ep.units.RE)

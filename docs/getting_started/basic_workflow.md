@@ -53,7 +53,7 @@ You can learn more about processing in tutorials #4 and #5 located in *tutorials
 
 ### 4. Save variables in a pre-defined data standard and file format
 
-The last step saves the variables in a pre-defined format utizing a data standard.  
+The last step saves the variables in a pre-defined format utizing a data standard.
 
 The pre-defined format specifies under which names the variables are saved, if the variables are split up in multiple files, and if daily, monthly, or yearly files are created.
 
