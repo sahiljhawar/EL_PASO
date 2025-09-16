@@ -18,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest]
+        os: [ubuntu-latest, macos-latest]
         python-version: [3.11, 3.12, 3.13]
 
     steps:
@@ -35,6 +35,8 @@ jobs:
 
       - name: Install package
         run: pip install .
+        env:
+          GITHUB_CI: true
 
       - name: Test IRBEM Fortran installation
         run: python IRBEM/python/IRBEM/test_IRBEM.py
