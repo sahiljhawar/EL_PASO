@@ -48,12 +48,12 @@ class CustomBuild(build_py):
     def _compile_and_install_irbem(self):
         print("Installing IRBEM library...")
         if sys.platform == "darwin":
-            if not os.environ.get("GITHUB_CI"):
-                subprocess.check_call(["make", "OS=osx64", "ENV=gfortran64", "all"], cwd="IRBEM")
-                subprocess.check_call(["make", "OS=osx64", "ENV=gfortran64", "install", "."], cwd="IRBEM")
+            if os.environ.get("GITHUB_CI"):
+                subprocess.check_call(["make", "OS=osx64", "ENV=github", "all"], cwd="IRBEM")
+                subprocess.check_call(["make", "OS=osx64", "ENV=github", "install"], cwd="IRBEM")
             else:
                 subprocess.check_call(["make", "OS=osx64", "all"], cwd="IRBEM")
-                subprocess.check_call(["make", "OS=osx64", "install", "."], cwd="IRBEM")
+                subprocess.check_call(["make", "OS=osx64", "install"], cwd="IRBEM")
         else:  # assume Linux
             subprocess.check_call(["make"], cwd="IRBEM")
             subprocess.check_call(["make", "install", "."], cwd="IRBEM")
