@@ -16,6 +16,7 @@ jobs:
   test:
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
         python-version: [3.11, 3.12, 3.13]
@@ -37,4 +38,4 @@ jobs:
 
       - name: Test import
         run: |
-          python -c "import el_paso; from IRBEM import Magfields, Coords; print('Import successful')"
+          python -c "import el_paso; from IRBEM import MagFields, Coords; print('Import successful')"
