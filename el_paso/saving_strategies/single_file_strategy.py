@@ -26,7 +26,7 @@ class SingleFileStrategy(SavingStrategy):
         file_path (Path): The path to the single output file where all data will be saved.
 
     Methods:
-        __init__(file_path): Initializes the strategy with the file path and sets up the single output file configuration.
+        __init__(file_path): Initializes the strategy with the file path.
         get_time_intervals_to_save: Returns the entire time range as a single interval.
         get_file_path: Always returns the pre-defined single file path.
         standardize_variable: Passes the variable through without any standardization.
@@ -48,9 +48,7 @@ class SingleFileStrategy(SavingStrategy):
 
         self.map_standard_name = {}
 
-    def get_time_intervals_to_save(self,
-                                   start_time: datetime,
-                                   end_time: datetime) -> list[tuple[datetime, datetime]]:
+    def get_time_intervals_to_save(self, start_time: datetime, end_time: datetime) -> list[tuple[datetime, datetime]]:
         """Returns the entire time range as a single interval.
 
         This strategy does not split data by time; it saves everything in one go.
@@ -64,10 +62,12 @@ class SingleFileStrategy(SavingStrategy):
         """
         return [(start_time, end_time)]
 
-    def get_file_path(self,
-                      interval_start: datetime,  # noqa: ARG002
-                      interval_end: datetime,  # noqa: ARG002
-                      output_file: OutputFile) -> Path:  # noqa: ARG002
+    def get_file_path(
+        self,
+        interval_start: datetime,  # noqa: ARG002
+        interval_end: datetime,  # noqa: ARG002
+        output_file: OutputFile,  # noqa: ARG002
+    ) -> Path:
         """Returns the pre-defined single file path, ignoring the interval.
 
         This method ensures all data is saved to the same file, regardless of the time interval.

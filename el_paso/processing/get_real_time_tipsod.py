@@ -3,8 +3,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import typing
 from datetime import datetime
 from datetime import timezone as tz
+from typing import Any
 
 import numpy as np
 from astropy import units as u  # type: ignore[reportMissingTypeStubs]
@@ -14,7 +16,7 @@ from sscws.sscws import CoordinateSystem, SscWs  # type: ignore[reportMissingTyp
 import el_paso as ep
 
 
-def get_real_time_tipsod(timestamps:NDArray[np.floating], sat_name:str, coord_system:str="GEO") -> ep.Variable:
+def get_real_time_tipsod(timestamps: NDArray[np.floating], sat_name: str, coord_system: str = "GEO") -> ep.Variable:
     """Gets real-time satellite position data from the TIPSOD service.
 
     This function queries the TIPSOD (Tool For Interactive Plotting, Sonification, and 3D Orbit Display)
@@ -71,7 +73,9 @@ def get_real_time_tipsod(timestamps:NDArray[np.floating], sat_name:str, coord_sy
     time_range = [start_time, end_time]
 
     coord_systems_dict = {"GEO": "Geo", "GM": "Gm", "GSE": "Gse", "GSM": "Gsm", "SM": "Sm", "J2000": "GeiJ2000"}
-    result = ssc.get_locations([sat_name], time_range, coords=[CoordinateSystem(coord_systems_dict[coord_system])])
+    result = typing.cast(
+        "Any", ssc.get_locations([sat_name], time_range, coords=[CoordinateSystem(coord_systems_dict[coord_system])])
+    )  # type: ignore[reportUnknownMemberType]
 
     try:
         # Extract X, Y, Z coordinates and corresponding times
@@ -79,11 +83,11 @@ def get_real_time_tipsod(timestamps:NDArray[np.floating], sat_name:str, coord_sy
         x_coords = np.array([entry["X"] for entry in result["Data"][0]["Coordinates"]]).flatten()
         y_coords = np.array([entry["Y"] for entry in result["Data"][0]["Coordinates"]]).flatten()
         z_coords = np.array([entry["Z"] for entry in result["Data"][0]["Coordinates"]]).flatten()
-    except(Exception) as e:
+    except Exception as e:
         raise ValueError(str(result)) from e
 
     # Bin the data according to the given datetimes grid and compute the median of the points in each bin
-    all_xyz = []
+    all_xyz: list[list[np.floating]] = []
     for i in range(len(datetimes) - 1):
         bin_mask = (times >= datetimes[i]) & (times < datetimes[i + 1])
         if bin_mask.any():
@@ -101,6 +105,6 @@ def get_real_time_tipsod(timestamps:NDArray[np.floating], sat_name:str, coord_sy
         all_xyz.append([x_median, y_median, z_median])
 
     var = ep.Variable(data=np.asarray(all_xyz), original_unit=u.km)
-    var.convert_to_unit(u.RE)
+    var.convert_to_unit(ep.units.RE)
 
     return var

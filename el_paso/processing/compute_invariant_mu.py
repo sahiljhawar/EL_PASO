@@ -10,10 +10,12 @@ import el_paso as ep
 from el_paso.physics import ParticleLiteral, en2pc, rest_energy
 
 
-def compute_invariant_mu(energy_var:ep.Variable,
-                         alpha_local_var:ep.Variable,
-                         B_local_var:ep.Variable,  # noqa: N803
-                         particle_species:ParticleLiteral) -> ep.Variable:
+def compute_invariant_mu(
+    energy_var: ep.Variable,
+    alpha_local_var: ep.Variable,
+    B_local_var: ep.Variable,  # noqa: N803
+    particle_species: ParticleLiteral,
+) -> ep.Variable:
     r"""Computes the first adiabatic invariant (mu) for given particle species.
 
     The first adiabatic invariant ($\mu$) is calculated using the formula:
@@ -51,14 +53,17 @@ def compute_invariant_mu(energy_var:ep.Variable,
     magnetic_field = B_local_var.get_data(u.nT)
 
     if energy.ndim != 2 or alpha_local.ndim != 2 or magnetic_field.ndim != 1:  # noqa: PLR2004
-        msg = ("Input variables must have the correct dimensions: "
-               "energy (2D), alpha_local (2D), and magnetic_field (1D).")
+        msg = (
+            "Input variables must have the correct dimensions: energy (2D), alpha_local (2D), and magnetic_field (1D)."
+        )
         raise ValueError(msg)
 
     if energy.shape[0] != alpha_local.shape[0] or energy.shape[0] != magnetic_field.shape[0]:
-        msg = ("Input variables must have matching time dimensions: "
-               f"energy ({energy.shape[0]}), alpha_local ({alpha_local.shape[0]}), "
-               f"and magnetic_field ({magnetic_field.shape[0]}).")
+        msg = (
+            "Input variables must have matching time dimensions: "
+            f"energy ({energy.shape[0]}), alpha_local ({alpha_local.shape[0]}), "
+            f"and magnetic_field ({magnetic_field.shape[0]})."
+        )
         raise ValueError(msg)
 
     mc2 = rest_energy(particle_species)
@@ -68,12 +73,12 @@ def compute_invariant_mu(energy_var:ep.Variable,
     sin_alpha_eq = np.sin(alpha_local)
 
     inv_mu = (pct[:, :, np.newaxis] * sin_alpha_eq[:, np.newaxis, :]) ** 2 / (
-            magnetic_field[:, np.newaxis, np.newaxis] * 2 * mc2)  # MeV/G
+        magnetic_field[:, np.newaxis, np.newaxis] * 2 * mc2
+    )  # MeV/G
 
     inv_mu[inv_mu <= 0] = np.nan
 
-    inv_mu_var = ep.Variable(data=inv_mu,
-                             original_unit=u.MeV / u.G) # type: ignore[reportUnknownArgumentType]
+    inv_mu_var = ep.Variable(data=inv_mu, original_unit=u.MeV / u.G)  # type: ignore[reportUnknownArgumentType]
 
     inv_mu_var.metadata.add_processing_note(f"Created with compute_invariant_mu for {particle_species} particles")
 

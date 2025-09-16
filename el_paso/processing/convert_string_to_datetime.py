@@ -12,7 +12,7 @@ from numpy.typing import NDArray
 from el_paso import Variable
 
 
-def convert_string_to_datetime(time_var:Variable) -> NDArray[np.generic]:
+def convert_string_to_datetime(time_var: Variable) -> NDArray[np.generic]:
     """Converts a Variable's string-based time data to UTC datetime objects.
 
     Args:

@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-#ruff: noqa: D103, INP001, S101
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -15,12 +14,19 @@ from swvo.io.RBMDataSet import RBMDataSet, RBMNcDataSet
 from examples.VanAllenProbes.process_ect_combined import process_ect_combined
 
 
-@pytest.mark.parametrize("mag_field", ["T89", "OP77", "T96", "TS04"])
-@pytest.mark.parametrize("save_strategy", ["dataorg", "netcdf"])
-def test_rbsp_ect_combined_snapshot(mag_field: Literal["T89", "TS04", "OP77", "T96"],
-                                    save_strategy: Literal["dataorg", "h5", "netcdf"],
-                                    tmpdir: Path) -> None:
-
+@pytest.mark.parametrize(
+    ("mag_field", "save_strategy"),
+    [
+        pytest.param("T89", "dataorg", marks=pytest.mark.basic),
+        ("OP77", "dataorg"),
+        ("T96", "dataorg"),
+        ("TS04", "dataorg"),
+        pytest.param("T89", "netcdf", marks=pytest.mark.basic),
+    ],
+)
+def test_rbsp_ect_combined_snapshot(
+    mag_field: Literal["T89", "TS04", "OP77", "T96"], save_strategy: Literal["dataorg", "h5", "netcdf"], tmpdir: Path
+) -> None:
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=0.4, seconds=-1)
 
@@ -28,24 +34,31 @@ def test_rbsp_ect_combined_snapshot(mag_field: Literal["T89", "TS04", "OP77", "T
 
     processed_data_path = tmpdir / "RBSP" / "rbspa" if save_strategy != "dataorg" else tmpdir
 
-    process_ect_combined(start_time=start_time,
-                         end_time=end_time,
-                         sat_str="a",
-                         irbem_lib_path=irbem_lib_path,
-                         mag_field=mag_field,
-                         raw_data_path = Path(__file__).parent / "data" / "raw",
-                         processed_data_path = processed_data_path,
-                         num_cores = 32,
-                         cadence = timedelta(hours=1),
-                         save_strategy = save_strategy)
+    process_ect_combined(
+        start_time=start_time,
+        end_time=end_time,
+        sat_str="a",
+        irbem_lib_path=irbem_lib_path,
+        mag_field=mag_field,
+        raw_data_path=Path(__file__).parent / "data" / "raw",
+        processed_data_path=processed_data_path,
+        num_cores=32,
+        cadence=timedelta(hours=1),
+        save_strategy=save_strategy,
+    )
 
     start_date = start_time.replace(day=1)
     end_date = end_time.replace(day=30)
 
     match save_strategy:
         case "dataorg":
-            out_path = (processed_data_path / "RBSP" / "rbspa" / "Processed_Mat_Files" /
-                        f"rbspa_ect_combined_{start_date:%Y%m%d}to{end_date:%Y%m%d}_flux_ver4.mat")
+            out_path = (
+                processed_data_path
+                / "RBSP"
+                / "rbspa"
+                / "Processed_Mat_Files"
+                / f"rbspa_ect_combined_{start_date:%Y%m%d}to{end_date:%Y%m%d}_flux_ver4.mat"
+            )
             assert out_path.exists()
         case "h5":
             out_path = processed_data_path / f"rbspa_ect_combined_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.h5"
@@ -57,13 +70,21 @@ def test_rbsp_ect_combined_snapshot(mag_field: Literal["T89", "TS04", "OP77", "T
     if save_strategy == "dataorg":
         rbsp_proc = RBMDataSet(start_time, end_time, tmpdir, "RBSPA", "ect_combined", mag_field)
 
-        rbsp_true = RBMDataSet(start_time, end_time, Path(__file__).parent / "data" / "processed",
-                                "RBSPA", "ect_combined", mag_field)
+        rbsp_true = RBMDataSet(
+            start_time,
+            end_time,
+            Path(__file__).parent / "data" / "processed",
+            "RBSPA",
+            "ect_combined",
+            mag_field,
+            preferred_extension="mat",
+        )
     elif save_strategy == "netcdf":
         rbsp_proc = RBMNcDataSet(start_time, end_time, tmpdir, "RBSPA", "ect_combined", mag_field)
 
-        rbsp_true = RBMNcDataSet(start_time, end_time, Path(__file__).parent / "data" / "processed",
-                                 "RBSPA", "ect_combined", mag_field)
+        rbsp_true = RBMNcDataSet(
+            start_time, end_time, Path(__file__).parent / "data" / "processed", "RBSPA", "ect_combined", mag_field
+        )
     else:
         msg = "Test not implemented for this save strategy."
         raise NotImplementedError(msg)

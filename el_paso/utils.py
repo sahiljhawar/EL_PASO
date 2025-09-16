@@ -10,10 +10,8 @@ import re
 import time
 import timeit
 import typing
-from collections.abc import Callable, Iterable
 from datetime import datetime, timedelta, timezone
 from functools import wraps
-from multiprocessing.pool import MapResult
 from pathlib import Path
 from typing import Any, ParamSpec, TypeVar
 
@@ -21,11 +19,16 @@ import pandas as pd
 import tqdm
 from packaging import version as version_pkg
 
-import el_paso as ep
+if typing.TYPE_CHECKING:
+    from collections.abc import Callable, Iterable
+    from multiprocessing.pool import MapResult
+
+    import el_paso as ep
 
 logger = logging.getLogger(__name__)
 
-def fill_str_template_with_time(input:str, time:datetime) -> str:
+
+def fill_str_template_with_time(input_str: str, time: datetime) -> str:
     """Fills a string template with time-based placeholders.
 
     This function replaces common time-based placeholders in a string with
@@ -33,25 +36,28 @@ def fill_str_template_with_time(input:str, time:datetime) -> str:
     are case-sensitive.
 
     Parameters:
-        input (str): The input string containing placeholders like 'yyyymmdd', 'YYYYMMDD',
-                     'YYYY', 'MM', and 'DD'.
+        input_str (str): The input string containing placeholders like 'yyyymmdd', 'YYYYMMDD',
+                         'YYYY', 'MM', and 'DD'.
         time (datetime): The datetime object to use for filling the template.
 
     Returns:
         str: The string with all placeholders replaced by their time values.
     """
-    yyyymmdd_str = time.strftime('%Y%m%d')
-    yyyy_str = time.strftime('%Y')
-    MM_str = time.strftime('%m')
-    DD_str = time.strftime('%d')
+    yyyymmdd_str = time.strftime("%Y%m%d")
+    yyyy_str = time.strftime("%Y")
+    mm_str = time.strftime("%m")
+    dd_str = time.strftime("%d")
 
-    return input.replace("yyyymmdd", yyyymmdd_str) \
-                 .replace("YYYYMMDD", yyyymmdd_str) \
-                 .replace("YYYY", yyyy_str) \
-                 .replace("MM", MM_str) \
-                 .replace("DD", DD_str)
+    return (
+        input_str.replace("yyyymmdd", yyyymmdd_str)
+        .replace("YYYYMMDD", yyyymmdd_str)
+        .replace("YYYY", yyyy_str)
+        .replace("MM", mm_str)
+        .replace("DD", dd_str)
+    )
 
-def extract_version(file_name:str|Path) -> tuple[str, version_pkg.Version]:
+
+def extract_version(file_name: str | Path) -> tuple[str, version_pkg.Version]:
     """Extracts the version string from a file name.
 
     The function looks for a version string pattern `_v*` (e.g., '_v1.2.3' or '_v1_2-3')
@@ -73,16 +79,18 @@ def extract_version(file_name:str|Path) -> tuple[str, version_pkg.Version]:
     # Regular expression to find the version part (_v* or _v*.*-*.*) before the file extension
     match = re.search(r"_(v[\d._-]+)(?=\.\w+$)", file_name)
     if match:
-        base_name = file_name[:match.start()]
+        base_name = file_name[: match.start()]
         ver_str = match.group(1)
         # Normalize the version string by replacing separators with dots
         normalized_ver_str = re.sub(r"[_-]", ".", ver_str.replace("v", ""))
         return base_name, version_pkg.parse(normalized_ver_str)
-    else:
-        return file_name, version_pkg.parse("0")
+    return file_name, version_pkg.parse("0")
 
-T = TypeVar("T", bound=Path|str)
-def get_file_by_version(file_paths:Iterable[T], version:str) -> T|None:
+
+T = TypeVar("T", bound=Path | str)
+
+
+def get_file_by_version(file_paths: Iterable[T], version: str) -> T | None:
     """Filters a list of file paths to find a specific version or the latest one.
 
     If a specific version string (e.g., 'v1.2.3') is provided, the function returns
@@ -120,10 +128,12 @@ def get_file_by_version(file_paths:Iterable[T], version:str) -> T|None:
     # Extract the file names from the dictionary
     return latest_file
 
+
 P = ParamSpec("P")
 R = TypeVar("R")
 
-def timed_function(func_name:str|None=None) -> Callable[[Callable[P, R]], Callable[P, R]]:
+
+def timed_function(func_name: str | None = None) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """A decorator that logs the execution time of a function.
 
     This decorator measures the time it takes for a decorated function to execute
@@ -137,6 +147,7 @@ def timed_function(func_name:str|None=None) -> Callable[[Callable[P, R]], Callab
     Returns:
         Callable: A decorator that wraps the target function with timing logic.
     """
+
     def timed_function_(f: Callable[P, R]) -> Callable[P, R]:
         @wraps(f)
         def wrap(*args: P.args, **kwargs: P.kwargs) -> R:
@@ -144,15 +155,18 @@ def timed_function(func_name:str|None=None) -> Callable[[Callable[P, R]], Callab
             result = f(*args, **kwargs)
             toc = timeit.default_timer()
             if func_name:
-                logger.info(f"\t\t{func_name} finished in {toc-tic:0.3f} seconds")
+                logger.info(f"\t\t{func_name} finished in {toc - tic:0.3f} seconds")
             else:
-                logger.info(f"\t\tFinished in {toc-tic:0.3f} seconds")
+                logger.info(f"\t\tFinished in {toc - tic:0.3f} seconds")
 
             return result
+
         return wrap
+
     return timed_function_
 
-def enforce_utc_timezone(time:datetime) -> datetime:
+
+def enforce_utc_timezone(time: datetime) -> datetime:
     """Ensures a datetime object has UTC timezone information.
 
     If the provided datetime object is naive (lacks timezone info), it is assigned
@@ -168,6 +182,7 @@ def enforce_utc_timezone(time:datetime) -> datetime:
         time = time.replace(tzinfo=timezone.utc)
     return time
 
+
 def datenum_to_datetime(datenum_val: float) -> datetime:
     """Converts a MATLAB datenum value to a timezone-aware datetime object.
 
@@ -180,7 +195,12 @@ def datenum_to_datetime(datenum_val: float) -> datetime:
     Returns:
         datetime: The converted datetime object with UTC timezone.
     """
-    return pd.to_datetime(datenum_val-719529, unit="D", origin=pd.Timestamp("1970-01-01")).to_pydatetime().replace(tzinfo=timezone.utc)
+    return (
+        pd.to_datetime(datenum_val - 719529, unit="D", origin=pd.Timestamp("1970-01-01"))
+        .to_pydatetime()
+        .replace(tzinfo=timezone.utc)
+    )
+
 
 def datetime_to_datenum(datetime_val: datetime) -> float:
     """Converts a datetime object to a MATLAB datenum value.
@@ -194,13 +214,14 @@ def datetime_to_datenum(datetime_val: datetime) -> float:
     Returns:
         float: The corresponding MATLAB datenum value.
     """
-    mdn = datetime_val + timedelta(days = 366)
+    mdn = datetime_val + timedelta(days=366)
     dt = datetime(datetime_val.year, datetime_val.month, datetime_val.day, 0, 0, 0, tzinfo=timezone.utc)
     frac = (datetime_val - dt).seconds / (24.0 * 60.0 * 60.0)
 
     return mdn.toordinal() + round(frac, 6)
 
-def assert_n_dim(var: ep.Variable, n_dims:int, name_in_file:str) -> None:
+
+def assert_n_dim(var: ep.Variable, n_dims: int, name_in_file: str) -> None:
     """Asserts that a variable's data has a specific number of dimensions.
 
     Raises a `ValueError` if the provided variable's data does not match the
@@ -214,11 +235,14 @@ def assert_n_dim(var: ep.Variable, n_dims:int, name_in_file:str) -> None:
     provided = var.get_data().ndim
 
     if provided != n_dims:
-        msg = (f"Encountered dimension missmatch for variable with name {name_in_file}:"
-               f"should be {n_dims}, got: {provided}!")
+        msg = (
+            f"Encountered dimension missmatch for variable with name {name_in_file}:"
+            f"should be {n_dims}, got: {provided}!"
+        )
         raise ValueError(msg)
 
-def show_process_bar_for_map_async(map_result:MapResult[Any], chunksize:int) -> None:
+
+def show_process_bar_for_map_async(map_result: MapResult[Any], chunksize: int) -> None:
     """Displays a progress bar for a `multiprocessing.pool.MapResult` object.
 
     This function creates a `tqdm` progress bar that tracks the completion of
@@ -231,19 +255,21 @@ def show_process_bar_for_map_async(map_result:MapResult[Any], chunksize:int) -> 
     """
     init = typing.cast("int", map_result._number_left) * chunksize  # type: ignore[reportUnknownMemberType] # noqa: SLF001
     with tqdm.tqdm(total=init) as t:
-        while (True):
+        while True:
             if map_result.ready():
                 break
-            t.n = (init-map_result._number_left*chunksize)  # type: ignore[reportUnknownMemberType] # noqa: SLF001
+            t.n = init - map_result._number_left * chunksize  # type: ignore[reportUnknownMemberType] # noqa: SLF001
             t.refresh()
             time.sleep(1)
 
-class Hashabledict(dict[Any,Any]):
+
+class Hashabledict(dict[Any, Any]):
     """A dictionary subclass that is hashable.
 
     This class enables a dictionary to be used in sets or as keys in other dictionaries
     by providing a custom hash implementation based on its contents.
     """
+
     def __hash__(self) -> int:  # type: ignore[reportIncompatibleVariableOverride]
         """Computes a hash value for the dictionary.
 
@@ -255,9 +281,10 @@ class Hashabledict(dict[Any,Any]):
         Returns:
             int: The hash value of the dictionary.
         """
-        return hash((frozenset(self), frozenset(self.itervalues()))) # type: ignore[reportAttributeAccessIssue]
+        return hash((frozenset(self), frozenset(self.itervalues())))  # type: ignore[reportAttributeAccessIssue]
 
-def make_dict_hashable(dict_input:dict[Any,Any]|None) -> Hashabledict|None:
+
+def make_dict_hashable(dict_input: dict[Any, Any] | None) -> Hashabledict | None:
     """Converts a standard dictionary into a hashable one.
 
     If the input is `None`, it is returned as is. Otherwise, a new `Hashabledict`

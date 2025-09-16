@@ -14,11 +14,10 @@ import el_paso as ep
 
 logger = logging.getLogger("__name__")
 
-def activate_release_mode(user_name:str,
-                          email_address:str,
-                          el_paso_repository_path:str|Path,
-                          *,
-                          dirty_ok:bool=False) -> None:
+
+def activate_release_mode(
+    user_name: str, email_address: str, el_paso_repository_path: str | Path, *, dirty_ok: bool = False
+) -> None:
     """Activates the package's release mode and validates the repository state.
 
     This function enables a special mode for data processing that records key
@@ -49,9 +48,7 @@ def activate_release_mode(user_name:str,
     el_paso_repo = git.Repo(el_paso_repository_path)
     commit_hash = el_paso_repo.head.commit.hexsha
 
-    if el_paso_repo.is_dirty(index=True,
-                            working_tree=True,
-                            untracked_files=True):
+    if el_paso_repo.is_dirty(index=True, working_tree=True, untracked_files=True):
         if dirty_ok:
             logger.warning("Dirty repository used for processing data in release mode!")
         else:
@@ -69,6 +66,7 @@ def activate_release_mode(user_name:str,
 
     ep._release_mode = True  # noqa: SLF001 # type: ignore[Private]
 
+
 def is_in_release_mode() -> bool:
     """Checks if the package's release mode is currently active.
 
@@ -76,6 +74,7 @@ def is_in_release_mode() -> bool:
         bool: `True` if release mode is active, `False` otherwise.
     """
     return ep._release_mode  # noqa: SLF001 # type: ignore[Private]
+
 
 def get_release_msg() -> str:
     """Retrieves the message associated with the package's release mode.

@@ -55,11 +55,13 @@ nav:
       - API_reference/processing/compute_invariant_mu.md
       - API_reference/processing/compute_magnetic_field_variables.md
       - API_reference/processing/compute_phase_space_density.md
+      - API_reference/processing/construct_pitch_angle_distribution.md
       - API_reference/processing/convert_string_to_datetime.md
       - API_reference/processing/fold_pitch_angles_and_flux.md
     - Utilities:
       - General Utilities: API_reference/utilities/general_utilities.md
       - Loading Geomagnetic Indices and Solar Wind Parameters: API_reference/utilities/load_indices_solar_wind_parameters.md
+      - Magnetic Field Utilities: API_reference/utilities/magnetic_field_utilities.md
       - Release mode: API_reference/utilities/release_mode.md
       - Scripts: API_reference/utilities/scripts.md
       - Units: API_reference/utilities/units.md

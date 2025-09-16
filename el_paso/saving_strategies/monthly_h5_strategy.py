@@ -43,15 +43,17 @@ class MonthlyH5Strategy(SavingStrategy):
         standardize_variable: Standardizes a variable's units, dimensions, and shape.
     """
 
-    output_files:list[OutputFile]
+    output_files: list[OutputFile]
 
-    file_path:Path
+    file_path: Path
 
-    def __init__(self,
-                 base_data_path:str|Path,
-                 file_name_stem:str,
-                 mag_field:ep.processing.magnetic_field_utils.MagneticFieldLiteral,
-                 data_standard: DataStandard|None = None) -> None:
+    def __init__(
+        self,
+        base_data_path: str | Path,
+        file_name_stem: str,
+        mag_field: ep.processing.magnetic_field_utils.MagneticFieldLiteral,
+        data_standard: DataStandard | None = None,
+    ) -> None:
         """Initializes the MonthlyH5Strategy.
 
         Parameters:
@@ -71,19 +73,35 @@ class MonthlyH5Strategy(SavingStrategy):
         self.data_standard = data_standard
 
         self.output_files = [
-            OutputFile("full", ["time",
-                                "flux/FEDU", "flux/FEDO", "flux/alpha_eq", "flux/energy", "flux/alpha_local",
-                                "position/xGEO", f"position/{mag_field}/MLT", f"position/{mag_field}/R0",
-                                f"position/{mag_field}/Lstar", f"position/{mag_field}/Lm",
-                                f"mag_field/{mag_field}/B_eq", f"mag_field/{mag_field}/B_local",
-                                "psd/PSD", f"psd/{mag_field}/inv_mu", f"psd/{mag_field}/inv_K",
-                                "density/density_local", f"density/{mag_field}/density_eq",
-            ], save_incomplete=True),
+            OutputFile(
+                "full",
+                [
+                    "time",
+                    "flux/FEDU",
+                    "flux/FEDO",
+                    "flux/alpha_eq",
+                    "flux/energy",
+                    "flux/alpha_local",
+                    "position/xGEO",
+                    f"position/{mag_field}/MLT",
+                    f"position/{mag_field}/R0",
+                    f"position/{mag_field}/Lstar",
+                    f"position/{mag_field}/Lm",
+                    f"mag_field/{mag_field}/B_eq",
+                    f"mag_field/{mag_field}/B_local",
+                    "psd/PSD",
+                    f"psd/{mag_field}/inv_mu",
+                    f"psd/{mag_field}/inv_K",
+                    "density/density_local",
+                    f"density/{mag_field}/density_eq",
+                ],
+                save_incomplete=True,
+            ),
         ]
 
-    def get_time_intervals_to_save(self,
-                                   start_time:datetime|None,
-                                   end_time:datetime|None) -> list[tuple[datetime, datetime]]:
+    def get_time_intervals_to_save(
+        self, start_time: datetime | None, end_time: datetime | None
+    ) -> list[tuple[datetime, datetime]]:
         """Splits the provided time range into a list of full-month intervals.
 
         This method generates a list of (start_datetime, end_datetime) tuples, where each tuple
@@ -99,7 +117,7 @@ class MonthlyH5Strategy(SavingStrategy):
         Raises:
             ValueError: If either `start_time` or `end_time` is not provided.
         """
-        time_intervals:list[tuple[datetime, datetime]] = []
+        time_intervals: list[tuple[datetime, datetime]] = []
 
         if start_time is None or end_time is None:
             msg = "start_time and end_time must be provided for MonthlyH5Strategy!"
@@ -114,12 +132,15 @@ class MonthlyH5Strategy(SavingStrategy):
             month_start = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
             month_end = datetime(year, month, eom_day, 23, 59, 59, tzinfo=timezone.utc)
             time_intervals.append((month_start, month_end))
-            current_time = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if month == 12 else \
-                datetime(year, month + 1, 1, tzinfo=timezone.utc)  # noqa: PLR2004
+            current_time = (
+                datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+                if month == 12  # noqa: PLR2004
+                else datetime(year, month + 1, 1, tzinfo=timezone.utc)
+            )
 
         return time_intervals
 
-    def get_file_path(self, interval_start:datetime, interval_end:datetime, output_file:OutputFile) -> Path:  # noqa: ARG002
+    def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:  # noqa: ARG002
         """Generates a structured file path for the HDF5 file.
 
         The file name is constructed from a predefined stem, the date range, and the magnetic

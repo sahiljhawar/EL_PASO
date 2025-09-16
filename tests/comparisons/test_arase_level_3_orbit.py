@@ -11,33 +11,31 @@ from typing import Literal
 import numpy as np
 import pytest
 from matplotlib import pyplot as plt
+from swvo.io import RBMDataSet
 
 import el_paso as ep
-from data_management.io import RBMDataSet
 from examples.Arase.arase_mepe import process_mepe_level_3
 from examples.Arase.get_arase_orbit_variables import get_arase_orbit_level_3_variables
 
-# ruff: noqa: D103, S101, PLR2004
-
 
 @functools.cache
-def arase_orbit_el_paso(start_time:datetime,
-                        end_time:datetime,
-                        irbem_lib_path:str,
-                        mag_field:Literal["T89", "TS04", "OP77Q"]) -> RBMDataSet.RBMDataSet:
-
+def arase_orbit_el_paso(
+    start_time: datetime, end_time: datetime, irbem_lib_path: str, mag_field: Literal["T89", "TS04", "OP77Q"]
+) -> RBMDataSet.RBMDataSet:
     Path("tests/comparisons/raw_data").mkdir(exist_ok=True)
     Path("tests/comparisons/processed_data").mkdir(exist_ok=True)
 
-    process_mepe_level_3(start_time,
-                         end_time,
-                         irbem_lib_path,
-                         mag_field,
-                         num_cores=48,
-                         use_level_3_orbit_data=False,
-                         cadence=timedelta(minutes=1),
-                         raw_data_path=Path("tests/comparisons/raw_data"),
-                         processed_data_path=Path("tests/comparisons/processed_data"))
+    process_mepe_level_3(
+        start_time,
+        end_time,
+        irbem_lib_path,
+        mag_field,
+        num_cores=48,
+        use_level_3_orbit_data=False,
+        cadence=timedelta(minutes=1),
+        raw_data_path=Path("tests/comparisons/raw_data"),
+        processed_data_path=Path("tests/comparisons/processed_data"),
+    )
 
     match mag_field:
         case "T89":
@@ -47,46 +45,40 @@ def arase_orbit_el_paso(start_time:datetime,
         case "OP77Q":
             mfm_enum = RBMDataSet.MfmEnum.OP77
 
-    arase_data = RBMDataSet.RBMDataSet(start_time,
-                                       end_time,
-                                       Path("tests/comparisons/processed_data/"),
-                                       "ARASE",
-                                       RBMDataSet.InstrumentEnum.MEPE,
-                                       mfm_enum,
-                                       verbose=True)
+    return RBMDataSet.RBMDataSet(
+        start_time,
+        end_time,
+        Path("tests/comparisons/processed_data/"),
+        "ARASE",
+        RBMDataSet.InstrumentEnum.MEPE,
+        mfm_enum,
+        verbose=True,
+    )
 
-    return arase_data
 
-# mag_field_list = ["TS04", "T89", "OP77"]
-mag_field_list = ["OP77Q"]
+mag_field_list = ["TS04", "T89", "OP77"]
+
 
 @pytest.mark.parametrize("mag_field", mag_field_list)
 @pytest.mark.visual
-def test_arase_level_3_orbit_comparison(mag_field:Literal["TS04", "T89", "OP77Q"]) -> None:
-
+def test_arase_level_3_orbit_comparison(mag_field: Literal["TS04", "T89", "OP77Q"]) -> None:
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=0, hours=23, minutes=59, seconds=59)
 
     Path("tests/comparisons/raw_data").mkdir(exist_ok=True)
 
-    orbit_vars = get_arase_orbit_level_3_variables(start_time,
-                                                   end_time,
-                                                   mag_field,
-                                                   raw_data_path="tests/comparisons/raw_data")
+    orbit_vars = get_arase_orbit_level_3_variables(
+        start_time, end_time, mag_field, raw_data_path="tests/comparisons/raw_data"
+    )
 
     orbit_vars["R0"].apply_thresholds_on_data(0, 50)
 
-    arase_data_el_paso = arase_orbit_el_paso(start_time,
-                                              end_time,
-                                              "IRBEM/libirbem.so",
-                                              mag_field)
+    arase_data_el_paso = arase_orbit_el_paso(start_time, end_time, "IRBEM/libirbem.so", mag_field)
 
     keys_to_compare = ["R0", "MLT"]
     orbit_time = [datetime.fromtimestamp(t, tz=timezone.utc) for t in orbit_vars["Epoch"].get_data(ep.units.posixtime)]
 
-    # max_diff = np.argmax(np.abs(orbit_vars["R0"].get_data().astype(np.float64) - arase_data_el_paso.R0))
-
-    fig, axs = plt.subplots(len(keys_to_compare), 1, figsize=(10, 6), sharex=True)
+    _, axs = plt.subplots(len(keys_to_compare), 1, figsize=(10, 6), sharex=True)
 
     for i, key in enumerate(keys_to_compare):
         match key:

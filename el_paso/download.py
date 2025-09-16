@@ -15,27 +15,31 @@ from pathlib import Path
 from typing import Literal
 
 import requests
+from requests.auth import HTTPDigestAuth
 
 from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version, timed_function
 
 ERROR_NOT_FOUND = 404
 logger = logging.getLogger(__name__)
 
+
 @timed_function()
-def download(start_time: datetime,
-             end_time: datetime,
-             save_path: str|Path,
-             file_cadence: Literal["daily", "monthly", "single_file"],
-             download_url: str,
-             file_name_stem: str,
-             download_arguments_prefixes: str = "",
-             download_arguments_suffixes: str = "",
-             method:Literal["request", "wget"]="request",
-             authentification_info:tuple[str,str]=("",""),
-             rename_file_name_stem: str|None = None,
-             *,
-             sort_raw_files_by_time: bool = True,
-             skip_existing: bool = True) -> None:
+def download(
+    start_time: datetime,
+    end_time: datetime,
+    save_path: str | Path,
+    file_cadence: Literal["daily", "monthly", "single_file"],
+    download_url: str,
+    file_name_stem: str,
+    download_arguments_prefixes: str = "",
+    download_arguments_suffixes: str = "",
+    method: Literal["request", "wget"] = "request",
+    authentification_info: tuple[str, str] = ("", ""),
+    rename_file_name_stem: str | None = None,
+    *,
+    sort_raw_files_by_time: bool = False,
+    skip_existing: bool = True,
+) -> None:
     """Download satellite data files within a specified time range and cadence.
 
     Examples can be found in the 'examples' and 'tutorials' folder.
@@ -61,6 +65,9 @@ def download(start_time: datetime,
         rename_file_name_stem (str | None, optional): If provided, rename the downloaded file to this stem.
                                                       Defaults to None.
         skip_existing (bool, optional): If True, skip downloading files that already exist. Defaults to True.
+        sort_raw_files_by_time (bool, optional):
+                If True, creates subdirectories for each year and month (e.g., 'YYYY/MM/').
+                This helps organize a large number of downloaded files. Defaults to False.
 
     Raises:
         NotImplementedError: If "monthly" cadence or an unsupported cadence is specified.
@@ -79,26 +86,26 @@ def download(start_time: datetime,
     while True:
         match method:
             case "request":
-                _requests_download(curr_time,
-                                    save_path,
-                                    download_url,
-                                    file_name_stem,
-                                    authentification_info,
-                                    rename_file_name_stem,
-                                    skip_existing=skip_existing,
-                                    sort_raw_files_by_time=sort_raw_files_by_time)
+                _requests_download(
+                    curr_time,
+                    save_path,
+                    download_url,
+                    file_name_stem,
+                    authentification_info,
+                    rename_file_name_stem,
+                    skip_existing=skip_existing,
+                    sort_raw_files_by_time=sort_raw_files_by_time,
+                )
             case "wget":
-                _wget_download(curr_time,
-                                save_path,
-                                download_url,
-                                download_arguments_prefixes,
-                                download_arguments_suffixes)
+                _wget_download(
+                    curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes
+                )
 
         match file_cadence:
             case "daily":
+                curr_time += timedelta(days=1)
                 if curr_time > end_time:
                     break
-                curr_time += timedelta(days=1)
 
             case "monthly":
                 msg = "Monthly file cadence has not been implemented yet!"
@@ -111,16 +118,23 @@ def download(start_time: datetime,
                 msg = "File cadence must be 'single_file', 'daily', or 'monthly'"
                 raise NotImplementedError(msg)
 
-def _requests_download(current_time:datetime,
-                       save_path:Path,
-                       download_url:str,
-                       file_name_stem:str,
-                       authentification_info:tuple[str,str],
-                       rename_file_name_stem: str|None,
-                       *,
-                       skip_existing:bool,
-                       sort_raw_files_by_time:bool) -> None:
+
+def _requests_download(
+    current_time: datetime,
+    save_path: Path,
+    download_url: str,
+    file_name_stem: str,
+    authentification_info: tuple[str, str],
+    rename_file_name_stem: str | None,
+    *,
+    skip_existing: bool,
+    sort_raw_files_by_time: bool,
+) -> None:
     """Download a file using the requests library."""
+    if sort_raw_files_by_time:
+        parent_folders = fill_str_template_with_time("YYYY/MM/", current_time)
+        save_path = save_path / parent_folders
+
     save_path = Path(fill_str_template_with_time(str(save_path), current_time))
     save_path.mkdir(exist_ok=True, parents=True)
 
@@ -146,17 +160,16 @@ def _requests_download(current_time:datetime,
         else:
             save_file_name = fill_str_template_with_time(rename_file_name_stem, current_time)
 
-        if sort_raw_files_by_time:
-            fill_str_template_with_time("YYYY/MM/", current_time)
-
         if skip_existing and (save_path / save_file_name).exists():
             logger.info(f"File already exists, skipping download: {save_path / save_file_name}")
             return
 
-        response = requests.get(f"{url}/{latest_file_name}",
-                                stream=True,
-                                timeout=10,
-                                auth=requests.auth.HTTPDigestAuth(*authentification_info)) #type: ignore[reportUnknownMemberType]
+        response = requests.get(
+            f"{url}/{latest_file_name}",
+            stream=True,
+            timeout=10,
+            auth=HTTPDigestAuth(*authentification_info),
+        )  # type: ignore[reportUnknownMemberType]
 
         if response.status_code == ERROR_NOT_FOUND:
             msg = f"File not found on server: {url}"
@@ -174,13 +187,10 @@ def _requests_download(current_time:datetime,
     except requests.exceptions.RequestException as e:
         logger.info(f"Error downloading file from {url}: {e}")
 
-@cache
-def _get_page_content(url:str, authentification_info:tuple[str,str]) -> requests.Response | None:
 
-    response_of_content = requests.get(url,
-                                        stream=True,
-                                        timeout=10,
-                                        auth=requests.auth.HTTPDigestAuth(*authentification_info)) #type: ignore[reportUnknownMemberType]
+@cache
+def _get_page_content(url: str, authentification_info: tuple[str, str]) -> requests.Response | None:
+    response_of_content = requests.get(url, stream=True, timeout=10, auth=HTTPDigestAuth(*authentification_info))  # type: ignore[reportUnknownMemberType]
 
     if response_of_content.status_code == ERROR_NOT_FOUND:
         msg = f"File not found on server: {url}"
@@ -191,12 +201,14 @@ def _get_page_content(url:str, authentification_info:tuple[str,str]) -> requests
 
     return response_of_content
 
-def _wget_download(current_time:datetime,
-                   save_path:Path,
-                   download_url:str,
-                   download_arguments_prefixes:str,
-                   download_arguments_suffixes:str) -> None:
 
+def _wget_download(
+    current_time: datetime,
+    save_path: Path,
+    download_url: str,
+    download_arguments_prefixes: str,
+    download_arguments_suffixes: str,
+) -> None:
     Path(fill_str_template_with_time(str(save_path), current_time)).parents[0].mkdir(exist_ok=True, parents=True)
 
     # Replace "yyyymmdd" or "YYYYMMDD" in url, prefix, and suffix with the parsed string

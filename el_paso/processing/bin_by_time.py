@@ -43,7 +43,7 @@ class TimeBinMethod(Enum):
     Repeat = "Repeat"
     Unique = "Unique"
 
-    def __call__(self, data:NDArray[np.generic], drop_percent:float=0) -> NDArray[np.generic]:  # noqa: C901, PLR0912
+    def __call__(self, data: NDArray[np.generic], drop_percent: float = 0) -> NDArray[np.generic]:  # noqa: C901, PLR0912
         """Applies the binning method to the provided data.
 
         Args:
@@ -60,12 +60,13 @@ class TimeBinMethod(Enum):
             TypeError: If the selected binning method requires numeric types and the
                 input data is not numeric.
         """
-        binned_array:NDArray[np.generic]
+        binned_array: NDArray[np.generic]
 
-        if self.value in ["Mean", "NanMean", "Median", "NanMedian", "NanMax", "NanMin"] \
-            and not np.issubdtype(data.dtype, np.number):
-                msg = f"{self.value} time bin method is only supported for numeric types!"
-                raise TypeError(msg)
+        if self.value in ["Mean", "NanMean", "Median", "NanMedian", "NanMax", "NanMin"] and not np.issubdtype(
+            data.dtype, np.number
+        ):
+            msg = f"{self.value} time bin method is only supported for numeric types!"
+            raise TypeError(msg)
 
         num_to_remove = int(len(data) * drop_percent / 100)
         if num_to_remove > 0 and np.issubdtype(data.dtype, np.number):
@@ -111,8 +112,8 @@ def bin_by_time(  # noqa: C901
     time_bin_method_dict: dict[str, TimeBinMethod],
     time_binning_cadence: timedelta,
     window_alignement: Literal["center", "left", "right"] = "center",
-    start_time: datetime|None=None,
-    end_time: datetime|None=None,
+    start_time: datetime | None = None,
+    end_time: datetime | None = None,
     drop_percent: float = 0,
 ) -> ep.Variable:
     """Bins one or more variables by time according to specified methods and cadence.
@@ -161,7 +162,7 @@ def bin_by_time(  # noqa: C901
     logger.info("Binning by time...")
 
     start_time = start_time or datenum_to_datetime(time_variable.get_data(ep.units.datenum)[0])
-    end_time   = end_time or datenum_to_datetime(time_variable.get_data(ep.units.datenum)[-1])
+    end_time = end_time or datenum_to_datetime(time_variable.get_data(ep.units.datenum)[-1])
 
     original_cadence = float(np.nanmedian(np.diff(time_variable.get_data(ep.units.posixtime))))
 
@@ -171,7 +172,6 @@ def bin_by_time(  # noqa: C901
     index_iterables = None
 
     for key, var in variables.items():
-
         if key not in time_bin_method_dict:
             continue
 
@@ -218,12 +218,14 @@ def bin_by_time(  # noqa: C901
         if isinstance(binned_data[0], str):
             var.set_data(np.array(binned_data, dtype=object), "same")
         else:
-            var.set_data(np.array(binned_data) , "same")
+            var.set_data(np.array(binned_data), "same")
 
         # update metadata
         var.metadata.original_cadence_seconds = original_cadence
-        var.metadata.add_processing_note(f"Time binned with method {time_bin_method_dict[key].value}"
-                                         f" and cadence of {time_binning_cadence.total_seconds()/60} minutes")
+        var.metadata.add_processing_note(
+            f"Time binned with method {time_bin_method_dict[key].value}"
+            f" and cadence of {time_binning_cadence.total_seconds() / 60} minutes"
+        )
 
     new_time_var = ep.Variable(data=binned_time, original_unit=ep.units.posixtime)
     new_time_var.metadata.add_processing_note("Created while time binning.")
@@ -231,12 +233,12 @@ def bin_by_time(  # noqa: C901
     return new_time_var
 
 
-def _create_binned_time_and_bins(start_time:datetime,
-                                 end_time:datetime,
-                                 time_binning_cadence:timedelta,
-                                 window_alignement:Literal["left", "center", "right"],
-                                 ) -> tuple[NDArray[np.floating], list[float]]:
-
+def _create_binned_time_and_bins(
+    start_time: datetime,
+    end_time: datetime,
+    time_binning_cadence: timedelta,
+    window_alignement: Literal["left", "center", "right"],
+) -> tuple[NDArray[np.floating], list[float]]:
     binned_time = np.arange(start_time.timestamp(), end_time.timestamp(), time_binning_cadence.total_seconds())
 
     # built bins
@@ -269,15 +271,15 @@ def _create_binned_time_and_bins(start_time:datetime,
     return binned_time, time_bins
 
 
-def _calculate_index_iterables(timestamps: NDArray[np.floating],
-                               time_bins: list[float]) -> tuple[NDArray[np.intp], list[int]]:
-
+def _calculate_index_iterables(
+    timestamps: NDArray[np.floating], time_bins: list[float]
+) -> tuple[NDArray[np.intp], list[int]]:
     index_set = np.digitize(timestamps, time_bins)
     index_set = index_set - 1  # shift indices by one to match time array
 
     unique_indices = np.unique(index_set)
 
-    indices_separation:list[int] = []
+    indices_separation: list[int] = []
     cursor = 0
 
     for i in range(len(unique_indices)):
@@ -292,7 +294,8 @@ def _calculate_index_iterables(timestamps: NDArray[np.floating],
 
     indices_separation.append(len(index_set))
     unique_indices = np.delete(
-        unique_indices, np.argwhere((unique_indices == -1) | (unique_indices == len(time_bins) - 1)),
+        unique_indices,
+        np.argwhere((unique_indices == -1) | (unique_indices == len(time_bins) - 1)),
     )
 
     return unique_indices, indices_separation

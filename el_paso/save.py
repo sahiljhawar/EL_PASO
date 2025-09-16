@@ -23,14 +23,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+
 @timed_function()
-def save(variables_dict: dict[str, Variable],
-         saving_strategy: SavingStrategy,
-         start_time: datetime,
-         end_time: datetime,
-         time_var: Variable|None=None,
-         *,
-         append:bool=False) -> None:
+def save(
+    variables_dict: dict[str, Variable],
+    saving_strategy: SavingStrategy,
+    start_time: datetime,
+    end_time: datetime,
+    time_var: Variable | None = None,
+    *,
+    append: bool = False,
+) -> None:
     """Saves variables to files based on the specified saving strategy and time intervals.
 
     This function iterates through defined time intervals, calling the saving strategy
@@ -63,11 +66,9 @@ def save(variables_dict: dict[str, Variable],
         for output_file in saving_strategy.output_files:
             file_path = saving_strategy.get_file_path(interval_start, interval_end, output_file)
 
-            target_variables = saving_strategy.get_target_variables(output_file,
-                                                                    variables_dict,
-                                                                    time_var,
-                                                                    interval_start,
-                                                                    interval_end)
+            target_variables = saving_strategy.get_target_variables(
+                output_file, variables_dict, time_var, interval_start, interval_end
+            )
 
             if target_variables is None:
                 logger.warning(
@@ -77,6 +78,7 @@ def save(variables_dict: dict[str, Variable],
             else:
                 data_dict = _get_data_dict_to_save(target_variables)
                 saving_strategy.save_single_file(file_path, data_dict, append=append)
+
 
 def _get_data_dict_to_save(target_variables: dict[str, Variable]) -> dict[str, Any]:
     """Generates a dictionary of data and metadata for saving.
@@ -121,6 +123,7 @@ def _get_data_dict_to_save(target_variables: dict[str, Variable]) -> dict[str, A
     data_dict["metadata"] = _sanitize_metadata_dict(metadata_dict)
 
     return data_dict
+
 
 def _sanitize_metadata_dict(metadata_dict: dict[Any, Any]) -> dict[Any, Any]:
     """Recursively sanitizes a metadata dictionary by replacing `None` with empty NumPy arrays.

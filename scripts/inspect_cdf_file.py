@@ -9,7 +9,7 @@ import cdflib
 from tabulate import tabulate
 
 
-def inspect_cdf_file(file_path:str) -> None:
+def inspect_cdf_file(file_path: str) -> None:
     """Prints a formatted table of metadata for all variables in a CDF file.
 
     This function opens a CDF (Common Data Format) file, retrieves key metadata
@@ -33,8 +33,8 @@ def inspect_cdf_file(file_path:str) -> None:
 
     for var in variable_names:
         var_attrs_full = cdf_file.varattsget(var)
-        vdr_info       = cdf_file.varinq(var)
-        var_data       = cdf_file.varget(var)
+        vdr_info = cdf_file.varinq(var)
+        var_data = cdf_file.varget(var)
 
         var_shape = var_data.shape  # type: ignore[reportAttributeAccessIssue]
 
@@ -48,8 +48,13 @@ def inspect_cdf_file(file_path:str) -> None:
 
         var_attrs_to_print.append([var, data_type, units, var_shape, fillvall, desc])
 
-    print(tabulate(var_attrs_to_print,  # noqa: T201
-                   headers=["Variable name", "Data Type", "Units", "Data Shape", "Fill value", "Description"]))
+    print(  # noqa: T201
+        tabulate(
+            var_attrs_to_print,
+            headers=["Variable name", "Data Type", "Units", "Data Shape", "Fill value", "Description"],
+        )
+    )
+
 
 if __name__ == "__main__":
     file_name = "X"

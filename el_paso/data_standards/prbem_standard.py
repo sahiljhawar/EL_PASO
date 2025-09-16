@@ -42,7 +42,7 @@ class PRBEMStandard(DataStandard):
                           its consistency validated.
         """
         if standard_name == "FEDU":
-            variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1)) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1))  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 3, standard_name)
             shape = variable.get_data().shape
@@ -51,7 +51,7 @@ class PRBEMStandard(DataStandard):
             self.consistency_check.check_pitch_angle_size(shape[2], standard_name)
 
         elif standard_name == "FEDO":
-            variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1)) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1))  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 2, standard_name)
             shape = variable.get_data().shape
@@ -59,7 +59,7 @@ class PRBEMStandard(DataStandard):
             self.consistency_check.check_energy_size(shape[1], standard_name)
 
         elif "alpha" in standard_name:
-            variable.convert_to_unit(u.deg) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit(u.deg)  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 2, standard_name)
             shape = variable.get_data().shape
@@ -67,7 +67,7 @@ class PRBEMStandard(DataStandard):
             self.consistency_check.check_pitch_angle_size(shape[1], standard_name)
 
         elif "energy" in standard_name:
-            variable.convert_to_unit(u.MeV) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit(u.MeV)  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 2, standard_name)
             shape = variable.get_data().shape
@@ -81,7 +81,7 @@ class PRBEMStandard(DataStandard):
             self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
 
         elif "MLT" in standard_name:
-            variable.convert_to_unit(u.hour) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit(u.hour)  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 1, standard_name)
             self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
@@ -101,13 +101,13 @@ class PRBEMStandard(DataStandard):
             self.consistency_check.check_pitch_angle_size(shape[1], standard_name)
 
         elif "B_eq" in standard_name or "B_local" in standard_name:
-            variable.convert_to_unit(u.nT) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit(u.nT)  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 1, standard_name)
             self.consistency_check.check_time_size(variable.get_data().shape[0], standard_name)
 
         elif "PSD" in standard_name:
-            variable.convert_to_unit((u.m * u.kg * u.m / u.s)**(-3)) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit((u.m * u.kg * u.m / u.s) ** (-3))  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 3, standard_name)
             shape = variable.get_data().shape
@@ -116,7 +116,7 @@ class PRBEMStandard(DataStandard):
             self.consistency_check.check_pitch_angle_size(shape[2], standard_name)
 
         elif "inv_mu" in standard_name:
-            variable.convert_to_unit(u.MeV/u.G) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit(u.MeV / u.G)  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 3, standard_name)
             shape = variable.get_data().shape
@@ -125,7 +125,7 @@ class PRBEMStandard(DataStandard):
             self.consistency_check.check_pitch_angle_size(shape[2], standard_name)
 
         elif "inv_K" in standard_name:
-            variable.convert_to_unit(u.RE * u.G**0.5) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit(ep.units.RE * u.G**0.5)  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 2, standard_name)
             shape = variable.get_data().shape
@@ -133,7 +133,7 @@ class PRBEMStandard(DataStandard):
             self.consistency_check.check_pitch_angle_size(shape[1], standard_name)
 
         elif "density" in standard_name:
-            variable.convert_to_unit(u.cm**(-3)) # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit(u.cm ** (-3))  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 1, standard_name)
             shape = variable.get_data().shape

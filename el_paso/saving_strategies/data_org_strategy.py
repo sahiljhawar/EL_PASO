@@ -55,13 +55,15 @@ class DataOrgStrategy(SavingStrategy):
 
     file_path: Path
 
-    def __init__(self,
-                 base_data_path: str | Path,
-                 mission: str,
-                 satellite: str,
-                 instrument: str,
-                 kext: str,
-                 file_format: Literal[".mat", ".pickle"] = ".mat") -> None:
+    def __init__(
+        self,
+        base_data_path: str | Path,
+        mission: str,
+        satellite: str,
+        instrument: str,
+        kext: str,
+        file_format: Literal[".mat", ".pickle"] = ".mat",
+    ) -> None:
         """Initializes the data organization strategy.
 
         Parameters:
@@ -120,9 +122,9 @@ class DataOrgStrategy(SavingStrategy):
         """
         return self.data_standard.standardize_variable(name_in_file, variable)
 
-    def get_time_intervals_to_save(self,
-                                   start_time: datetime | None,
-                                   end_time: datetime | None) -> list[tuple[datetime, datetime]]:
+    def get_time_intervals_to_save(
+        self, start_time: datetime | None, end_time: datetime | None
+    ) -> list[tuple[datetime, datetime]]:
         """Splits the time range into a list of full-month intervals.
 
         This method iterates from the start month to the end month, creating a new
@@ -154,8 +156,11 @@ class DataOrgStrategy(SavingStrategy):
             month_start = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
             month_end = datetime(year, month, eom_day, 23, 59, 59, tzinfo=timezone.utc)
             time_intervals.append((month_start, month_end))
-            current_time = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if month == 12 \
-                else datetime(year, month + 1, 1, tzinfo=timezone.utc)  # noqa: PLR2004
+            current_time = (
+                datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+                if month == 12  # noqa: PLR2004
+                else datetime(year, month + 1, 1, tzinfo=timezone.utc)
+            )
 
         return time_intervals
 
@@ -176,8 +181,10 @@ class DataOrgStrategy(SavingStrategy):
         start_year_month_day = interval_start.strftime("%Y%m%d")
         end_year_month_day = interval_end.strftime("%Y%m%d")
 
-        file_name = (f"{self.satellite.lower()}_{self.instrument.lower()}_"
-                     f"{start_year_month_day}to{end_year_month_day}_{output_file.name}")
+        file_name = (
+            f"{self.satellite.lower()}_{self.instrument.lower()}_"
+            f"{start_year_month_day}to{end_year_month_day}_{output_file.name}"
+        )
 
         if output_file.name in ["alpha_and_energy", "lstar", "lm", "invmu_and_invk", "mlt", "bfield", "R0"]:
             file_name += f"_n4_4_{self.kext}"
@@ -215,7 +222,6 @@ class DataOrgStrategy(SavingStrategy):
             time_1_in_2 = np.squeeze(np.isin(time_1, time_2))
 
             for key, value_1 in data_dict_old.items():
-
                 if key not in data_dict_to_save:
                     msg = "Key missmatch when concatenating data dicts!"
                     raise ValueError(msg)
@@ -225,15 +231,18 @@ class DataOrgStrategy(SavingStrategy):
 
                     value_2 = data_dict_to_save[key]
 
-                    concatenated_value = value_2 if value_1_truncated.size == 0 \
+                    concatenated_value = (
+                        value_2
+                        if value_1_truncated.size == 0
                         else np.insert(value_1_truncated, idx_to_insert, value_2, axis=0)
+                    )
 
                     if key == "time" and len(np.unique(concatenated_value)) != len(concatenated_value):
                         msg = "Time values were not unique when concatinating arrays!"
                         raise ValueError(msg)
                     data_dict_to_save[key] = concatenated_value
 
-                elif isinstance(value_1, dict): # this is the metadata dict
+                elif isinstance(value_1, dict):  # this is the metadata dict
                     continue
 
             return data_dict_to_save

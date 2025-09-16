@@ -8,7 +8,6 @@ from __future__ import annotations
 import typing
 from dataclasses import dataclass, field
 from datetime import datetime
-from enum import Enum
 from typing import Literal, overload
 
 import numpy as np
@@ -57,7 +56,7 @@ class VariableMetadata:
         """
         self.processing_steps_counter = 1
 
-    def add_processing_note(self, processing_note:str) -> None:
+    def add_processing_note(self, processing_note: str) -> None:
         """Adds a processing note to the metadata.
 
         The note is prefixed with the current processing steps counter and a newline
@@ -71,6 +70,7 @@ class VariableMetadata:
         self.processing_notes += processing_note
         self.processing_steps_counter += 1
 
+
 class Variable:
     """Variable class holding data and metadata.
 
@@ -82,13 +82,13 @@ class Variable:
 
     __slots__ = "_data", "metadata"
 
-    _data:NDArray[np.generic]
-    metadata:VariableMetadata
+    _data: NDArray[np.generic]
+    metadata: VariableMetadata
 
     def __init__(
         self,
         original_unit: u.UnitBase,
-        data:NDArray[np.generic]|None = None,
+        data: NDArray[np.generic] | None = None,
         description: str = "",
         processing_notes: str = "",
     ) -> None:
@@ -113,7 +113,7 @@ class Variable:
         """Returns a string representation of the Variable object."""
         return f"Variable holding {self._data.shape} data points with metadata: {self.metadata}"
 
-    def convert_to_unit(self, target_unit:u.UnitBase|str) -> None:
+    def convert_to_unit(self, target_unit: u.UnitBase | str) -> None:
         """Converts the data to a given unit.
 
         Args:
@@ -124,19 +124,17 @@ class Variable:
 
         if self.metadata.unit != target_unit:
             data_with_unit = u.Quantity(self._data, self.metadata.unit)
-            self._data = typing.cast("NDArray[np.generic]", data_with_unit.to_value(target_unit)) #type: ignore[reportUnknownMemberType]
+            self._data = typing.cast("NDArray[np.generic]", data_with_unit.to_value(target_unit))  # type: ignore[reportUnknownMemberType]
 
             self.metadata.unit = target_unit
 
     @overload
-    def get_data(self, target_unit:u.UnitBase|str) -> NDArray[np.floating|np.integer]:
-        ...
+    def get_data(self, target_unit: u.UnitBase | str) -> NDArray[np.floating | np.integer]: ...
 
     @overload
-    def get_data(self, target_unit:None=None) -> NDArray[np.generic]:
-        ...
+    def get_data(self, target_unit: None = None) -> NDArray[np.generic]: ...
 
-    def get_data(self, target_unit:u.UnitBase|str|None=None) -> NDArray[np.generic]:
+    def get_data(self, target_unit: u.UnitBase | str | None = None) -> NDArray[np.generic]:
         """Gets the data of the variable.
 
         Args:
@@ -160,9 +158,9 @@ class Variable:
             msg = f"Unit conversion is only supported for numeric types! Encountered for variable {self}."
             raise TypeError(msg)
 
-        return typing.cast("NDArray[np.generic]", u.Quantity(self._data, self.metadata.unit).to_value(target_unit)) #type: ignore[reportUnknownMemberType]
+        return typing.cast("NDArray[np.generic]", u.Quantity(self._data, self.metadata.unit).to_value(target_unit))  # type: ignore[reportUnknownMemberType]
 
-    def set_data(self, data:NDArray[np.generic], unit:Literal["same"]|str|u.UnitBase) -> None:  # noqa: PYI051
+    def set_data(self, data: NDArray[np.generic], unit: Literal["same"] | str | u.UnitBase) -> None:  # noqa: PYI051
         """Sets the data and optionally updates the unit of the variable.
 
         Args:
@@ -179,13 +177,13 @@ class Variable:
         if isinstance(unit, str):
             if unit != "same":
                 self.metadata.unit = u.Unit(unit)
-        elif isinstance(unit, u.UnitBase): #type: ignore[reportUnknownMemberType]
+        elif isinstance(unit, u.UnitBase):  # type: ignore[reportUnknownMemberType]
             self.metadata.unit = unit
         else:
             msg = "unit must be either a str or a astropy unit!"
             raise TypeError(msg)
 
-    def transpose_data(self, seq: list[int]|tuple[int,...]) -> None:
+    def transpose_data(self, seq: list[int] | tuple[int, ...]) -> None:
         """Transposes the internal data array.
 
         Args:
@@ -215,7 +213,7 @@ class Variable:
 
         self._data = np.where((self._data > lower_threshold) & (self._data < upper_threshold), self._data, np.nan)
 
-    def truncate(self, time_variable:Variable, start_time:float|datetime, end_time:float|datetime) -> None:
+    def truncate(self, time_variable: Variable, start_time: float | datetime, end_time: float | datetime) -> None:
         """Truncates the variable's data based on a time variable and a time range.
 
         Args:
