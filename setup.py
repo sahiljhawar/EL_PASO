@@ -28,7 +28,7 @@ class CustomBuild(build_py):
 
         try:
             self._init_submodule()
-            self._compile_irbem()
+            self._compile_and_install_irbem()
             self._apply_patch()
         except subprocess.CalledProcessError as e:
             print(f"✗ Build failed with return code {e.returncode}")
@@ -45,8 +45,10 @@ class CustomBuild(build_py):
         else:
             print("✓ IRBEM submodule already present")
 
-    def _compile_irbem(self):
+    def _compile_and_install_irbem(self):
         print("Installing IRBEM library...")
+        subprocess.check_call(["make"], cwd="IRBEM")    
+        subprocess.check_call(["make", "install", "."], cwd="IRBEM")
         subprocess.check_call([sys.executable, "setup.py", "install"], cwd="IRBEM/python")
 
     def _apply_patch(self):
