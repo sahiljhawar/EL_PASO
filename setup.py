@@ -47,12 +47,8 @@ class CustomBuild(build_py):
 
     def _compile_and_install_irbem(self):
         print("Installing IRBEM library...")
-        if sys.platform == "darwin":
-            subprocess.check_call(["make", "OS=osx64", "all"], cwd="IRBEM")
-            subprocess.check_call(["make", "OS=osx64", "install", "."], cwd="IRBEM")
-        else:
-            subprocess.check_call(["make"], cwd="IRBEM")
-            subprocess.check_call(["make", "install", "."], cwd="IRBEM")
+        subprocess.check_call(["make"], cwd="IRBEM")    
+        subprocess.check_call(["make", "install", "."], cwd="IRBEM")
         subprocess.check_call([sys.executable, "setup.py", "install"], cwd="IRBEM/python")
 
     def _apply_patch(self):
