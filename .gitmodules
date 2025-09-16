@@ -6,3 +6,4 @@
 [submodule "IRBEM"]
 	path = IRBEM
 	url = https://github.com/PRBEM/IRBEM.git
+	branch = main
