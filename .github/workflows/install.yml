@@ -36,6 +36,9 @@ jobs:
       - name: Install package
         run: pip install .
 
+      - name: Test IRBEM Fortran installation
+        run: python IRBEM/python/IRBEM/test_IRBEM.py
+
       - name: Test import
         run: |
           python -c "import el_paso; from IRBEM import MagFields, Coords; print('Import successful')"
