@@ -1,8 +1,27 @@
 # SPDX-FileCopyrightText: 2022 Mykhaylo Shumko
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
 #
-# SPDX-License-Identifier: Apache-2.0
 # SPDX-License-Identifier: LGPL-3.0-only
+
+import copy
+import ctypes
+import os
+import pathlib
+import shutil
+import sys
+import typing
+import warnings
+from collections.abc import Mapping, Sequence
+from datetime import datetime
+from pathlib import Path
+from typing import Literal, NamedTuple
+
+import dateutil.parser
+import numpy as np
+import scipy.interpolate
+from numpy.typing import NDArray
+
+from el_paso.processing.magnetic_field_utils.construct_maginput import MagInputKeys
 
 __author__ = "Mykhaylo Shumko"
 __last_modified__ = "2022-06-16"
@@ -29,24 +48,6 @@ You should have received a copy of the GNU Lesser General Public License
 along with IRBEM-LIB.  If not, see <http://www.gnu.org/licenses/>.
 ***************************************************************************
 """
-
-import copy
-import ctypes
-import datetime
-import os
-import pathlib
-import shutil
-import sys
-import warnings
-from collections.abc import Mapping
-from typing import Literal
-
-import dateutil.parser
-import numpy as np
-import scipy.interpolate
-import scipy.optimize
-from numpy.typing import NDArray
-
 try:
     import pandas as pd
 
@@ -62,7 +63,7 @@ Re = 6371  # km
 c = 3.0e8  # m/s
 
 # External magnetic field model look up table.
-extModels = [
+EXT_MODELS = [
     "None",
     "MF75",
     "TS87",
@@ -81,18 +82,78 @@ extModels = [
 ]
 
 
+class MakeLstarOutput(NamedTuple):
+    lm: NDArray[np.float64]
+    mlt: NDArray[np.float64]
+    blocal: NDArray[np.float64]
+    bmin: NDArray[np.float64]
+    lstar: NDArray[np.float64]
+    xj: NDArray[np.float64]
+
+
+class GetFieldMultiOutput(NamedTuple):
+    bgeo: NDArray[np.float64]
+    blocal: NDArray[np.float64]
+
+
+class MakeLstarShellSplittingOutput(NamedTuple):
+    lm: NDArray[np.float64]
+    mlt: NDArray[np.float64]
+    blocal: NDArray[np.float64]
+    bmin: NDArray[np.float64]
+    lstar: NDArray[np.float64]
+    xj: NDArray[np.float64]
+
+
+class DriftShellOutput(NamedTuple):
+    lm: float
+    lstar: float
+    blocal: NDArray[np.float64]
+    bmin: float
+    xj: float
+    posit: NDArray[np.float64]
+    nposit: NDArray[np.int32]
+
+
+class FindMagEquatorOutput(NamedTuple):
+    xgeo: NDArray[np.float64]
+    bmin: float
+
+
+class TraceFieldLineOutput(NamedTuple):
+    posit: NDArray[np.float64]
+    n_posit: int
+    lm: float
+    blocal: NDArray[np.float64]
+    bmin: float
+    xj: float
+
+class FindFootPointOutput(NamedTuple):
+    x_foot: NDArray[np.float64]
+    b_foot: NDArray[np.float64]
+    b_foot_mag: NDArray[np.float64]
+
+class FindMirrorPointOutput(NamedTuple):
+    blocal: float
+    bmin: float
+    posit: NDArray[np.float64]
+
+class DriftBounceOrbitOutput(NamedTuple):
+    xgeo: NDArray[np.float64]
+    bl: NDArray[np.float64]
+    l: NDArray[np.float64]
+    mlt: NDArray[np.float64]
+    b_eq: NDArray[np.float64]
+    x_eq: NDArray[np.float64]
+    s: NDArray[np.float64]
+    alpha: NDArray[np.float64]
+    lam: NDArray[np.float64]
+    t: NDArray[np.float64]
+    npts: NDArray[np.int32]
+
+
 class MagFields:
     """Wrappers for IRBEM's magnetic field functions.
-
-    Functions wrapped and tested:
-    make_lstar()
-    drift_shell()
-    find_mirror_point()
-    find_foot_point()
-    trace_field_line()
-    find_magequator()
-    get_field_multi()
-    get_mlt()
 
     Functions wrapped and not tested:
     None at this time
@@ -105,13 +166,21 @@ class MagFields:
     or you would like me to wrap a particular function.
     """
 
-    def __init__(self, **kwargs):
-        """When initializing the IRBEM instance, you can provide the path kwarg that
+    def __init__(
+        self,
+        *,
+        lib_path: str | Path,
+        verbose: bool = False,
+        kext: int | str = 5,
+        sysaxes: int = 0,
+        options: Sequence[int] | None = None,
+    ):
+        """Initialize the MagFields class.
+
+        When initializing the IRBEM instance, you can provide the path kwarg that
         specifies the location of the compiled FORTRAN shared object (.so or .dll)
         file, otherwise, it will search for the shared object file in the top-level
-        IRBEM directory.
-
-        Python wrapper error value is -9999 (IRBEM-Lib's Fortan error value is -1E31).
+        IRBEM directory. Python wrapper error value is -9999 (IRBEM-Lib's Fortan error value is -1E31).
 
         Parameters
         ----------
@@ -129,977 +198,548 @@ class MagFields:
             Prints a statement prior to running each function. Usefull for debugging in
             case Python quietly crashes (likely a wrapper or a Fortran issue).
         """
-        self.irbem_obj_path = kwargs.get("path")
-        self.TMI = kwargs.get("verbose", False)
+        self.irbem_obj_path = Path(lib_path)
+        self.verbose = verbose
 
-        self.path, self._irbem_obj = _load_shared_object(self.irbem_obj_path)
+        self._irbem_obj = _load_shared_object(self.irbem_obj_path)
 
         # global model parameters, default is OPQ77 model with GDZ coordinate
         # system. If kext is a string, find the corresponding integer value.
-        kext = kwargs.get("kext", 5)
         if isinstance(kext, str):
             try:
-                self.kext = ctypes.c_int(extModels.index(kext))
+                self.kext = ctypes.c_int(EXT_MODELS.index(kext))
             except ValueError as err:
-                raise ValueError(
-                    "Incorrect external model selected. Valid models are 'None', 'MF75',",
-                    "'TS87', 'TL87', 'T89', 'OPQ77', 'OPD88', 'T96', 'OM97'",
-                    "'T01', 'T04', 'A00'",
-                ) from err
+                msg = (
+                    "Incorrect external model selected. Valid models are 'None', 'MF75',"
+                    "'TS87', 'TL87', 'T89', 'OPQ77', 'OPD88', 'T96', 'OM97'"
+                    "'T01', 'T04', 'A00'"
+                )
+                raise ValueError(msg) from err
         else:
             self.kext = ctypes.c_int(kext)
 
-        self.sysaxes = ctypes.c_int(kwargs.get("sysaxes", 0))
+        self.sysaxes = ctypes.c_int(sysaxes)
 
         # If options are not supplied, assume they are all 0's.
-        optionsType = ctypes.c_int * 5
-        if "options" in kwargs:
-            self.options = optionsType()
-            for i in range(5):
-                self.options[i] = kwargs["options"][i]
+        options_type = ctypes.c_int * 5
+        if options is None:
+            self.options = options_type(0, 0, 0, 0, 0)
         else:
-            self.options = optionsType(0, 0, 0, 0, 0)
+            self.options = options_type()
+            for i in range(5):
+                self.options[i] = options[i]
 
         # Get the NTIME_MAX value
-        self.NTIME_MAX = ctypes.c_int(-1)
-        self._irbem_obj.get_irbem_ntime_max1_(ctypes.byref(self.NTIME_MAX))
+        self.ntime_max = ctypes.c_int(-1)
+        self._irbem_obj.get_irbem_ntime_max1_(ctypes.byref(self.ntime_max))
 
-    def make_lstar(self, X, maginput):
-        """This function allows one to compute magnetic coordinate at any s/c position,
-        i.e. L, L*, Blocal/Bmirror, Bequator. A set of internal/external field can be selected.
-
-        Parameters
-        ----------
-        X: dict
-            A dictionary that specifies the input time and location. The `time` key can be a
-            ISO-formatted time string, or a `datetime.datetime` or `pd.TimeStamp` objects.
-            The three location keys: `x1`, `x2`, and `x3` specify the location in the `sysaxes`.
-        maginput: dict
-            The magnetic field input dictionary. See the online documentation for the valid
-            keys and the corresponding models.
-
-        Returns:
-        -------
-        dict
-            Contains keys Lm, MLT, blocal, bmin, LStar, and xj.
-        """
+    def make_lstar(
+        self,
+        time: Sequence[datetime | str] | datetime | str,
+        position: Mapping[Literal["x1", "x2", "x3"], Sequence[np.floating] | NDArray[np.floating] | np.floating],
+        maginput: Mapping[MagInputKeys, NDArray[np.number] | list[np.number] | np.number],
+    ) -> MakeLstarOutput:
         # Convert the satellite time and position into c objects.
-        ntime, iyear, idoy, ut, x1, x2, x3 = self._prepTimeLocArray(X)
+        c_ntime, c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3 = self._prep_time_pos_array(time, position)
 
         # Convert the model parameters into c objects.
-        maginput = self._prepMagInput(maginput)
+        c_maginput = self._prep_maginput(maginput)
 
         # Model outputs
-        doubleArrType = ctypes.c_double * ntime.value
-        lm, lstar, blocal, bmin, xj, mlt = [doubleArrType() for i in range(6)]
+        double_arr_type = ctypes.c_double * c_ntime.value
+        c_lm, c_lstar, c_blocal, c_bmin, c_xj, c_mlt = [double_arr_type() for i in range(6)]
 
-        if self.TMI:
+        if self.verbose:
             print("Running IRBEM-LIB make_lstar")
 
         self._irbem_obj.make_lstar1_(
-            ctypes.byref(ntime),
+            ctypes.byref(c_ntime),
             ctypes.byref(self.kext),
             ctypes.byref(self.options),
             ctypes.byref(self.sysaxes),
-            ctypes.byref(iyear),
-            ctypes.byref(idoy),
-            ctypes.byref(ut),
-            ctypes.byref(x1),
-            ctypes.byref(x2),
-            ctypes.byref(x3),
-            ctypes.byref(maginput),
-            ctypes.byref(lm),
-            ctypes.byref(lstar),
-            ctypes.byref(blocal),
-            ctypes.byref(bmin),
-            ctypes.byref(xj),
-            ctypes.byref(mlt),
+            ctypes.byref(c_iyear),
+            ctypes.byref(c_idoy),
+            ctypes.byref(c_ut),
+            ctypes.byref(c_x1),
+            ctypes.byref(c_x2),
+            ctypes.byref(c_x3),
+            ctypes.byref(c_maginput),
+            ctypes.byref(c_lm),
+            ctypes.byref(c_lstar),
+            ctypes.byref(c_blocal),
+            ctypes.byref(c_bmin),
+            ctypes.byref(c_xj),
+            ctypes.byref(c_mlt),
         )
-        self.make_lstar_output = {
-            "Lm": lm[:],
-            "MLT": mlt[:],
-            "blocal": blocal[:],
-            "bmin": bmin[:],
-            "Lstar": lstar[:],
-            "xj": xj[:],
-        }
-        return self.make_lstar_output
 
-    def make_lstar_shell_splitting(self, X, maginput, alpha_in):
-        """This function allows one to compute magnetic coordinate at any s/c position for any local pitch angle,
-        i.e. L, L*, Blocal/Bmirror, Bequator. A set of internal/external field can be selected.
+        return MakeLstarOutput(c_lm.value, c_lstar.value, c_blocal.value, c_bmin.value, c_lstar.value, c_xj.value)
 
-        Parameters
-        ----------
-        X: dict
-            A dictionary that specifies the input time and location. The `time` key can be a
-            ISO-formatted time string, or a `datetime.datetime` or `pd.TimeStamp` objects.
-            The three location keys: `x1`, `x2`, and `x3` specify the location in the `sysaxes`.
-        maginput: dict
-            The magnetic field input dictionary. See the online documentation for the valid
-            keys and the corresponding models.
-        alpha: list
-            The array of local pitch angles to calculate for. Note that the calculation assumes time-invariant
-            local pitch angles, so structure your loops around this function appropriately if your local
-            pitch angles do change in time.
+    def make_lstar_shell_splitting(
+        self,
+        time: Sequence[datetime | str] | datetime | str,
+        position: Mapping[Literal["x1", "x2", "x3"], Sequence[np.floating] | NDArray[np.floating] | np.floating],
+        maginput: Mapping[MagInputKeys, NDArray[np.number] | list[np.number] | np.number],
+        alpha: Sequence[np.floating] | NDArray[np.floating] | np.floating,
+    ) -> MakeLstarShellSplittingOutput:
+        c_ntime, c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3 = self._prep_time_pos_array(time, position)
 
-        Returns:
-        -------
-        dict
-            Contains keys Lm, MLT, blocal, bmin, LStar, and xj.
-        """
-        # Convert the satellite time and position into c objects.
-        ntime, iyear, idoy, ut, x1, x2, x3 = self._prepTimeLocArray(X)
+        if not isinstance(alpha, Sequence | np.ndarray):
+            alpha = [alpha]
+
         # Cast additional inputs
-        if np.isscalar(alpha_in):
-            Nipa = ctypes.c_int(1)
-            alpha = ctypes.c_double(alpha_in)
-        else:
-            Nipa = ctypes.c_int(len(alpha_in))
+        c_n_alpha = ctypes.c_int(len(alpha))
+        c_alpha = (ctypes.c_double * c_n_alpha.value)()
 
-            doubleArrType = ctypes.c_double * len(alpha_in)
-            alpha = doubleArrType()
-
-            for da in range(len(alpha_in)):
-                alpha[da] = alpha_in[da]
+        for da in range(c_n_alpha.value):
+            c_alpha[da] = alpha[da]
 
         # Convert the model parameters into c objects.
-        maginput = self._prepMagInput(maginput)
+        c_maginput = self._prep_maginput(maginput)
 
         # Model outputs
-        doubleArrType = ctypes.c_double * ntime.value
-        lm, lstar, blocal, bmin, xj, mlt = [doubleArrType() for i in range(6)]
+        double_arr_type = ctypes.c_double * (c_ntime.value * c_n_alpha.value)
+        c_lm, c_lstar, c_blocal, c_bmin, c_xj, c_mlt = [double_arr_type() for _ in range(6)]
 
-        if self.TMI:
+        if self.verbose:
             print("Running IRBEM-LIB make_lstar_shell_splitting")
 
         self._irbem_obj.make_lstar_shell_splitting1_(
-            ctypes.byref(ntime),
-            ctypes.byref(Nipa),
+            ctypes.byref(c_ntime),
+            ctypes.byref(c_n_alpha),
             ctypes.byref(self.kext),
             ctypes.byref(self.options),
             ctypes.byref(self.sysaxes),
-            ctypes.byref(iyear),
-            ctypes.byref(idoy),
-            ctypes.byref(ut),
-            ctypes.byref(x1),
-            ctypes.byref(x2),
-            ctypes.byref(x3),
-            ctypes.byref(alpha),
-            ctypes.byref(maginput),
-            ctypes.byref(lm),
-            ctypes.byref(lstar),
-            ctypes.byref(blocal),
-            ctypes.byref(bmin),
-            ctypes.byref(xj),
-            ctypes.byref(mlt),
+            ctypes.byref(c_iyear),
+            ctypes.byref(c_idoy),
+            ctypes.byref(c_ut),
+            ctypes.byref(c_x1),
+            ctypes.byref(c_x2),
+            ctypes.byref(c_x3),
+            ctypes.byref(c_alpha),
+            ctypes.byref(c_maginput),
+            ctypes.byref(c_lm),
+            ctypes.byref(c_lstar),
+            ctypes.byref(c_blocal),
+            ctypes.byref(c_bmin),
+            ctypes.byref(c_xj),
+            ctypes.byref(c_mlt),
         )
-        self.make_lstar_output = {
-            "Lm": lm[:],
-            "MLT": mlt[:],
-            "blocal": blocal[:],
-            "bmin": bmin[:],
-            "Lstar": lstar[:],
-            "xj": xj[:],
-        }
-        return self.make_lstar_output
 
-    def drift_shell(self, X, maginput):
-        """This function traces a full drift shell for particles that have their
-        mirror point at the input location.  The output is a full array of positions
-        of the drift shell, usefull for plotting and visualization.
+        return MakeLstarShellSplittingOutput(
+            lm=np.array(c_lm).reshape(c_n_alpha.value, c_ntime.value),
+            mlt=np.array(c_mlt).reshape(c_n_alpha.value, c_ntime.value),
+            blocal=np.array(c_blocal).reshape(c_n_alpha.value, c_ntime.value),
+            bmin=np.array(c_bmin).reshape(c_n_alpha.value, c_ntime.value),
+            lstar=np.array(c_lstar).reshape(c_n_alpha.value, c_ntime.value),
+            xj=np.array(c_xj).reshape(c_n_alpha.value, c_ntime.value),
+        )
 
-        Parameters
-        ----------
-        X: dict
-            A dictionary that specifies the input time and location. The `time` key can be a
-            ISO-formatted time string, or a `datetime.datetime` or `pd.TimeStamp` objects.
-            The three location keys: `x1`, `x2`, and `x3` specify the location in the `sysaxes`.
-        maginput: dict
-            The magnetic field input dictionary. See the online documentation for the valid
-            keys and the corresponding models.
+    def drift_shell(
+        self,
+        time: datetime | str | pd.Timestamp,
+        position: Mapping[Literal["x1", "x2", "x3"], np.floating],
+        maginput: Mapping[MagInputKeys, NDArray[np.number] | list[np.number] | np.number],
+    ) -> DriftShellOutput:
+        c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3 = self._prep_time_pos(time, position)
+        c_maginput = self._prep_maginput(maginput)
 
-        Returns:
-        -------
-        dict
-            Contains keys Lm, Lstar or Φ, Blocal, Bmin, XJ, POSIT, Nposit
+        if self.verbose:
+            print("Running IRBEM-LIB drift_shell for multiple time steps")
 
-            Posit structure: 1st element: x, y, z GEO coord, 2nd element: points along field
-            line, 3rd element: number of field lines. Nposit structure: long integer array
-            (48) providing the number of points along the field line for each field line
-            traced in 2nd element of POSIT max 1000.
-        """
-        # Prep the magnetic field model inputs and samping spacetime location.
-        self._prepMagInput(maginput)
-        iyear, idoy, ut, x1, x2, x3 = self._prepTimeLoc(X)
-
-        # DEFINE OUTPUTS HERE
-        positType = ((ctypes.c_double * 3) * 1000) * 48
-        posit = positType()
-        npositType = 48 * ctypes.c_int
-        nposit = npositType()
-        lm, lstar, bmin, xj = [ctypes.c_double() for i in range(4)]
-        blocalType = (ctypes.c_double * 1000) * 48
-        blocal = blocalType()
-
-        if self.TMI:
-            print("Running IRBEM-LIB drift_shell")
+        c_posit = (((ctypes.c_double * 3) * 1000) * 48)()
+        c_nposit = (48 * ctypes.c_int)()
+        c_lm, c_lstar, c_bmin, c_xj = [ctypes.c_double() for _ in range(4)]
+        c_blocal = ((ctypes.c_double * 1000) * 48)()
 
         self._irbem_obj.drift_shell1_(
             ctypes.byref(self.kext),
             ctypes.byref(self.options),
             ctypes.byref(self.sysaxes),
-            ctypes.byref(iyear),
-            ctypes.byref(idoy),
-            ctypes.byref(ut),
-            ctypes.byref(x1),
-            ctypes.byref(x2),
-            ctypes.byref(x3),
-            ctypes.byref(self.maginput),
-            ctypes.byref(lm),
-            ctypes.byref(lstar),
-            ctypes.byref(blocal),
-            ctypes.byref(bmin),
-            ctypes.byref(xj),
-            ctypes.byref(posit),
-            ctypes.byref(nposit),
+            ctypes.byref(c_iyear),
+            ctypes.byref(c_idoy),
+            ctypes.byref(c_ut),
+            ctypes.byref(c_x1),
+            ctypes.byref(c_x2),
+            ctypes.byref(c_x3),
+            ctypes.byref(c_maginput),
+            ctypes.byref(c_lm),
+            ctypes.byref(c_lstar),
+            ctypes.byref(c_blocal),
+            ctypes.byref(c_bmin),
+            ctypes.byref(c_xj),
+            ctypes.byref(c_posit),
+            ctypes.byref(c_nposit),
         )
-        # Format the output into a dictionary, and convert ctypes arrays into
-        # native Python format.
-        posit = np.array(posit)
-        nposit = np.array(nposit)
+
+        posit = np.array(c_posit)
+        nposit = np.array(c_nposit)
         for i, n in enumerate(nposit):
             posit[i, n:, :] = np.nan
-        self.drift_shell_output = {
-            "Lm": lm.value,
-            "blocal": np.array(blocal),
-            "bmin": bmin.value,
-            "lstar": lstar.value,
-            "xj": xj.value,
-            "POSIT": posit,
-            "Nposit": nposit,
-        }
-        return self.drift_shell_output
 
-    def drift_bounce_orbit(self, X, maginput, alpha=90, R0=1):
-        """This function traces a full drift-bounce orbit for particles with a specified pitch
-        angle at the input location.  The output is a full array of positions of the
-        drift-bounce orbit, usefull for computing drift-bounce averages.
-        Key differences from `drif_shell`:
-         (1) only positions between mirror points are returned,
-         (2) 25 rather than 48 azimuths are returned,
-         (3) Lstar accuracy respects options(3) and options(4),
-         (4) a new parameter R0 is required which specifies the minimum radial distance allowed
-             along the drift path (usually R0=1, but use R0<1 in the drift loss cone),
-         (5) hmin and hmin_lon outputs provide the altitude and longitude (GDZ) of the minimum
-             altitude point along the orbit (among those traced, not just those returned). A set
-             of internal/external field can be selected.
-
-        Parameters
-        ----------
-        X: dict
-            A dictionary that specifies the input time and location. The `time` key can be a
-            ISO-formatted time string, or a `datetime.datetime` or `pd.TimeStamp` objects.
-            The three location keys: `x1`, `x2`, and `x3` specify the location in the `sysaxes`.
-        maginput: dict
-            The magnetic field input dictionary. See the online documentation for the valid
-            keys and the corresponding models.
-        alpha: float
-            The local pitch angle.
-        R0: float
-            The radius, in units of RE, of the reference surface (i.e. altitude) between which
-            the line is traced.
-
-        Returns:
-        -------
-        dict
-            Contains keys Lm, lstar or Φ, blocal, bmin, bmirr, XJ, POSIT, Nposit, hmin, hmin_lon
-        """
-        # Prep the magnetic field model inputs and samping spacetime location.
-        self._prepMagInput(maginput)
-        iyear, idoy, ut, x1, x2, x3 = self._prepTimeLoc(X)
-        alpha = ctypes.c_double(alpha)
-        R0 = ctypes.c_double(R0)
-
-        # DEFINE OUTPUTS HERE
-        positType = ((ctypes.c_double * 3) * 1000) * 25
-        posit = positType()
-        npositType = 25 * ctypes.c_int
-        nposit = npositType()
-        lm, lstar, bmin, bmirr, xj, hmin, hmin_lon = [ctypes.c_double() for i in range(7)]
-        blocalType = (ctypes.c_double * 1000) * 25
-        blocal = blocalType()
-
-        if self.TMI:
-            print("Running IRBEM-LIB drift_bounce_orbit")
-        self._irbem_obj.drift_bounce_orbit2_1_(
-            ctypes.byref(self.kext),
-            ctypes.byref(self.options),
-            ctypes.byref(self.sysaxes),
-            ctypes.byref(iyear),
-            ctypes.byref(idoy),
-            ctypes.byref(ut),
-            ctypes.byref(x1),
-            ctypes.byref(x2),
-            ctypes.byref(x3),
-            ctypes.byref(alpha),
-            ctypes.byref(self.maginput),
-            ctypes.byref(R0),
-            ctypes.byref(lm),
-            ctypes.byref(lstar),
-            ctypes.byref(blocal),
-            ctypes.byref(bmin),
-            ctypes.byref(bmirr),
-            ctypes.byref(xj),
-            ctypes.byref(posit),
-            ctypes.byref(nposit),
-            ctypes.byref(hmin),
-            ctypes.byref(hmin_lon),
+        return DriftShellOutput(
+            lm=c_lm.value,
+            lstar=c_lstar.value,
+            blocal=np.array(c_blocal),
+            bmin=c_bmin.value,
+            xj=c_xj.value,
+            posit=posit,
+            nposit=nposit,
         )
-        # Format the output into a dictionary, and convert ctypes arrays into
-        # native Python format.
-        posit = np.array(posit)
-        nposit = np.array(nposit)
-        for i, n in enumerate(nposit):
-            posit[i, n:, :] = np.nan
-        self.drift_bounce_orbit_output = {
-            "Lm": lm.value,
-            "blocal": np.array(blocal),
-            "bmin": bmin.value,
-            "bmirr": bmirr.value,
-            "lstar": lstar.value,
-            "xj": xj.value,
-            "POSIT": posit,
-            "Nposit": nposit,
-            "hmin": hmin.value,
-            "hmin_lon": hmin_lon.value,
-        }
-        return self.drift_bounce_orbit_output
 
-    def find_mirror_point(self, X, maginput, alpha):
-        """Find the magnitude and location of the mirror point along a field
-        line traced from any given location and local pitch-angle.
+    def find_mirror_point(
+        self,
+        time: Sequence[datetime | str] | datetime | str,
+        position: Mapping[Literal["x1", "x2", "x3"], Sequence[np.floating] | NDArray[np.floating] | np.floating],
+        maginput: Mapping[MagInputKeys, NDArray[np.number] | list[np.number] | np.number],
+        alpha: float,
+    ) -> FindMirrorPointOutput:
+        c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3 = self._prep_time_pos(time, position)
+        c_maginput = self._prep_maginput(maginput)
 
-        Parameters
-        ----------
-        X: dict
-            A dictionary that specifies the input time and location. The `time` key can be a
-            ISO-formatted time string, or a `datetime.datetime` or `pd.TimeStamp` objects.
-            The three location keys: `x1`, `x2`, and `x3` specify the location in the `sysaxes`.
-        maginput: dict
-            The magnetic field input dictionary. See the online documentation for the valid
-            keys and the corresponding models.
-        alpha: float
-            The local pitch angle in degrees.
+        c_alpha = ctypes.c_double(alpha)
 
-        Returns:
-        -------
-        dict
-            A dictionary with "blocal" and "bmin" scalars, and "POSIT" that contains the
-            GEO coordinates of the mirror point.
-        """
-        a = ctypes.c_double(alpha)
+        if self.verbose:
+            print("Running IRBEM-LIB find_mirror_point for multiple time steps and pitch angles")
 
-        # Prep the magnetic field model inputs and samping spacetime location.
-        self._prepMagInput(maginput)
-        iyear, idoy, ut, x1, x2, x3 = self._prepTimeLoc(X)
-
-        blocal, bmin = [ctypes.c_double(-9999) for i in range(2)]
-        positType = 3 * ctypes.c_double
-        posit = positType()
-
-        if self.TMI:
-            print("Running IRBEM-LIB mirror_point")
+        c_blocal = c_bmin = ctypes.c_double(-9999)
+        c_posit = (3 * ctypes.c_double)()
 
         self._irbem_obj.find_mirror_point1_(
             ctypes.byref(self.kext),
             ctypes.byref(self.options),
             ctypes.byref(self.sysaxes),
-            ctypes.byref(iyear),
-            ctypes.byref(idoy),
-            ctypes.byref(ut),
-            ctypes.byref(x1),
-            ctypes.byref(x2),
-            ctypes.byref(x3),
-            ctypes.byref(a),
-            ctypes.byref(self.maginput),
-            ctypes.byref(blocal),
-            ctypes.byref(bmin),
-            ctypes.byref(posit),
+            ctypes.byref(c_iyear),
+            ctypes.byref(c_idoy),
+            ctypes.byref(c_ut),
+            ctypes.byref(c_x1),
+            ctypes.byref(c_x2),
+            ctypes.byref(c_x3),
+            ctypes.byref(c_alpha),
+            ctypes.byref(c_maginput),
+            ctypes.byref(c_blocal),
+            ctypes.byref(c_bmin),
+            ctypes.byref(c_posit),
         )
 
-        self.find_mirror_point_output = {"blocal": blocal.value, "bmin": bmin.value, "POSIT": posit[:]}
-        return self.find_mirror_point_output
+        return FindMirrorPointOutput(
+            blocal=c_blocal.value,
+            bmin=c_bmin.value,
+            posit=np.array(c_posit),
+        )
 
-    def find_foot_point(self, X, maginput, stopAlt, hemiFlag):
-        """Find the footprint of a field line that passes throgh location X in
-        a given hemisphere.
+    def find_foot_point(
+        self,
+        time: Sequence[datetime | str] | datetime | str,
+        position: Mapping[Literal["x1", "x2", "x3"], Sequence[np.floating] | NDArray[np.floating] | np.floating],
+        maginput: Mapping[MagInputKeys, NDArray[np.number] | list[np.number] | np.number],
+        stop_alt: float,
+        hemi_flag: int,
+    ) -> FindFootPointOutput:
+        c_ntime, c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3 = self._prep_time_pos_array(time, position)
+        c_maginput = self._prep_maginput(maginput)
 
-        Parameters
-        ----------
-        X: dict
-            A dictionary that specifies the input time and location. The `time` key can be a
-            ISO-formatted time string, or a `datetime.datetime` or `pd.TimeStamp` objects.
-            The three location keys: `x1`, `x2`, and `x3` specify the location in the `sysaxes`.
-        maginput: dict
-            The magnetic field input dictionary. See the online documentation for the valid
-            keys and the corresponding models.
-        stopAlt: float
-            The footprint altitude above Earth's surface, in kilometers.
-        hemiFlag: int
-            Determines what hemisphere to find the footprint.
-            - 0    = same magnetic hemisphere as starting point
-            - +1   = northern magnetic hemisphere
-            - -1   = southern magnetic hemisphere
-            - +2   = opposite magnetic hemisphere as starting point
+        c_stop_alt = ctypes.c_double(stop_alt)
+        c_hemi_flag = ctypes.c_int(hemi_flag)
 
-        Returns:
-        -------
-        dict:
-            A dictionary with three keys:
-            - "XFOOT" the footprint location in GDZ coordinates
-            - "BFOOT" the magnetic field vector at the footprint, in GEO coordinates, and in
-            unit of nT.
-            - "BFOOTMAG" the footprint magnetic field magnitude in nT units.
-        """
-        # Prep the magnetic field model inputs and samping spacetime location.
-        self._prepMagInput(maginput)
-        iyear, idoy, ut, x1, x2, x3 = self._prepTimeLoc(X)
+        # Output lists for multiple time steps
+        xfoot_list: list[np.ndarray] = []
+        bfoot_list: list[np.ndarray] = []
+        bfootmag_list: list[float] = []
 
-        stop_alt = ctypes.c_double(stopAlt)
-        hemi_flag = ctypes.c_int(hemiFlag)
-
-        # Define output variables here
-        outputType = ctypes.c_double * 3
-        XFOOT = outputType(-9999, -9999, -9999)
-        BFOOT = outputType(-9999, -9999, -9999)
-        BFOOTMAG = outputType(-9999, -9999, -9999)
-
-        if self.TMI:
+        if self.verbose:
             print("Running IRBEM-LIB find_foot_point")
 
-        self._irbem_obj.find_foot_point1_(
+        # The underlying Fortran function is not vectorized over time, so we must loop
+        for i in range(c_ntime.value):
+            # Define output variables for a single time step
+            c_xfoot = (ctypes.c_double * 3)()
+            c_bfoot = (ctypes.c_double * 3)()
+            c_bfootmag = ctypes.c_double()
+
+            # Get single-time-step inputs
+            c_iyear_i = ctypes.c_int(c_iyear[i])
+            c_idoy_i = ctypes.c_int(c_idoy[i])
+            c_ut_i = ctypes.c_double(c_ut[i])
+            c_position_i = (ctypes.c_double * 3)(c_x1[i], c_x2[i], c_x3[i])
+
+            self._irbem_obj.find_foot_point1_(
+                ctypes.byref(self.kext),
+                ctypes.byref(self.options),
+                ctypes.byref(self.sysaxes),
+                ctypes.byref(c_iyear_i),
+                ctypes.byref(c_idoy_i),
+                ctypes.byref(c_ut_i),
+                ctypes.byref(c_position_i),
+                ctypes.byref(c_stop_alt),
+                ctypes.byref(c_hemi_flag),
+                ctypes.byref(c_maginput),
+                ctypes.byref(c_xfoot),
+                ctypes.byref(c_bfoot),
+                ctypes.byref(c_bfootmag),
+            )
+
+            xfoot_list.append(np.array(c_xfoot))
+            bfoot_list.append(np.array(c_bfoot))
+            bfootmag_list.append(c_bfootmag.value)
+
+        # Stack the results into a single NumPy array, adding a new dimension for time
+        return FindFootPointOutput(
+            x_foot=np.array(xfoot_list),
+            b_foot=np.array(bfoot_list),
+            b_foot_mag=np.array(bfootmag_list),
+        )
+
+    def trace_field_line(
+        self,
+        time: datetime | str | pd.Timestamp,
+        position: Mapping[Literal["x1", "x2", "x3"], np.floating],
+        maginput: Mapping[MagInputKeys, NDArray[np.number] | list[np.number] | np.number],
+        r0: float = 1,
+    ) -> TraceFieldLineOutput:
+
+        c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3 = self._prep_time_pos(time, position)
+        c_maginput = self._prep_maginput(maginput)
+
+        c_r0 = ctypes.c_double(r0)
+
+        if self.verbose:
+            print("Running IRBEM-LIB trace_field_line for multiple time steps")
+
+        c_posit = ((ctypes.c_double * 3) * 3000)()
+        c_n_posit = ctypes.c_int(-9999)
+        c_lm = c_blocal = c_bmin = c_xj = ctypes.c_double(-9999)
+        c_blocal = (ctypes.c_double * 3000)()
+
+        self._irbem_obj.trace_field_line1_(
             ctypes.byref(self.kext),
             ctypes.byref(self.options),
             ctypes.byref(self.sysaxes),
-            ctypes.byref(iyear),
-            ctypes.byref(idoy),
-            ctypes.byref(ut),
-            ctypes.byref(x1),
-            ctypes.byref(x2),
-            ctypes.byref(x3),
-            ctypes.byref(stop_alt),
-            ctypes.byref(hemi_flag),
-            ctypes.byref(self.maginput),
-            ctypes.byref(XFOOT),
-            ctypes.byref(BFOOT),
-            ctypes.byref(BFOOTMAG),
-        )
-        self.find_foot_point_output = {"XFOOT": XFOOT[:], "BFOOT": BFOOT[:], "BFOOTMAG": BFOOTMAG[:]}
-        return self.find_foot_point_output
-
-    def trace_field_line(self, X, maginput, R0=1):
-        """Trace a full field line which crosses the input position.
-
-        Parameters
-        ----------
-        X: dict
-            A dictionary that specifies the input time and location. The `time` key can be a
-            ISO-formatted time string, or a `datetime.datetime` or `pd.TimeStamp` objects.
-            The three location keys: `x1`, `x2`, and `x3` specify the location in the `sysaxes`.
-        maginput: dict
-            The magnetic field input dictionary. See the online documentation for the valid
-            keys and the corresponding models.
-        R0: float
-            The radius, in units of RE, of the reference surface (i.e. altitude) between which
-            the line is traced.
-
-        Returns:
-        -------
-        dict:
-            A dictionary with six keys:
-            - "POSIT" the field line locations in GEO coordinates with shape (3, 3000).
-            - "Nposit" the number of points along the field line for each field line traced.
-            - "lm" is the McIlwain L shell.
-            - "blocal" the magnitude of the local magnetic field.
-            - "bmin" the magnitude of the minimum magnetic field.
-            - "xj" I, related to second adiabatic invariant.
-        """
-        # specifies radius of reference surface between which field line is
-        # traced.
-        R0 = ctypes.c_double(R0)
-
-        # Prep the magnetic field model inputs and samping spacetime location.
-        self._prepMagInput(maginput)
-        iyear, idoy, ut, x1, x2, x3 = self._prepTimeLoc(X)
-
-        # Output variables
-        positType = (ctypes.c_double * 3) * 3000
-        posit = positType()
-        Nposit = ctypes.c_int(-9999)
-        lm, blocal, bmin, xj = [ctypes.c_double(-9999) for i in range(4)]
-
-        blocalType = ctypes.c_double * 3000
-        blocal = blocalType()
-
-        if self.TMI:
-            print("Running trace_field_line. Python may", "temporarily stop responding")
-
-        self._irbem_obj.trace_field_line2_1_(
-            ctypes.byref(self.kext),
-            ctypes.byref(self.options),
-            ctypes.byref(self.sysaxes),
-            ctypes.byref(iyear),
-            ctypes.byref(idoy),
-            ctypes.byref(ut),
-            ctypes.byref(x1),
-            ctypes.byref(x2),
-            ctypes.byref(x3),
-            ctypes.byref(self.maginput),
-            ctypes.byref(R0),
-            ctypes.byref(lm),
-            ctypes.byref(blocal),
-            ctypes.byref(bmin),
-            ctypes.byref(xj),
-            ctypes.byref(posit),
-            ctypes.byref(Nposit),
+            ctypes.byref(c_iyear),
+            ctypes.byref(c_idoy),
+            ctypes.byref(c_ut),
+            ctypes.byref(c_x1),
+            ctypes.byref(c_x2),
+            ctypes.byref(c_x3),
+            ctypes.byref(c_maginput),
+            ctypes.byref(c_r0),
+            ctypes.byref(c_lm),
+            ctypes.byref(c_blocal),
+            ctypes.byref(c_bmin),
+            ctypes.byref(c_xj),
+            ctypes.byref(c_posit),
+            ctypes.byref(c_n_posit),
         )
 
-        self.trace_field_line_output = {
-            "POSIT": np.array(posit[: Nposit.value]),
-            "Nposit": Nposit.value,
-            "lm": lm.value,
-            "blocal": np.array(blocal[: Nposit.value]),
-            "bmin": bmin.value,
-            "xj": xj.value,
-        }
-        return self.trace_field_line_output
+        return TraceFieldLineOutput(
+            posit = np.array(c_posit[: c_n_posit.value]),
+            n_posit = c_posit.value,
+            lm = c_lm.value,
+            blocal = np.array(c_blocal[: c_n_posit.value]),
+            bmin = c_bmin.value,
+            xj = c_xj.value,
+        )
 
     def find_magequator(
-        self, X: Mapping[str, datetime.datetime | pd.Timestamp | str | float], maginput: dict[str, NDArray[np.number]]
-    ) -> dict[Literal["bmin", "XGEO"], float | NDArray[np.float64]]:
-        """Find the coordinates of the magnetic equator from tracing the magntic
-        field line from the input location.
+        self,
+        time: datetime | str | pd.Timestamp,
+        position: Mapping[Literal["x1", "x2", "x3"], np.floating],
+        maginput: Mapping[MagInputKeys, NDArray[np.number] | list[np.number] | np.number],
+    ) -> FindMagEquatorOutput:
 
-        Parameters
-        ----------
-        X: dict
-            A dictionary that specifies the input time and location. The `time` key can be a
-            ISO-formatted time string, or a `datetime.datetime` or `pd.TimeStamp` objects.
-            The three location keys: `x1`, `x2`, and `x3` specify the location in the `sysaxes`.
-        maginput: dict
-            The magnetic field input dictionary. See the online documentation for the valid
-            keys and the corresponding models.
+        c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3 = self._prep_time_pos(time, position)
+        c_maginput = self._prep_maginput(maginput)
 
-        Returns:
-        -------
-        dict:
-            A dictionary with two keys:
-            - "bmin" the magntitude of the magnetic field at the equator.
-            - "XGEO" the location of the magnetic equator in GEO coordinates.
-        """
-        # Prep the magnetic field model inputs and samping spacetime location.
-        self._prepMagInput(maginput)
-        iyear, idoy, ut, x1, x2, x3 = self._prepTimeLoc(X)
+        if self.verbose:
+            print("Running IRBEM-LIB find_magequator for multiple time steps")
 
-        # Define outputs
-        bmin = ctypes.c_double(-9999)
-        XGEOType = ctypes.c_double * 3
-        XGEO = XGEOType(-9999, -9999, -9999)
-
-        if self.TMI:
-            print("Running IRBEM find_magequator")
+        c_xgeo = (ctypes.c_double * 3)(-9999, -9999, -9999)
+        c_bmin = ctypes.c_double(-9999)
 
         self._irbem_obj.find_magequator1_(
             ctypes.byref(self.kext),
             ctypes.byref(self.options),
             ctypes.byref(self.sysaxes),
-            ctypes.byref(iyear),
-            ctypes.byref(idoy),
-            ctypes.byref(ut),
-            ctypes.byref(x1),
-            ctypes.byref(x2),
-            ctypes.byref(x3),
-            ctypes.byref(self.maginput),
-            ctypes.byref(bmin),
-            ctypes.byref(XGEO),
+            ctypes.byref(c_iyear),
+            ctypes.byref(c_idoy),
+            ctypes.byref(c_ut),
+            ctypes.byref(c_x1),
+            ctypes.byref(c_x2),
+            ctypes.byref(c_x3),
+            ctypes.byref(c_maginput),
+            ctypes.byref(c_bmin),
+            ctypes.byref(c_xgeo),
         )
-        self.find_magequator_output: dict[Literal["bmin", "XGEO"], float | NDArray[np.float64]] = {
-            "bmin": bmin.value,
-            "XGEO": np.array(XGEO),
-        }
-        return self.find_magequator_output
 
-    def get_field_multi(self, X, maginput):
-        """This function computes the GEO vector of the magnetic field at input
-        location for a set of internal/external magnetic field to be selected.
+        return FindMagEquatorOutput(xgeo=np.array(c_xgeo), bmin=c_bmin.value)
 
-        Parameters
-        ----------
-        X : dict
-            The dictionary specifying the time and location.
-        maginput : dict
-            The magnetic field inpit parameter dictionary.
-
-        Returns:
-        -------
-        A dictionary with the following key-value pairs:
-        BxGEO: array
-            X component of the magnetic field (nT)
-        ByGEO: array
-            Y component of the magnetic field (nT)
-        BzGEO: array
-            Z component of the magnetic field (nT)
-        Bl: array
-            Magnitude of magnetic field (nT)
-
-        Example:
-        -------
-        model = IRBEM.MagFields(options=[0,0,0,0,0], verbose=True)
-        LLA = {}
-        LLA['x1'] = 651
-        LLA['x2'] = 63.97
-        LLA['x3'] = 15.9
-        LLA['dateTime'] = '2015-02-02T06:12:43'
-        maginput = {'Kp':40.0}
-        output = model.get_field_multi(LLA, maginput)
-        print(output)
-        """
+    def get_field_multi(
+        self,
+        time: Sequence[datetime | str] | datetime | str,
+        position: Mapping[Literal["x1", "x2", "x3"], Sequence[np.floating] | NDArray[np.floating] | np.floating],
+        maginput: Mapping[MagInputKeys, NDArray[np.number] | list[np.number] | np.number],
+    ) -> GetFieldMultiOutput:
         # Prep the time and position variables.
-        ntime, iyear, idoy, ut, x1, x2, x3 = self._prepTimeLocArray(X)
+        c_ntime, c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3 = self._prep_time_pos_array(time, position)
 
         # Prep magnetic field model inputs
-        maginput = self._prepMagInput(maginput)
+        c_maginput = self._prep_maginput(maginput)
 
-        # Model output types
-        Bl_type = ctypes.c_double * ntime.value
-        Bgeo_type = (ctypes.c_double * 3) * ntime.value
         # Model output arrays
-        Bgeo = Bgeo_type()
-        Bl = Bl_type()
+        c_bmag = (ctypes.c_double * c_ntime.value)()
+        c_bgeo = ((ctypes.c_double * 3) * c_ntime.value)()
 
-        if self.TMI:
+        if self.verbose:
             print("Running IRBEM-LIB get_field_multi")
 
         self._irbem_obj.get_field_multi_(
-            ctypes.byref(ntime),
+            ctypes.byref(c_ntime),
             ctypes.byref(self.kext),
             ctypes.byref(self.options),
             ctypes.byref(self.sysaxes),
-            ctypes.byref(iyear),
-            ctypes.byref(idoy),
-            ctypes.byref(ut),
-            ctypes.byref(x1),
-            ctypes.byref(x2),
-            ctypes.byref(x3),
-            ctypes.byref(maginput),
-            ctypes.byref(Bgeo),
-            ctypes.byref(Bl),
+            ctypes.byref(c_iyear),
+            ctypes.byref(c_idoy),
+            ctypes.byref(c_ut),
+            ctypes.byref(c_x1),
+            ctypes.byref(c_x2),
+            ctypes.byref(c_x3),
+            ctypes.byref(c_maginput),
+            ctypes.byref(c_bgeo),
+            ctypes.byref(c_bmag),
         )
-        Bgeo_np = np.array(Bgeo)
-        self.get_field_multi_output = {
-            "BxGEO": Bgeo_np[:, 0],
-            "ByGEO": Bgeo_np[:, 1],
-            "BzGEO": Bgeo_np[:, 2],
-            "Bl": np.array(Bl),
-        }
-        return self.get_field_multi_output
 
-    def get_mlt(self, X):
-        """Method to get Magnetic Local Time (MLT) from a Cartesian GEO
-        position and date.
+        return GetFieldMultiOutput(np.array(c_bgeo), np.array(c_bmag))
 
-        Parameters
-        ----------
-        X: dict
-            The dictionary specifying the time and location in GEO coordinates.
+    def get_mlt(
+        self,
+        time: datetime | str | pd.Timestamp,
+        position: Mapping[Literal["x1", "x2", "x3"], np.floating],
+    ) -> float:
+        c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3 = self._prep_time_pos(time, position)
 
-        Returns:
-        -------
-        MLT: float
-            The MLT value (hours).
-        """
-        # Inputs
-        iyear, idoy, ut, _, _, _ = self._prepTimeLoc(X)
-        coordsType = ctypes.c_double * 3
-        geo_coords = coordsType(X["x1"], X["x2"], X["x3"])
+        if self.verbose:
+            print("Running IRBEM-LIB get_mlt in a time loop")
 
-        # Model output variable
-        MLT = ctypes.c_double(-9999)
-
-        if self.TMI:
-            print("Running IRBEM-LIB get_mlt")
+        c_mlt = ctypes.c_double(-9999)
+        c_position = (ctypes.c_double * 3)(c_x1, c_x2, c_x3)
 
         self._irbem_obj.get_mlt1_(
-            ctypes.byref(iyear), ctypes.byref(idoy), ctypes.byref(ut), ctypes.byref(geo_coords), ctypes.byref(MLT)
+            ctypes.byref(c_iyear),
+            ctypes.byref(c_idoy),
+            ctypes.byref(c_ut),
+            ctypes.byref(c_position),
+            ctypes.byref(c_mlt),
         )
-        self.get_mlt_output = MLT.value
-        return self.get_mlt_output
 
-    ### Non-IRBEM methods.
-    def bounce_period(self, X, maginput, E, Erest=511, R0=1, alpha=90, interpNum=100000):
-        """Calculate the bounce period in an arbitary magnetic field model.
-        The default particle is electron, but you can change the Erest
-        parameter to calculate the bounce period for other particles.
+        return c_mlt.value
 
-        Parameters
-        ----------
-        X: dict
-            A dictionary that specifies the input time and location. The `time` key can be a
-            ISO-formatted time string, or a `datetime.datetime` or `pd.TimeStamp` objects.
-            The three location keys: `x1`, `x2`, and `x3` specify the location in the `sysaxes`.
-        maginput: dict
-            The magnetic field input dictionary. See the online documentation for the valid
-            keys and the corresponding models.
-        E: float, list, or np.array
-            A single or multiple values of particle energy in keV.
-        Erest: float
-            The particle's rest energy in keV.
-        R0: float
-            The radius, in units of RE, of the reference surface (i.e. altitude) between which
-            the line is traced.
-        alpha: float
-            The local pitch angle.
-        interpNum: int
-            The number of samples to interpolate the magnetic field line.
-            100000 is a good balance between speed and accuracy.
-
-        Returns:
-        -------
-        float or np.array
-            Bounce period(s) in seconds.
-        """
-        if self.TMI:
-            print("IRBEM: Calculating bounce periods")
-
-        fLine = self._interpolate_field_line(X, maginput, R0=R0, alpha=alpha)
-
-        # If the mirror point is below the ground, Scipy will error, try
-        # to change the R0 parameter...
-        try:
-            startInd = scipy.optimize.brentq(fLine["fB"], 0, len(fLine["S"]) / 2)
-            endInd = scipy.optimize.brentq(fLine["fB"], len(fLine["S"]) / 2, len(fLine["S"]) - 1)
-        except ValueError as err:
-            if str(err) == "f(a) and f(b) must have different signs":
-                raise ValueError("Mirror point below R0") from err
-            raise
-
-        # Resample S to a finer density of points.
-        if len(fLine["S"]) > interpNum:
-            warnings.warn(
-                "Warning: interpolating with less data than IRBEM outputs," + " the bounce period may be inaccurate!"
-            )
-        sInterp = np.linspace(startInd, endInd, num=interpNum)
-
-        # Calculate the small change in position, and magnetic field.
-        dx = np.convolve(fLine["fx"](sInterp), [-1, 1], mode="same")
-        dy = np.convolve(fLine["fy"](sInterp), [-1, 1], mode="same")
-        dz = np.convolve(fLine["fz"](sInterp), [-1, 1], mode="same")
-        ds = 6.371e6 * np.sqrt(dx**2 + dy**2 + dz**2)
-        dB = fLine["fB"](sInterp) + fLine["mirrorB"]
-
-        # This is basically an integral of ds/v||.
-        if isinstance(E, (np.ndarray, list)):
-            self.Tb = np.array(
-                [2 * np.sum(np.divide(ds[1:-1], vparalel(Ei, fLine["mirrorB"], dB, Erest=Erest)[1:-1])) for Ei in E]
-            )
-        else:
-            self.Tb = 2 * np.sum(np.divide(ds[1:-1], vparalel(E, fLine["mirrorB"], dB, Erest=Erest)[1:-1]))
-        return self.Tb
-
-    def mirror_point_altitude(self, X, maginput, R0=1):
-        """Calculate the mirror point of locally mirroring electrons
-        in the opposite hemisphere. Similar to the find_mirror_point()
-        method, but it works in the opposite hemisphere.
-
-        Parameters
-        ----------
-        X: dict
-            The dictionary specifying the time and location.
-        maginput: dict
-            The magnetic field inpit parameter dictionary.
-        R0: float
-            The radius, in units of RE, of the reference surface (i.e. altitude) between which
-            the line is traced.
-
-        Returns:
-        -------
-        float
-            The mirror point altitude in the opposite hemisphere.
-        """
-        if self.TMI:
-            print("IRBEM: Calculating mirror point altitude")
-
-        fLine = self._interpolate_field_line(X, maginput, R0=R0)
-
-        # If the mirror point is below the ground, Scipy will error, try
-        # to change the R0 parameter...
-        try:
-            startInd = scipy.optimize.brentq(fLine["fB"], 0, len(fLine["S"]) / 2)
-            endInd = scipy.optimize.brentq(fLine["fB"], len(fLine["S"]) / 2, len(fLine["S"]) - 1)
-        except ValueError as err:
-            if str(err) == "f(a) and f(b) must have different signs":
-                raise ValueError("Mirror point below R0") from err
-            raise
-
-        # Start indicies of the magnetic field is always in the northern
-        # hemisphere, so take the opposite.
-        self.mirrorAlt = {}
-        if fLine["fz"](startInd) > 0:
-            self.mirrorAlt = Re * (
-                np.sqrt(fLine["fx"](endInd) ** 2 + fLine["fy"](endInd) ** 2 + fLine["fz"](endInd) ** 2) - 1
-            )
-        else:
-            self.mirrorAlt = Re * (
-                np.sqrt(fLine["fx"](startInd) ** 2 + fLine["fy"](startInd) ** 2 + fLine["fz"](startInd) ** 2) - 1
-            )
-        return self.mirrorAlt
-
-    def _prepTimeLoc(
-        self, X: dict[str, pd.Timestamp | datetime.datetime | str | float]
+    def _prep_time_pos(
+        self,
+        time: datetime | str | pd.Timestamp,
+        position: Mapping[Literal["x1", "x2", "x3"], np.floating],
     ) -> tuple[ctypes.c_int, ctypes.c_int, ctypes.c_double, ctypes.c_double, ctypes.c_double, ctypes.c_double]:
-        """Prepares spacetime inputs.
-
-        Parameters
-        ----------
-        X: dict
-            The dictionary specifying the time and location. Keys must be
-            'dateTime', 'x1', 'x2', 'x3'. Other time keys will work, as
-            long as they contain the word 'time' (case insensitive).
-
-        Returns:
-        -------
-        ctype:
-            year
-        ctype:
-            day of year
-        ctype:
-            seconds elapsed since midnight
-        ctype:
-            First cooridnate in sysaxes coordinates
-        ctype:
-            Second cooridnate in sysaxes coordinates
-        ctype:
-            Third cooridnate in sysaxes coordinates
-        """
-        if self.TMI:
+        if self.verbose:
             print("Prepping time and space input variables")
 
         # Deep copy X so if the single inputs get encapsulated in
         # an array, it wont be propaged back to the user.
-        Xc = copy.deepcopy(X)
+        position = copy.deepcopy(position)
+        time = copy.deepcopy(time)
 
-        time_key = [key for key in Xc.keys() if "time" in key.lower()]
-        assert len(time_key) == 1, f"None or multiple time keys found in dictionary input \n {Xc}"
-        time_key = time_key[0]
-
-        if isinstance(Xc[time_key], datetime.datetime):
-            t = Xc[time_key]
-        elif pandas_imported and isinstance(Xc[time_key], pd.Timestamp):
-            t = pd.dt.to_pydatetime()
+        if isinstance(time, datetime):
+            time_dt = time
+        elif isinstance(time, pd.Timestamp):
+            time_dt = time.to_pydatetime()
         else:
-            t = dateutil.parser.parse(Xc[time_key])
-        iyear = ctypes.c_int(t.year)
-        idoy = ctypes.c_int(t.timetuple().tm_yday)
-        ut = ctypes.c_double(3600 * t.hour + 60 * t.minute + t.second)  # Seconds of day
-        x1 = ctypes.c_double(Xc["x1"])
-        x2 = ctypes.c_double(Xc["x2"])
-        x3 = ctypes.c_double(Xc["x3"])
-        if self.TMI:
+            time_dt = dateutil.parser.parse(time)
+
+        c_iyear = ctypes.c_int(time_dt.year)
+        c_idoy = ctypes.c_int(time_dt.timetuple().tm_yday)
+        c_ut = ctypes.c_double(3600 * time_dt.hour + 60 * time_dt.minute + time_dt.second)  # Seconds of day
+        c_x1 = ctypes.c_double(float(position["x1"]))
+        c_x2 = ctypes.c_double(float(position["x2"]))
+        c_x3 = ctypes.c_double(float(position["x3"]))
+
+        if self.verbose:
             print("Done prepping time and space input variables")
-        return iyear, idoy, ut, x1, x2, x3
 
-    def _prepTimeLocArray(self, X):
-        """NAME:  _prepTimeLocArray(self, X)
-        USE:   Prepares spacetime inputs used for IRBEM functions accepting
-                array inputs.
-        INPUT: A dictionary, X, containing the time and sampling location.
-               Input keys must be 'dateTime', 'x1', 'x2', 'x3'. Other time keys
-               will work, as long as they contain the word 'time' (case
-               insensitive).
-        AUTHOR: Mykhaylo Shumko
-        RETURNS: ctypes variables iyear, idoy, ut, x1, x2, x3.
-        MOD:     2020-05-26
-        """
-        # Deep copy X so if the single inputs get encapsulated in
-        # an array, it wont be propaged back to the user.
-        Xc = copy.deepcopy(X)
+        return c_iyear, c_idoy, c_ut, c_x1, c_x2, c_x3
 
-        # identify the time key.
-        time_keys = [key for key in Xc.keys() if "time" in key.lower()]
-        assert len(time_keys) == 1, f"None or multiple time keys found in dictionary input \n {Xc}"
-        time_key = time_keys[0]
+    def _prep_time_pos_array(
+        self,
+        time: Sequence[datetime | str | pd.Timestamp] | NDArray[np.generic] | datetime | str | pd.Timestamp,
+        position: Mapping[Literal["x1", "x2", "x3"], Sequence[np.floating] | NDArray[np.floating] | np.floating],
+    ) -> tuple[
+        ctypes.c_int,
+        ctypes.Array[ctypes.c_int],
+        ctypes.Array[ctypes.c_double],
+        ctypes.Array[ctypes.c_double],
+        ctypes.Array[ctypes.c_double],
+        ctypes.Array[ctypes.c_double],
+        ctypes.Array[ctypes.c_double],
+    ]:
+        time = copy.deepcopy(time)
+        time = np.atleast_1d(np.asarray(time))
 
-        # Check if function arguments are lists or arrays and convert them
-        # to numpy arrays if they are not.
-        if not isinstance(Xc[time_key], (list, np.ndarray)):
-            for key in Xc.keys():
-                Xc[key] = np.array([Xc[key]])
+        position = dict(copy.deepcopy(position))
+        position["x1"] = np.atleast_1d(np.asarray(position["x1"]))
+        position["x2"] = np.atleast_1d(np.asarray(position["x2"]))
+        position["x3"] = np.atleast_1d(np.asarray(position["x3"]))
 
         # Check that the input array length does not exceed NTIME_MAX.
-        nTimePy = len(Xc[time_key])
-        if nTimePy > self.NTIME_MAX.value:
-            raise ValueError(
-                f"Input array length {nTimePy} is longer "
-                f"than IRBEM's NTIME_MAX = {self.NTIME_MAX.value}. "
+        if len(time) > self.ntime_max.value:
+            msg = (
+                f"Input array length {len(time)} is longer "
+                f"than IRBEM's NTIME_MAX = {self.ntime_max.value}. "
                 f"Use a for loop."
             )
-        ntime = ctypes.c_int(nTimePy)
+            raise ValueError(msg)
+        ntime = ctypes.c_int(len(time))
 
         # Check that the times are datetime objects, and convert otherwise.
-        if isinstance(Xc[time_key][0], datetime.datetime):
-            t = Xc[time_key]
-        elif pandas_imported and isinstance(Xc[time_key][0], pd.Timestamp):
-            t = pd.dt.to_pydatetime()
+        if isinstance(time[0], datetime):
+            time = typing.cast("Sequence[datetime]", time)
+            time_dt = time
+        elif isinstance(time[0], pd.Timestamp):
+            time = typing.cast("Sequence[pd.Timestamp]", time)
+            time_dt = [t.to_pydatetime() for t in time]
         else:
-            t = [dateutil.parser.parse(t_i) for t_i in Xc[time_key]]
-
-        nTimePy = len(Xc[time_key])
-        ntime = ctypes.c_int(nTimePy)
+            time = typing.cast("Sequence[str]", time)
+            time_dt = [dateutil.parser.parse(t) for t in time]
 
         # C arrays are statically defined with the following procedure.
         # There are a few ways of doing this...
-        intArrType = ctypes.c_int * nTimePy
-        iyear = intArrType()
-        idoy = intArrType()
+        int_arr_type = ctypes.c_int * len(time_dt)
+        iyear = int_arr_type()
+        idoy = int_arr_type()
 
-        doubleArrType = ctypes.c_double * nTimePy
-        ut, x1, x2, x3 = [doubleArrType() for i in range(4)]
+        double_arr_type = ctypes.c_double * len(time_dt)
+        ut, x1, x2, x3 = [double_arr_type() for i in range(4)]
 
         # Now fill the input time and model sampling (s/c location) parameters.
-        for dt in range(nTimePy):
-            iyear[dt] = t[dt].year
-            idoy[dt] = t[dt].timetuple().tm_yday
-            ut[dt] = 3600 * t[dt].hour + 60 * t[dt].minute + t[dt].second
-            x1[dt] = Xc["x1"][dt]
-            x2[dt] = Xc["x2"][dt]
-            x3[dt] = Xc["x3"][dt]
+        for dt in range(len(time_dt)):
+            iyear[dt] = time_dt[dt].year
+            idoy[dt] = time_dt[dt].timetuple().tm_yday
+            ut[dt] = 3600 * time_dt[dt].hour + 60 * time_dt[dt].minute + time_dt[dt].second
+            x1[dt] = position["x1"][dt]
+            x2[dt] = position["x2"][dt]
+            x3[dt] = position["x3"][dt]
+
         return ntime, iyear, idoy, ut, x1, x2, x3
 
-    def _prepMagInput(self, inputDict: dict[str, NDArray[np.number] | float | int | np.float64] = None):
-        """NAME:  _prepMagInput(self, inputDict)
-        USE:   Prepares magnetic field model inputs.
-        INPUT: A dictionary containing the maginput keys in either numpy
-              arrays, lists, ints, or doubles. The keys must be some of these:
-              'Kp', 'Dst', 'dens', 'velo', 'Pdyn', 'ByIMF', 'BzIMF',
-              'G1', 'G2', 'G3', 'W1', 'W2', 'W3', 'W4', 'W5', 'W6', 'AL'
-        AUTHOR: Mykhaylo Shumko
-        RETURNS: self.maginput, a ctypes 2D array to pass as an argument to
-              IRBEM functions. Dummy values are -9999.
-        MOD:     2017-01-05
-        """
-        if self.TMI:
+    def _prep_maginput(
+        self, input_dict: Mapping[MagInputKeys, list[np.number] | NDArray[np.number] | np.number] | None = None
+    ) -> ctypes.Array[ctypes.c_double]:
+        if self.verbose:
             print("Prepping magnetic field inputs.")
 
         # If no model inputs (statis magnetic field model)
-        if (inputDict is None) or (inputDict == {}):
-            magInputType = ctypes.c_double * 25
-            self.maginput = magInputType()
+        if (input_dict is None) or (input_dict == {}):
+            maginput = (ctypes.c_double * 25)()
             for i in range(25):
-                self.maginput[i] = -9999
-            return self.maginput
+                maginput[i] = -9999
+            return maginput
 
-        orderedKeys = [
+        ordered_keys: list[MagInputKeys] = [
             "Kp",
             "Dst",
             "dens",
@@ -1118,96 +758,34 @@ class MagFields:
             "W6",
             "AL",
         ]
-        # Assume all values assosiated with keys are the same type.
-        magType = type(inputDict[list(inputDict.keys())[0]])
 
         # If the model inputs are arrays
-        if magType in [np.ndarray, list]:
-            nTimePy = len(inputDict[list(inputDict.keys())[0]])
-            magInputType = (ctypes.c_double * 25) * nTimePy
-            self.maginput = magInputType()
+        if isinstance(next(iter(input_dict.values())), list | np.ndarray):
+            input_dict = typing.cast("Mapping[MagInputKeys, list[np.number] | NDArray[np.number]]", input_dict)
+            ntime = len(next(iter(input_dict.values())))
 
-            # Loop over potential keys.
-            for i in range(len(orderedKeys)):
-                # Loop over times.
-                for dt in range(nTimePy):
-                    # For every key provided by user, populate the maginput
-                    # C array.
-                    if orderedKeys[i] in list(inputDict.keys()):
-                        # maginput(25,ntime_max)
-                        self.maginput[dt][i] = inputDict[orderedKeys[i]][dt]
+            maginput = ((ctypes.c_double * 25) * ntime)()
+
+            for i, key in enumerate(ordered_keys):
+                for dt in range(ntime):
+                    if key in input_dict:
+                        maginput[dt][i] = input_dict[key][dt]
                     else:
-                        self.maginput[dt][i] = ctypes.c_double(-9999)
+                        maginput[dt][i] = ctypes.c_double(-9999)
 
-                        # If model inputs are integers or doubles.
-        elif magType in [int, float, np.float64]:
-            magInputType = ctypes.c_double * 25
-            self.maginput = magInputType()
-
-            # Loop over ordered keys, and fill the maginput array with keys
-            # given.
-            for i in range(len(orderedKeys)):
-                # Loop over times.
-                if orderedKeys[i] in list(inputDict.keys()):
-                    self.maginput[i] = inputDict[orderedKeys[i]]
-                else:
-                    self.maginput[i] = ctypes.c_double(-9999)
-
-                    # If model inputs are something else (probably incorrect format)
         else:
-            raise TypeError(
-                "Model inputs are in an unrecognizable format. Try a dictionary of numpy arrays, lists, ints or floats"
-            )
+            maginput = (ctypes.c_double * 25)()
 
-        if self.TMI:
+            for i, key in enumerate(ordered_keys):
+                if key in input_dict:
+                    maginput[i] = input_dict[key]
+                else:
+                    maginput[i] = ctypes.c_double(-9999)
+
+        if self.verbose:
             print("Done prepping magnetic field inputs.")
 
-        return self.maginput
-
-    def _interpolate_field_line(self, X, maginput, R0=1, alpha=90):
-        """NAME:  _interpolate_field_line(self, X, maginput)
-        USE:   This function cubic spline interpolates a magnetic field line
-               that crosses the input location down to a radius, R0 from Earth
-               center.
-        INPUT: A dictionary, X containing the time and and location.
-               Input keys must be 'dateTime', 'x1', 'x2', 'x3'. maginput
-               dictionary contains model parameters.
-               Optionally, R0 = 1 (Earth's surface) can be changed.
-               alpha = 90 is the local pitch angle (for bounce period
-               calculation).
-        AUTHOR: Mykhaylo Shumko
-        RETURNS: Interpolate objects of the B field, B field path coordinate S,
-                 X, Y, Z GEO coordinates, and B field at input location.
-        MOD:     2017-04-06
-        """
-        if self.TMI:
-            print("Interpolating magnetic field line")
-
-        X2 = copy.deepcopy(X)
-        self.make_lstar(X2, maginput)
-        inputblocal = self.make_lstar_output["blocal"][0]
-
-        out = self.trace_field_line(X, maginput)
-        if out["Nposit"] == -9999:
-            raise ValueError("This is an open field line!")
-
-        # Create arrays of GEO coordinates, and path coordinate, S.
-        xGEO = out["POSIT"][: out["Nposit"], 0]
-        yGEO = out["POSIT"][: out["Nposit"], 1]
-        zGEO = out["POSIT"][: out["Nposit"], 2]
-        S = range(len(out["blocal"][: out["Nposit"]]))
-
-        # Interpolate the magnetic field, as well as GEO coordinates.
-        fB = scipy.interpolate.interp1d(
-            S, np.subtract(out["blocal"][: out["Nposit"]], inputblocal / np.sin(np.deg2rad(alpha)) ** 2), kind="cubic"
-        )
-        fx = scipy.interpolate.interp1d(S, xGEO, kind="cubic")
-        fy = scipy.interpolate.interp1d(S, yGEO, kind="cubic")
-        fz = scipy.interpolate.interp1d(S, zGEO, kind="cubic")
-        if self.TMI:
-            print("Done interpolating magnetic field line.")
-        return {"S": S, "fB": fB, "fx": fx, "fy": fy, "fz": fz, "mirrorB": inputblocal / np.sin(np.deg2rad(alpha)) ** 2}
-
+        return maginput
 
 class Coords:
     """Wrappers for IRBEM's coordinate transformation functions.
@@ -1241,9 +819,9 @@ class Coords:
 
     def __init__(self, **kwargs):
         self.irbem_obj_path = kwargs.get("path")
-        self.TMI = kwargs.get("verbose", False)
+        self.verbose = kwargs.get("verbose", False)
 
-        self.path, self._irbem_obj = _load_shared_object(self.irbem_obj_path)
+        self._irbem_obj = _load_shared_object(self.irbem_obj_path)
 
     def coords_transform(self, *args, **kwargs):
         warnings.warn("Coords.coords_transform() is deprecated. Use Coords.transform instead.")
@@ -1254,7 +832,7 @@ class Coords:
         USE:   This function transforms coordinate systems from a point at time
                time and position pos from a coordinate system sysaxesIn to
                sysaxesOut.
-        INPUT:  time - datetime.datetime objects
+        INPUT:  time - datetime objects
                        (or arrays/lists containing them)
                 pos - A (nT x 3) array where nT is the number of points to transform.
 
@@ -1337,7 +915,7 @@ class Coords:
         # Convert to datetimes if necessary.
         if isinstance(times[0], str):
             t = list(map(dateutil.parser.parse, times))
-        elif isinstance(times[0], datetime.datetime):
+        elif isinstance(times[0], datetime):
             t = times
         else:
             raise ValueError(
@@ -1383,22 +961,24 @@ class Coords:
         raise ValueError("Error, coordinate axis can only be a string or int!")
 
 
-def _load_shared_object(path=None):
-    """Searches for and loads a shared object (.so or .dll file). If path is specified
-    it doesn't search for the file.
+def _load_shared_object(path: Path | None = None) -> ctypes.CDLL:
+    """Searches for and loads a shared object (.so or .dll file).
+
+    If path is specified it doesn't search for the file.
     """
     if path is None:
         if (sys.platform == "win32") or (sys.platform == "cygwin"):
             obj_name = "libirbem.dll"
-            loader = ctypes.WinDLL
         else:
             obj_name = "libirbem.so"
-            loader = ctypes.cdll
         matched_object_files = list(pathlib.Path(__file__).parents[2].rglob(obj_name))
-        assert len(matched_object_files) == 1, (
-            f"{len(matched_object_files)} .so or .dll shared object files found in "
-            f"{pathlib.Path(__file__).parents[2]} folder: {matched_object_files}."
-        )
+        if len(matched_object_files) != 1:
+            msg = (
+                f"{len(matched_object_files)} .so or .dll shared object files found in "
+                f"{pathlib.Path(__file__).parents[2]} folder: {matched_object_files}."
+            )
+            raise ValueError(msg)
+
         path = matched_object_files[0]
 
     # Open the shared object file.
@@ -1408,24 +988,12 @@ def _load_shared_object(path=None):
             # files are located, or ctypes is unable to load the IREBM dll.
             gfortran_path = pathlib.Path(shutil.which("gfortran.exe"))
             os.add_dll_directory(gfortran_path.parent)  # e.g. C:\msys64\mingw64\bin
-            _irbem_obj = ctypes.WinDLL(str(path))
+            irbem_obj = ctypes.WinDLL(str(path))
         else:
-            _irbem_obj = ctypes.CDLL(str(path))
+            irbem_obj = ctypes.CDLL(str(path))
     except OSError as err:
         if "Try using the full path with constructor syntax." in str(err):
-            raise OSError(f"Could not load the IRBEM shared object file in {path}") from err
+            msg = f"Could not load the IRBEM shared object file in {path}"
+            raise OSError(msg) from err
         raise
-    return path, _irbem_obj
-
-
-"""
-These are helper functions to calculate relativistic velocity,
-parallel velocity, and relativistic gamma factor.
-Units of energy is keV unless you supply both the particle energy and rest
-energy in different units.
-
-These functions should be used with caution in your own applications!
-"""
-beta = lambda Ek, Erest=511: np.sqrt(1 - ((Ek / Erest) + 1) ** (-2))  # Ek,a dErest must be in keV
-gamma = lambda Ek, Erest=511: np.sqrt(1 - beta(Ek, Erest=511) ** 2) ** (-1 / 2)
-vparalel = lambda Ek, Bm, B, Erest=511: c * beta(Ek, Erest) * np.sqrt(1 - np.abs(B / Bm))
+    return irbem_obj
