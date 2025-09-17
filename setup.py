@@ -58,9 +58,9 @@ class CustomBuild(build_py):
         print("Installing IRBEM library...")
         if sys.platform == "darwin":
             fc = self._get_fortran_compiler_darwin()
-            os.environ["FC"] = fc
-            subprocess.check_call(["make", "OS=osx64", "all"], cwd="IRBEM")
-            subprocess.check_call(["make", "OS=osx64", "install"], cwd="IRBEM")
+            base_cmd = ["make", "OS=osx64", f"FC={fc}", f"LD={fc}"]
+            subprocess.check_call(base_cmd + ["all"], cwd="IRBEM")
+            subprocess.check_call(base_cmd + ["install"], cwd="IRBEM")
         else:
             subprocess.check_call(["make"], cwd="IRBEM")
             subprocess.check_call(["make", "install", "."], cwd="IRBEM")
