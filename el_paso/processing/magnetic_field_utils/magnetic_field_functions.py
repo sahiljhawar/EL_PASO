@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils.construct_maginput import MagInputKeys
-from el_paso.processing.magnetic_field_utils.IRBEM import Coords, MagFields
+from el_paso.processing.magnetic_field_utils.irbem import Coords, MagFields
 from el_paso.processing.magnetic_field_utils.mag_field_enum import MagneticField
 from el_paso.utils import show_process_bar_for_map_async, timed_function
 
@@ -92,10 +92,10 @@ def _get_magequator_parallel(
     it: int,
 ) -> tuple[float, NDArray[np.float64]]:
     model = MagFields(
-        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
+        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3],
     )
 
-    x_dict_single: dict[Literal["x1", "x2", "x3"], list[np.float64]] = {
+    x_dict_single: dict[Literal["x1", "x2", "x3"], np.float64] = {
         "x1": x_geo[it, 0],
         "x2": x_geo[it, 1],
         "x3": x_geo[it, 2],
@@ -180,7 +180,7 @@ def get_magequator(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: Ir
     )
 
     # add radial distance field in SM coordinates
-    x_sm = Coords(path=irbem_input.irbem_lib_path).transform(  # type: ignore[reportUnknownMemberType]
+    x_sm = Coords(lib_path=irbem_input.irbem_lib_path).transform(
         datetimes,
         x_geo_min,
         ep.IRBEM_SYSAXIS_GEO,
@@ -215,7 +215,6 @@ def _get_footpoint_atmosphere_parallel(
         options=irbem_args[1],
         kext=irbem_args[2],
         sysaxes=irbem_args[3],
-        verbose=False,
     )
 
     x_dict_single: dict[Literal["x1", "x2", "x3"], np.float64] = {
@@ -227,7 +226,7 @@ def _get_footpoint_atmosphere_parallel(
 
     footpoint_output = model.find_foot_point(datetimes[it], x_dict_single, maginput, stop_alt=100, hemi_flag=0)
 
-    return footpoint_output.b_foot_mag
+    return np.asarray(footpoint_output.b_foot_mag)
 
 
 @timed_function()
@@ -326,7 +325,6 @@ def get_MLT(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: IrbemInpu
         options=irbem_input.irbem_options,
         kext=kext,
         sysaxes=sysaxes,
-        verbose=False,
     )
 
     mlt_output = np.empty_like(datetimes)
@@ -398,7 +396,6 @@ def get_local_B_field(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input:
         options=irbem_input.irbem_options,
         kext=kext,
         sysaxes=sysaxes,
-        verbose=False,
     )
 
     field_multi_output = model.get_field_multi(datetimes, x_dict, irbem_input.maginput)
@@ -420,7 +417,7 @@ def _get_mirror_point_parallel(
     it: int,
 ) -> NDArray[np.float64]:
     model = MagFields(
-        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
+        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3],
     )
 
     x_dict_single: dict[Literal["x1", "x2", "x3"], np.floating] = {
@@ -525,7 +522,7 @@ def _make_lstar_shell_splitting_parallel(
     it: int,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     model = MagFields(
-        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
+        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3],
     )
 
     x_dict_single: dict[Literal["x1", "x2", "x3"], np.floating] = {
