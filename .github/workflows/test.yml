@@ -36,4 +36,4 @@ jobs:
           pip install coveralls coverage pytest-cov
 
       - name: Run tests
-        run: python -m coverage run --source swvo -m pytest tests -m basic --ignore tests/system # ignore system tests due to RBMNcDataSet
+        run: python -m coverage run --source el_paso -m pytest tests -m basic --ignore tests/system # ignore system tests due to RBMNcDataSet
