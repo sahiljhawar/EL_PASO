@@ -92,7 +92,10 @@ def _get_magequator_parallel(
     it: int,
 ) -> tuple[float, NDArray[np.float64]]:
     model = MagFields(
-        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3],
+        lib_path=irbem_args[0],
+        options=irbem_args[1],
+        kext=irbem_args[2],
+        sysaxes=irbem_args[3],
     )
 
     x_dict_single: dict[Literal["x1", "x2", "x3"], np.float64] = {
@@ -167,7 +170,7 @@ def get_magequator(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: Ir
     B_eq[B_eq == FORTRAN_BAD_VALUE] = np.nan
     x_geo_min[x_geo_min == FORTRAN_BAD_VALUE] = np.nan
 
-    B_eq_var = ep.Variable(data=B_eq.astype(np.float64), original_unit=u.nT)
+    B_eq_var = ep.Variable(data=B_eq.astype(np.float64), original_unit=u.nT)  # type:ignore [reportAttributeAccessIssue]
     B_eq_var.metadata.add_processing_note(
         f"Calculated magnetic field at the equator using IRBEM model {irbem_input.magnetic_field} "
         f"with options {irbem_input.irbem_options}."
@@ -282,7 +285,7 @@ def get_footpoint_atmosphere(
 
     B_foot[B_foot == FORTRAN_BAD_VALUE] = np.nan
 
-    var = ep.Variable(data=B_foot.astype(np.float64), original_unit=u.nT)
+    var = ep.Variable(data=B_foot.astype(np.float64), original_unit=u.nT)  # type:ignore [reportAttributeAccessIssue]
     var.metadata.add_processing_note(
         f"Calculated foot point at the atmosphere using IRBEM model {irbem_input.magnetic_field} "
         f"with options {irbem_input.irbem_options}."
@@ -339,7 +342,7 @@ def get_MLT(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: IrbemInpu
 
     mlt_output = mlt_output.astype(np.float64)
 
-    var = ep.Variable(data=mlt_output, original_unit=u.hour)
+    var = ep.Variable(data=mlt_output, original_unit=u.hour)  # type:ignore [reportAttributeAccessIssue]
     var.metadata.add_processing_note(
         f"Calculated MLT using IRBEM model {irbem_input.magnetic_field} with options {irbem_input.irbem_options}."
     )
@@ -404,7 +407,7 @@ def get_local_B_field(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input:
     field_multi_output.bgeo[field_multi_output.bgeo == fortran_bad_value] = np.nan
     field_multi_output.blocal[field_multi_output.blocal == fortran_bad_value] = np.nan
 
-    b_local_var = ep.Variable(data=field_multi_output.blocal, original_unit=u.nT)
+    b_local_var = ep.Variable(data=field_multi_output.blocal, original_unit=u.nT)  # type:ignore [reportAttributeAccessIssue]
     return {create_var_name("B_local", irbem_input.magnetic_field): b_local_var}
 
 
@@ -417,7 +420,10 @@ def _get_mirror_point_parallel(
     it: int,
 ) -> NDArray[np.float64]:
     model = MagFields(
-        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3],
+        lib_path=irbem_args[0],
+        options=irbem_args[1],
+        kext=irbem_args[2],
+        sysaxes=irbem_args[3],
     )
 
     x_dict_single: dict[Literal["x1", "x2", "x3"], np.floating] = {
@@ -457,7 +463,7 @@ def get_mirror_point(
 
     timestamps = time_var.get_data(ep.units.posixtime)
     x_geo = xgeo_var.get_data(ep.units.RE)
-    pa_local = pa_local_var.get_data(u.deg)
+    pa_local = pa_local_var.get_data(u.deg)  # type:ignore [reportAttributeAccessIssue]
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = ep.IRBEM_SYSAXIS_GEO
@@ -504,7 +510,7 @@ def get_mirror_point(
     # replace bad values with nan
     mirror_point_output[mirror_point_output < 0] = np.nan
 
-    var = ep.Variable(data=mirror_point_output.astype(np.float64), original_unit=u.nT)
+    var = ep.Variable(data=mirror_point_output.astype(np.float64), original_unit=u.nT)  # type:ignore [reportAttributeAccessIssue]
     var.metadata.add_processing_note(
         f"Calculated mirror points using IRBEM model {irbem_input.magnetic_field} "
         f"with options {irbem_input.irbem_options}."
@@ -522,7 +528,10 @@ def _make_lstar_shell_splitting_parallel(
     it: int,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     model = MagFields(
-        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3],
+        lib_path=irbem_args[0],
+        options=irbem_args[1],
+        kext=irbem_args[2],
+        sysaxes=irbem_args[3],
     )
 
     x_dict_single: dict[Literal["x1", "x2", "x3"], np.floating] = {
@@ -569,7 +578,7 @@ def get_Lstar(
 
     timestamps = time_var.get_data(ep.units.posixtime)
     x_geo = xgeo_var.get_data(ep.units.RE)
-    pa_local = pa_local_var.get_data(u.deg)
+    pa_local = pa_local_var.get_data(u.deg)  # type:ignore [reportAttributeAccessIssue]
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = ep.IRBEM_SYSAXIS_GEO
