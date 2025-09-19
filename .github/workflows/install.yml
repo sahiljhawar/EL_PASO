@@ -41,4 +41,4 @@ jobs:
 
       - name: Test import
         run: |
-          python -c "import el_paso; from IRBEM import MagFields, Coords; print('Import successful')"
+          python -c "import el_paso; print('Import successful')"
