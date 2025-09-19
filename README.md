@@ -50,35 +50,8 @@ Install the core EL-PASO package using pip.
 pip install .
 ```
 
-### Step 4: Prepare and Install the IRBEM Library
+The custom `setup.py` script will automatically download and compile the IRBEM Fortran library during this step.
 
-The [IRBEM library](https://github.com/PRBEM/IRBEM) is the backend for magnetic field calculations. It is already included as a submodule and can be cloned by calling:
-
-```bash
-git submodule init
-git submodule update
-```
-
-Now, the IRBEM repository has been cloned to the *IRBEM* folder. Next, we have to compile the IRBEM library. You can follow their compilation instructions at on [github](https://github.com/PRBEM/IRBEM) but on Linux, you should be able to simple call:
-
-```bash
-cd IRBEM
-make
-make install .
-```
-
-These commands compile the *libirbem.so* file and copy it to the root of the IRBEM directory.
-
-Before installing the python bindings, we have to apply a custom patch to the python wrapper, since some necessary functionalities are missing in the official IRBEM python wrapper. For this, copy the IRBEM.py file from the root of the EL-PASO repository to the IRBEM python wrapper:
-
-```bash
-cp ../IRBEM.py python/IRBEM
-```
-
-Now we can install the wrapper:
-```bash
-pip install python/
-```
 ### Verifying the Installation
 
 You can validate your installation by running the minimal example located in *examples*:
@@ -91,3 +64,5 @@ python3 examples/minimal_example.py
 
 This work has been funded by the German Research Foundation (NFDI4Earth, DFG project no. 460036893, https://www.nfdi4earth.de/).
 The authors acknowledge the work of Mátyás Szabó-Roberts who led the foundation for the EL-PASO framework.
+
+The thank the authors of the [IRBEM library](https://github.com/PRBEM/IRBEM) for providing their code.
