@@ -16,11 +16,11 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
+from el_paso.processing.magnetic_field_utils.irbem import Coords
 from examples.Arase.get_arase_orbit_variables import (
     get_arase_orbit_level_2_variables,
     get_arase_orbit_level_3_variables,
 )
-from IRBEM import Coords
 
 
 def process_mepe_level_3(  # noqa: PLR0915

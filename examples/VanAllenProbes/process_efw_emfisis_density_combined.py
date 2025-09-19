@@ -15,7 +15,7 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
-from IRBEM import Coords
+from el_paso.processing.magnetic_field_utils.irbem import Coords
 
 
 def process_efw_emfisis_density_combined(
