@@ -9,7 +9,6 @@
 import subprocess
 import os
 import sys
-import shutil
 from setuptools import find_packages, setup
 from setuptools.command.build_py import build_py
 
@@ -29,7 +28,6 @@ class CustomBuild(build_py):
         try:
             self._init_submodule()
             self._compile_and_install_irbem()
-            self._apply_patch()
         except subprocess.CalledProcessError as e:
             print(f"✗ Build failed with return code {e.returncode}")
             print(f"Command: {' '.join(e.cmd)}")
@@ -64,15 +62,6 @@ class CustomBuild(build_py):
         else:
             subprocess.check_call(["make"], cwd="IRBEM")
             subprocess.check_call(["make", "install", "."], cwd="IRBEM")
-
-        subprocess.check_call([sys.executable, "setup.py", "install"], cwd="IRBEM/python")
-
-    def _apply_patch(self):
-        irbem_py_src = "IRBEM.py"
-        irbem_py_dst = os.path.join("IRBEM", "python", "IRBEM", "IRBEM.py")
-        print("Applying custom IRBEM.py patch...")
-        os.makedirs(os.path.dirname(irbem_py_dst), exist_ok=True)
-        shutil.copy(irbem_py_src, irbem_py_dst)
 
 
 setup(
