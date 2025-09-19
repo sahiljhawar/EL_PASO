@@ -64,3 +64,5 @@ python3 examples/minimal_example.py
 
 This work has been funded by the German Research Foundation (NFDI4Earth, DFG project no. 460036893, https://www.nfdi4earth.de/).
 The authors acknowledge the work of Mátyás Szabó-Roberts who led the foundation for the EL-PASO framework.
+
+The thank the authors of the [IRBEM library](https://github.com/PRBEM/IRBEM) for providing their code.

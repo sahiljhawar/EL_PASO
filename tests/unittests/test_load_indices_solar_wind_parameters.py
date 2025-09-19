@@ -15,7 +15,6 @@ import el_paso as ep
 # ruff: noqa: PLR2004
 
 
-@pytest.mark.basic
 def test_calculate_w_parameters() -> None:
     start_time = datetime(2015, 3, 17, 0, 0, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=1)
