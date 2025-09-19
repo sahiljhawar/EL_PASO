@@ -6,30 +6,30 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.2.0
     hooks:
-    -   id: trailing-whitespace
-    -   id: end-of-file-fixer
-    -   id: check-yaml
-    -   id: check-added-large-files
-    -   id: check-toml
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: check-toml
 
--   repo: https://github.com/fsfe/reuse-tool
+  - repo: https://github.com/fsfe/reuse-tool
     rev: v5.1.1
     hooks:
       - id: reuse
 
--   repo: https://github.com/northisup/pyright-pretty
+  - repo: https://github.com/northisup/pyright-pretty
     rev: v0.1.0
     hooks:
-    - id: pyright-pretty
-      files: el_paso/.*
+      - id: pyright-pretty
+        files: el_paso/.*
 
--   repo: https://github.com/astral-sh/ruff-pre-commit
+  - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.13.0
     hooks:
-        - id: ruff-check
-          types_or: [ python, pyi ]
-        - id: ruff-format
-          types_or: [ python, pyi ]
+      - id: ruff-check
+        types_or: [python, pyi]
+      - id: ruff-format
+        types_or: [python, pyi]
