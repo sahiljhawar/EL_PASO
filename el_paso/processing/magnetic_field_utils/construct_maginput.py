@@ -53,9 +53,9 @@ MAGINPUT_REQUIRED_INPUTS: dict[kext, list[SW_Index]] = {
 MAGINPUT_TO_INDEX: dict[SW_Index, int | list[int]] = {
     "Kp": 0,
     "Dst": 1,
-    "Pdyn": 2,
+    "SW_speed": 2,
     "SW_density": 3,
-    "SW_speed": 4,
+    "Pdyn": 4,
     "IMF_By": 5,
     "IMF_Bz": 6,
     "G1": 7,
