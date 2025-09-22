@@ -211,7 +211,9 @@ def load_indices_solar_wind_parameters(  # noqa: C901, PLR0912, PLR0915
                 )
                 assert isinstance(output_df, pd.DataFrame)
 
-                output_df["proton_density"] = output_df["proton_density"].interpolate(method="spline", order=3)
+                output_df["proton_density"] = (
+                    output_df["proton_density"].interpolate(method="spline", order=3).ffill().bfill()
+                )
 
                 result = _create_variables_from_data_frame(
                     output_df, "proton_density", u.cm**-3, target_time_variable, "linear"
