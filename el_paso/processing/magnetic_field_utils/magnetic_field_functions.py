@@ -18,9 +18,9 @@ from numpy.typing import NDArray
 
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils.construct_maginput import MagInputKeys
+from el_paso.processing.magnetic_field_utils.irbem import Coords, MagFields
 from el_paso.processing.magnetic_field_utils.mag_field_enum import MagneticField
 from el_paso.utils import show_process_bar_for_map_async, timed_function
-from IRBEM import Coords, MagFields
 
 logger = logging.getLogger(__name__)
 
@@ -92,20 +92,19 @@ def _get_magequator_parallel(
     it: int,
 ) -> tuple[float, NDArray[np.float64]]:
     model = MagFields(
-        path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
+        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3],
     )
 
-    x_dict_single: dict[str, datetime | float] = {
-        "dateTime": datetimes[it],
+    x_dict_single: dict[Literal["x1", "x2", "x3"], np.float64] = {
         "x1": x_geo[it, 0],
         "x2": x_geo[it, 1],
         "x3": x_geo[it, 2],
     }
-    maginput_single = {key: maginput[key][it] for key in maginput}
+    maginput = {key: maginput[key][it] for key in maginput}
 
-    magequator_output = model.find_magequator(x_dict_single, maginput_single)
-    bmin = magequator_output["bmin"]
-    xgeo = magequator_output["XGEO"]
+    magequator_output = model.find_magequator(datetimes[it], x_dict_single, maginput)
+    bmin = magequator_output.bmin
+    xgeo = magequator_output.xgeo
 
     assert isinstance(bmin, float)
     assert isinstance(xgeo, np.ndarray)
@@ -181,7 +180,7 @@ def get_magequator(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: Ir
     )
 
     # add radial distance field in SM coordinates
-    x_sm = Coords(path=irbem_input.irbem_lib_path).transform(  # type: ignore[reportUnknownMemberType]
+    x_sm = Coords(lib_path=irbem_input.irbem_lib_path).transform(
         datetimes,
         x_geo_min,
         ep.IRBEM_SYSAXIS_GEO,
@@ -210,26 +209,24 @@ def _get_footpoint_atmosphere_parallel(
     datetimes: list[datetime],
     maginput: dict[MagInputKeys, NDArray[np.float64]],
     it: int,
-) -> list[float]:
+) -> NDArray[np.float64]:
     model = MagFields(
-        path=irbem_args[0],
+        lib_path=irbem_args[0],
         options=irbem_args[1],
         kext=irbem_args[2],
         sysaxes=irbem_args[3],
-        verbose=False,
     )
 
-    x_dict_single: dict[str, datetime | float] = {
-        "dateTime": datetimes[it],
+    x_dict_single: dict[Literal["x1", "x2", "x3"], np.float64] = {
         "x1": x_geo[it, 0],
         "x2": x_geo[it, 1],
         "x3": x_geo[it, 2],
     }
-    maginput_single = {key: maginput[key][it] for key in maginput}
+    maginput = {key: maginput[key][it] for key in maginput}
 
-    footpoint_output = model.find_foot_point(x_dict_single, maginput_single, stopAlt=100, hemiFlag=0)  # type: ignore[reportUnknownMemberType]
+    footpoint_output = model.find_foot_point(datetimes[it], x_dict_single, maginput, stop_alt=100, hemi_flag=0)
 
-    return footpoint_output["BFOOTMAG"]
+    return np.asarray(footpoint_output.b_foot_mag)
 
 
 @timed_function()
@@ -324,19 +321,21 @@ def get_MLT(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: IrbemInpu
     kext = irbem_input.magnetic_field.kext()
 
     model = MagFields(
-        path=irbem_input.irbem_lib_path, options=irbem_input.irbem_options, kext=kext, sysaxes=sysaxes, verbose=False
+        lib_path=irbem_input.irbem_lib_path,
+        options=irbem_input.irbem_options,
+        kext=kext,
+        sysaxes=sysaxes,
     )
 
     mlt_output = np.empty_like(datetimes)
 
     for i in range(len(datetimes)):
-        x_dict: dict[str, datetime | float] = {
-            "dateTime": datetimes[i],
+        x_dict: dict[Literal["x1", "x2", "x3"], np.floating] = {
             "x1": x_geo[i, 0],
             "x2": x_geo[i, 1],
             "x3": x_geo[i, 2],
         }
-        mlt_output[i] = model.get_mlt(x_dict)  # type: ignore[reportUnknownMemberType]
+        mlt_output[i] = model.get_mlt(datetimes[i], x_dict)
 
     mlt_output = mlt_output.astype(np.float64)
 
@@ -385,8 +384,7 @@ def get_local_B_field(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input:
         msg = f"Encountered size mismatch for x_geo: len of x_geo data: {len(x_geo)}, requested len: {len(datetimes)}"
         raise ValueError(msg)
 
-    x_dict: dict[str, NDArray[np.float64] | list[datetime]] = {
-        "dateTime": datetimes,
+    x_dict: dict[Literal["x1", "x2", "x3"], NDArray[np.floating]] = {
         "x1": x_geo[:, 0],
         "x2": x_geo[:, 1],
         "x3": x_geo[:, 2],
@@ -394,16 +392,19 @@ def get_local_B_field(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input:
     kext = irbem_input.magnetic_field.kext()
 
     model = MagFields(
-        path=irbem_input.irbem_lib_path, options=irbem_input.irbem_options, kext=kext, sysaxes=sysaxes, verbose=False
+        lib_path=irbem_input.irbem_lib_path,
+        options=irbem_input.irbem_options,
+        kext=kext,
+        sysaxes=sysaxes,
     )
 
-    field_multi_output = model.get_field_multi(x_dict, irbem_input.maginput)  # type: ignore[reportUnknownMemberType]
+    field_multi_output = model.get_field_multi(datetimes, x_dict, irbem_input.maginput)
 
     # replace bad values with nan
-    for key in field_multi_output:
-        field_multi_output[key][field_multi_output[key] == fortran_bad_value] = np.nan
+    field_multi_output.bgeo[field_multi_output.bgeo == fortran_bad_value] = np.nan
+    field_multi_output.blocal[field_multi_output.blocal == fortran_bad_value] = np.nan
 
-    b_local_var = ep.Variable(data=field_multi_output["Bl"], original_unit=u.nT)
+    b_local_var = ep.Variable(data=field_multi_output.blocal, original_unit=u.nT)
     return {create_var_name("B_local", irbem_input.magnetic_field): b_local_var}
 
 
@@ -416,23 +417,22 @@ def _get_mirror_point_parallel(
     it: int,
 ) -> NDArray[np.float64]:
     model = MagFields(
-        path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
+        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3],
     )
 
-    x_dict_single: dict[str, datetime | float] = {
-        "dateTime": datetimes[it],
+    x_dict_single: dict[Literal["x1", "x2", "x3"], np.floating] = {
         "x1": x_geo[it, 0],
         "x2": x_geo[it, 1],
         "x3": x_geo[it, 2],
     }
-    maginput_single = {key: maginput[key][it] for key in maginput}
+    maginput = {key: maginput[key][it] for key in maginput}
 
-    mirror_point_output = np.empty_like(pa_local[it, :])
+    bmin_output = np.empty_like(pa_local[it, :])
 
     for i, pa in enumerate(pa_local[it, :]):
-        mirror_point_output[i] = model.find_mirror_point(x_dict_single, maginput_single, pa)["bmin"]  # type: ignore[reportUnknownMemberType]
+        bmin_output[i] = model.find_mirror_point(datetimes[it], x_dict_single, maginput, pa).bmin
 
-    return mirror_point_output.astype(np.float64)
+    return bmin_output.astype(np.float64)
 
 
 @timed_function()
@@ -522,27 +522,26 @@ def _make_lstar_shell_splitting_parallel(
     it: int,
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
     model = MagFields(
-        path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3], verbose=False
+        lib_path=irbem_args[0], options=irbem_args[1], kext=irbem_args[2], sysaxes=irbem_args[3],
     )
 
-    x_dict_single: dict[str, datetime | float] = {
-        "dateTime": datetimes[it],
+    x_dict_single: dict[Literal["x1", "x2", "x3"], np.floating] = {
         "x1": x_geo[it, 0],
         "x2": x_geo[it, 1],
         "x3": x_geo[it, 2],
     }
-    maginput_single = {key: maginput[key][it] for key in maginput}
+    maginput = {key: maginput[key][it] for key in maginput}
 
     Lm = np.empty_like(pa_local[it, :])
     Lstar = np.empty_like(pa_local[it, :])
     xj = np.empty_like(pa_local[it, :])
 
     for i, pa in enumerate(pa_local[it, :]):
-        Lstar_output_single = model.make_lstar_shell_splitting(x_dict_single, maginput_single, pa)  # type: ignore[reportUnknownMemberType]
+        Lstar_output_single = model.make_lstar_shell_splitting(datetimes[it], x_dict_single, maginput, pa)
 
-        Lm[i] = Lstar_output_single["Lm"][0]
-        Lstar[i] = Lstar_output_single["Lstar"][0]
-        xj[i] = Lstar_output_single["xj"][0]
+        Lm[i] = Lstar_output_single.lm
+        Lstar[i] = Lstar_output_single.lstar
+        xj[i] = Lstar_output_single.xj
 
     return (Lm.astype(np.float64), Lstar.astype(np.float64), xj.astype(np.float64))
 
