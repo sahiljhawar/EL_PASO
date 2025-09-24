@@ -39,7 +39,7 @@ jobs:
         run: python -m coverage run --source el_paso -m pytest tests -m basic --ignore tests/system # ignore system tests due to RBMNcDataSet
 
       - name: Run Coveralls
-        if: ${{ success() }}
+        if: ${{ success() && matrix.python-version == '3.11' }}
         run: |
           coveralls --service=github
         env:
