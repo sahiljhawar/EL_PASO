@@ -5,6 +5,8 @@ SPDX-FileContributor: Bernhard Haas
 SPDX-License-Identifier: Apache-2.0
 -->
 
+[![Docs](https://app.readthedocs.org/projects/el-paso/badge/?version=latest)](https://el-paso.readthedocs.io/en/latest/)
+[![Coverage Status](https://coveralls.io/repos/github/GFZ/SWVO/badge.svg?branch=main)](https://coveralls.io/github/GFZ/EL_PASO?branch=main)
 [![REUSE status](https://api.reuse.software/badge/github.com/GFZ/EL_PASO)](https://api.reuse.software/info/github.com/GFZ/EL_PASO)
 
 # ELaborative Particle Analysis from Satellite Observations (EL-PASO)
