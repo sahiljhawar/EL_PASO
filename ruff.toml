@@ -7,15 +7,16 @@ line-length = 120
 
 [lint]
 select = ["ALL"]
-ignore = ["D100", # undocumented-public-module
-          "D104", # undocumented-public-package
-          "G004", # logging-f-string
-          "PLR0913", # too-many-arguments
-          "UP017", # datetime-timezone-undocumented
-          "COM812", # disable trailing whitespace because we use formatter
-          "S101", # allow assert statements
-          "RET504", # allow assignment before return
-          ]
+ignore = [
+    "D100",    # undocumented-public-module
+    "D104",    # undocumented-public-package
+    "G004",    # logging-f-string
+    "PLR0913", # too-many-arguments
+    "UP017",   # datetime-timezone-undocumented
+    "COM812",  # disable trailing whitespace because we use formatter
+    "S101",    # allow assert statements
+    "RET504",  # allow assignment before return
+]
 exclude = ["*.ipynb", "IRBEM/*", "setup.py"]
 
 [lint.pydocstyle]
