@@ -32,6 +32,7 @@ dependencies = [
     "tqdm>=4.67.1",
     "wget>=3.2",
     "wheel>=0.45.1",
+    "skyfield"
 ]
 
 [tool.setuptools.packages.find]

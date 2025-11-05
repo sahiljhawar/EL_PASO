@@ -637,12 +637,14 @@ def get_Lstar(
     for arr in [Lm, Lstar, xj]:
         arr[arr < 0] = np.nan
         if not np.any(np.isfinite(arr)):
-            msg = ("Lstar calculation failed! All points are NaNs! Hints for debugging:\n"
-                   "1) The calculation can fail for very low pitch-angles, where particles"
-                   "are not actually trapped"
-                   "2) Make sure your equatorial pitch angles and xGEO positions are correct\n"
-                   "3) Check other magnetic field outputs like equatorial magnetic fields."
-                   "If they are also NaN, the maginput to IRBEM might be wrong and needs debugging.")
+            msg = (
+                "Lstar calculation failed! All points are NaNs! Hints for debugging:\n"
+                "1) The calculation can fail for very low pitch-angles, where particles"
+                "are not actually trapped"
+                "2) Make sure your equatorial pitch angles and xGEO positions are correct\n"
+                "3) Check other magnetic field outputs like equatorial magnetic fields."
+                "If they are also NaN, the maginput to IRBEM might be wrong and needs debugging."
+            )
             raise ValueError(msg)
 
     Lm_var = ep.Variable(data=Lm.astype(np.float64), original_unit=u.dimensionless_unscaled)
