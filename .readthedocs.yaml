@@ -16,3 +16,6 @@ python:
   install:
     - requirements: docs/requirements.txt
     - path: "." 
+apt_packages:
+  - gfortran
+  - git
