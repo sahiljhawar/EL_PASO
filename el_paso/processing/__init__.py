@@ -5,6 +5,7 @@
 
 from el_paso.processing import magnetic_field_utils
 from el_paso.processing.bin_by_time import TimeBinMethod, bin_by_time
+from el_paso.processing.compute_equatorial_plasmaspheric_density import compute_equatorial_plasmaspheric_density
 from el_paso.processing.compute_invariant_K import compute_invariant_K
 from el_paso.processing.compute_invariant_mu import compute_invariant_mu
 from el_paso.processing.compute_magnetic_field_variables import VariableRequest, compute_magnetic_field_variables
@@ -20,6 +21,7 @@ __all__ = [
     "TimeBinMethod",
     "VariableRequest",
     "bin_by_time",
+    "compute_equatorial_plasmaspheric_density",
     "compute_invariant_K",
     "compute_invariant_mu",
     "compute_magnetic_field_variables",

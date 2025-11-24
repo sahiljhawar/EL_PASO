@@ -639,7 +639,7 @@ def get_Lstar(
         if not np.any(np.isfinite(arr)):
             msg = ("Lstar calculation failed! All points are NaNs! Hints for debugging:\n"
                    "1) The calculation can fail for very low pitch-angles, where particles"
-                   "are not actually trapped"
+                   "are not actually trapped\n"
                    "2) Make sure your equatorial pitch angles and xGEO positions are correct\n"
                    "3) Check other magnetic field outputs like equatorial magnetic fields."
                    "If they are also NaN, the maginput to IRBEM might be wrong and needs debugging.")

@@ -22,7 +22,9 @@ class DataOrgStandard(DataStandard):
         """Initializes the DataOrgStandard with a ConsistencyCheck object."""
         self.consistency_check = ConsistencyCheck()
 
-    def standardize_variable(self, standard_name: str, variable: ep.Variable) -> ep.Variable:  # noqa: C901, PLR0912, PLR0915
+    def standardize_variable(   # noqa: C901, PLR0912, PLR0915
+        self, standard_name: str, variable: ep.Variable, *, reset_consistency_check: bool,
+    ) -> ep.Variable:
         """Standardizes a variable based on its specified standard name.
 
         Applies unit conversions and dimension checks to a variable, ensuring its structure
@@ -31,6 +33,7 @@ class DataOrgStandard(DataStandard):
         Parameters:
             standard_name (str): The canonical name of the variable (e.g., 'FEDU', 'xGEO').
             variable (ep.Variable): The variable to be standardized.
+            reset_consistency_check (bool): If set to true, the consistency check will be reseted.
 
         Returns:
             ep.Variable: The standardized variable.
@@ -39,6 +42,9 @@ class DataOrgStandard(DataStandard):
             AssertionError: If the variable's dimensions are incorrect.
             UnitConversionError: If unit conversion fails.
         """
+        if reset_consistency_check:
+            self.consistency_check = ConsistencyCheck()
+
         match standard_name:
             case "time":
                 variable.convert_to_unit(ep.units.datenum)

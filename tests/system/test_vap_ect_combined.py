@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
-from swvo.io.RBMDataSet import RBMDataSet, RBMNcDataSet
+from swvo.io.RBMDataSet import RBMDataSet, RBMNcDataSet, VariableEnum
 
 from examples.VanAllenProbes.process_ect_combined import process_ect_combined
 
@@ -88,5 +88,33 @@ def test_rbsp_ect_combined_snapshot(
     else:
         msg = "Test not implemented for this save strategy."
         raise NotImplementedError(msg)
+
+    print(rbsp_proc.InvK[0,:])
+    print(rbsp_true.InvK[0,:])
+    adsf
+
+    import numpy as np
+
+    for var in VariableEnum:
+        self_var = getattr(rbsp_proc, var.var_name)
+        other_var = getattr(rbsp_true, var.var_name)
+
+        print("Testing:", var)
+
+        if isinstance(self_var, list) and isinstance(other_var, list):
+            if len(self_var) != len(other_var):
+                print(var)
+                continue
+            for dt1, dt2 in zip(self_var, other_var):
+                if dt1 != dt2:
+                    print(var)
+                    continue
+        elif isinstance(self_var, np.ndarray) and isinstance(other_var, np.ndarray):
+            if self_var.shape != other_var.shape:
+                print(var)
+                continue
+            if not np.allclose(self_var, other_var, equal_nan=True):
+                print(var)
+    asdf
 
     assert rbsp_proc == rbsp_true

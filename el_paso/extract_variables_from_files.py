@@ -186,9 +186,15 @@ def _extract_data_from_files(  # noqa: C901
             key = info.name_or_column
             if variable_data[key].size == 0:
                 variable_data[key] = new_data[key]
+
             elif info.is_time_dependent:
                 logger.debug(f"Concatenating data for {key} ...")
                 variable_data[key] = np.concatenate((variable_data[key], new_data[key]), axis=0)
+
+            elif np.any(np.isnan(variable_data[key])):
+                logger.debug(f"Found NaNs in non-time-dependent variable {key}. Trying to fill with next file ...")
+                nan_idx = np.isnan(variable_data[key])
+                variable_data[key] = new_data[key][nan_idx]
 
     return variable_data
 
@@ -289,9 +295,15 @@ def _extract_data_from_cdf(
         if info.name_or_column in cdfinfo.zVariables:
             # Retrieve data corresponding to the variable name from the CDF file
             var_content = cdf_file.varget(info.name_or_column)  # type: ignore[reportUnknownMemberType]
+            var_content = typing.cast("NDArray[Any]", var_content)
+
             if isinstance(var_content, str):
-                # If the content is a string, convert it to a numpy array
                 var_content = np.array([var_content])
+
+            if np.issubdtype(var_content.dtype, np.floating) and "FILLVAL" in cdf_file.varattsget(info.name_or_column):
+                fill_value = cdf_file.attget("FILLVAL", info.name_or_column).Data  #type: ignore[reportUnknownMemberType]
+                var_content[var_content == fill_value] = np.nan
+
             variable_data[info.name_or_column] = var_content
         else:
             logger.warning(f"Data with name {info.name_or_column} was not found in file {file_path}!", stacklevel=2)

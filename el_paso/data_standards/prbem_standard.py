@@ -24,7 +24,9 @@ class PRBEMStandard(DataStandard):
         """Initializes the PRBEMStandard with a ConsistencyCheck object."""
         self.consistency_check = ConsistencyCheck()
 
-    def standardize_variable(self, standard_name: str, variable: ep.Variable) -> ep.Variable:  # noqa: C901, PLR0912, PLR0915
+    def standardize_variable(  # noqa: C901, PLR0912, PLR0915
+        self, standard_name: str, variable: ep.Variable, *, reset_consistency_check: bool
+    ) -> ep.Variable:
         """Standardizes a variable based on its specified standard name.
 
         This method first converts the variable to its canonical unit based on the
@@ -36,11 +38,15 @@ class PRBEMStandard(DataStandard):
             standard_name (str): The name of the data standard to apply (e.g.,
                 'FEDU', 'xGEO', 'Lstar').
             variable (ep.Variable): The variable to be standardized.
+            reset_consistency_check (bool): If set to true, the consistency check will be reseted.
 
         Returns:
             ep.Variable: The standardized variable with its unit converted and
                           its consistency validated.
         """
+        if reset_consistency_check:
+            self.consistency_check = ConsistencyCheck()
+
         if standard_name == "FEDU":
             variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1))  # type: ignore[reportUnknownArgumentType]
 

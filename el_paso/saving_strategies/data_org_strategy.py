@@ -102,7 +102,7 @@ class DataOrgStrategy(SavingStrategy):
 
         self.data_standard = DataOrgStandard()
 
-    def standardize_variable(self, variable: Variable, name_in_file: str) -> Variable:
+    def standardize_variable(self, variable: Variable, name_in_file: str, *, first_call_of_interval: bool) -> Variable:
         """Standardizes a variable's units and dimensions based on its predefined name.
 
         This method acts as a proxy, delegating the actual standardization logic
@@ -113,6 +113,7 @@ class DataOrgStrategy(SavingStrategy):
             variable (Variable): The variable instance to be standardized.
             name_in_file (str): The predefined name of the variable to use for
                 determining the standardization rules.
+            first_call_of_interval (bool): Flag to indicate if it is the first call of a time interval
 
         Returns:
             Variable: The standardized variable instance.
@@ -120,7 +121,9 @@ class DataOrgStrategy(SavingStrategy):
         Raises:
             ValueError: If an unknown `name_in_file` is encountered..
         """
-        return self.data_standard.standardize_variable(name_in_file, variable)
+        return self.data_standard.standardize_variable(
+            name_in_file, variable, reset_consistency_check=first_call_of_interval
+        )
 
     def get_time_intervals_to_save(
         self, start_time: datetime | None, end_time: datetime | None

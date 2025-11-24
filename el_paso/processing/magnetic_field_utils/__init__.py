@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from el_paso.processing.magnetic_field_utils.construct_maginput import construct_maginput
+from el_paso.processing.magnetic_field_utils.irbem import Coords
 from el_paso.processing.magnetic_field_utils.mag_field_enum import MagneticField, MagneticFieldLiteral, kext
 from el_paso.processing.magnetic_field_utils.magnetic_field_functions import (
     IrbemInput,
@@ -19,6 +20,7 @@ from el_paso.processing.magnetic_field_utils.magnetic_field_functions import (
 )
 
 __all__ = [
+    "Coords",
     "IrbemInput",
     "IrbemOutput",
     "MagFieldVarTypes",

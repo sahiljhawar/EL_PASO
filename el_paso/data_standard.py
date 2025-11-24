@@ -14,7 +14,9 @@ class DataStandard(ABC):
     """Abstract base class for data standardization."""
 
     @abstractmethod
-    def standardize_variable(self, standard_name: str, variable: ep.Variable) -> ep.Variable:
+    def standardize_variable(
+        self, standard_name: str, variable: ep.Variable, *, reset_consistency_check: bool
+    ) -> ep.Variable:
         """Standardizes a variable according to the data standard's rules.
 
         This abstract method takes avariable and a standard name,
@@ -23,6 +25,7 @@ class DataStandard(ABC):
         Args:
             standard_name (str): The name of the standard to apply to the variable.
             variable (ep.Variable): The variable to be standardized.
+            reset_consistency_check (bool): If set to true, the consistency check will be reseted.
 
         Returns:
             ep.Variable: The standardized variable.

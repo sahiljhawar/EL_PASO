@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import typing
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import netCDF4 as nC
 
@@ -25,21 +25,7 @@ if typing.TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-class MonthlyNetCDFStrategy(MonthlyH5Strategy):
-    """A saving strategy that saves data to monthly NetCDF files.
-
-    This strategy organizes and saves processed scientific data into a series of
-    NetCDF files, partitioned by month. It inherits from `MonthlyH5Strategy` but
-    overrides the file saving logic to use the NetCDF format, which is widely used
-    in climate and earth science for storing array-oriented scientific data.
-
-    The strategy standardizes variables based on a provided `DataStandard` and
-    structures the output files with a consistent naming convention that includes
-    the file stem, date range, and magnetic field models used. It supports
-    multiple magnetic field models and automatically configures the output files
-    and their dependencies.
-    """
-
+class DensityNetCDFStrategy(MonthlyH5Strategy):
     output_files: list[OutputFile]
 
     file_path: Path
@@ -50,6 +36,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
         base_data_path: str | Path,
         file_name_stem: str,
         mag_field: MagneticFieldLiteral | list[MagneticFieldLiteral],
+        satellite: Literal["RBSP", "Other"] = "Other",
         data_standard: DataStandard | None = None,
     ) -> None:
         """Initializes the monthly NetCDF saving strategy.
@@ -76,57 +63,52 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
 
         output_file_entries = [
             "time",
-            "flux/FEDU",
-            "flux/FEDO",
-            "flux/alpha_eq",
-            "flux/energy",
-            "flux/alpha_local",
-            "position/xGEO",
-            "density/density_local",
-        ]
-
-        for single_mag_field in mag_field:
-            output_file_entries.extend(
-                [
-                    f"position/{single_mag_field}/MLT",
-                    f"position/{single_mag_field}/R0",
-                    f"position/{single_mag_field}/Lstar",
-                    f"position/{single_mag_field}/Lm",
-                    f"mag_field/{single_mag_field}/B_eq",
-                    f"mag_field/{single_mag_field}/B_local",
-                    f"psd/{single_mag_field}/inv_mu",
-                    f"psd/{single_mag_field}/inv_K",
-                    f"density/{single_mag_field}/density_eq",
-                ]
-            )
-        self.output_files = [
-            OutputFile("full", output_file_entries, save_incomplete=True),
+            "xGEO",
+            "MLT",
+            "R_eq",
+            "Lstar",
+            "xGEO_eq",
         ]
 
         self.dependency_dict = {
             "time": ["time"],
-            "flux/FEDU": ["time", "energy", "alpha"],
-            "flux/FEDO": ["time", "energy"],
-            "flux/alpha_eq": ["time", "alpha"],
-            "flux/energy": ["time", "energy"],
-            "flux/alpha_local": ["time", "alpha"],
-            "position/xGEO": ["time", "xGEO_components"],
-            "psd/PSD": ["time", "energy", "alpha"],
-            "density/density_local": ["time"],
+            "xGEO": ["time", "xGEO_components"],
+            "MLT": ["time"],
+            "R_eq": ["time"],
+            "xGEO_eq": ["time", "xGEO_components"],
+            "Lstar": ["time"],
         }
 
-        for single_mag_field in mag_field:
+        if satellite == "Other":
+            output_file_entries += ["density_local", "density_eq"]
+            self.dependency_dict |= {"density_local": ["time"], "density_eq": ["time"]}
+
+        elif satellite == "RBSP":
+            output_file_entries += [
+                "density_emfisis_local",
+                "density_efw_local",
+                "density_hiss_derived_local",
+                "density_emfisis_eq",
+                "density_efw_eq",
+                "density_hiss_derived_eq",
+            ]
+
             self.dependency_dict |= {
-                f"position/{single_mag_field}/MLT": ["time"],
-                f"position/{single_mag_field}/R0": ["time"],
-                f"position/{single_mag_field}/Lstar": ["time", "alpha"],
-                f"position/{single_mag_field}/Lm": ["time", "alpha"],
-                f"mag_field/{single_mag_field}/B_eq": ["time"],
-                f"mag_field/{single_mag_field}/B_local": ["time"],
-                f"psd/{single_mag_field}/inv_mu": ["time", "energy", "alpha"],
-                f"psd/{single_mag_field}/inv_K": ["time", "alpha"],
-                f"density/{single_mag_field}/density_eq": ["time"],
+                "density_emfisis_local": ["time"],
+                "density_efw_local": ["time"],
+                "density_hiss_derived_local": ["time"],
+                "density_emfisis_eq": ["time"],
+                "density_efw_eq": ["time"],
+                "density_hiss_derived_eq": ["time"],
             }
+
+        else:
+            msg = "Enountered invalid satellite! Valid names are: 'RBSP', 'Other'."
+            raise ValueError(msg)
+
+        self.output_files = [
+            OutputFile("full", output_file_entries, save_incomplete=True),
+        ]
 
     def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:  # noqa: ARG002
         """Generates the file path for a monthly NetCDF file.
@@ -154,9 +136,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
 
         return self.base_data_path / file_name
 
-    def standardize_variable(
-        self, variable: ep.Variable, name_in_file: str, *, first_call_of_interval: bool
-    ) -> ep.Variable:
+    def standardize_variable(self, variable: ep.Variable, name_in_file: str, *, first_call_of_interval:bool) -> ep.Variable:
         """Standardizes a variable based on the configured `DataStandard`.
 
         This method delegates the standardization process to a `DataStandard` instance,
@@ -171,11 +151,9 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
         Returns:
             ep.Variable: The standardized variable.
         """
-        return self.standard.standardize_variable(
-            name_in_file, variable, reset_consistency_check=first_call_of_interval
-        )
+        return self.standard.standardize_variable(name_in_file, variable, reset_consistency_check=first_call_of_interval)
 
-    def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:  # noqa: C901
+    def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:
         """Saves a dictionary of variables to a single NetCDF file.
 
         This method creates a new NetCDF4 file, defines dimensions based on the data,
@@ -200,56 +178,33 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
         if file_path.exists() and append:
             dict_to_save = self.append_data(file_path, dict_to_save)
 
-        with nC.Dataset(file_path, "w", format="NETCDF4") as file:
-            size_time = dict_to_save["time"].shape[0]
-            size_pitch_angle: int = 0
-            size_energy: int = 0
+        # a NETCDF4_CLASSIC format allows for loading mulitple files via netCDF4.MFDataset
+        with nC.Dataset(file_path, "w", format="NETCDF4_CLASSIC") as file:
 
-            if "flux/alpha_eq" in dict_to_save and dict_to_save["flux/alpha_eq"].size > 0:
-                size_pitch_angle = dict_to_save["flux/alpha_eq"].shape[1]
-            elif "flux/alpha_local" in dict_to_save and dict_to_save["flux/alpha_local"].size > 0:
-                size_pitch_angle = dict_to_save["flux/alpha_local"].shape[1]
+            file.createDimension("time", size=None) # time is unlimited
 
-            if "flux/energy" in dict_to_save and dict_to_save["flux/energy"].size > 0:
-                size_energy = dict_to_save["flux/energy"].shape[1]
-
-            file.createDimension("time", size_time)
-            file.createDimension("alpha", size_pitch_angle)
-            file.createDimension("energy", size_energy)
-
-            if "position/xGEO" in dict_to_save and dict_to_save["position/xGEO"].size > 0:
+            if ("xGEO" in dict_to_save and dict_to_save["xGEO"].size) > 0 or \
+               ("xGEO_eq" in dict_to_save and dict_to_save["xGEO_eq"].size > 0):
                 file.createDimension("xGEO_components", 3)
 
-            for path, value in dict_to_save.items():
-                if path == "metadata":
+            for dataset_name, value in dict_to_save.items():
+                if dataset_name == "metadata":
                     continue
 
                 if value.size == 0:
                     continue
 
-                path_parts = path.split("/")
-                groups = path_parts[:-1]
-                dataset_name = path_parts[-1]
-
-                curr_hierachy = file
-                for group in groups:
-                    if group not in curr_hierachy.groups:
-                        curr_hierachy = curr_hierachy.createGroup(group)  # type: ignore[reportUnknownVariableType]
-                    else:
-                        curr_hierachy = typing.cast("nC.Group", curr_hierachy[group])
-
                 data_set = typing.cast(
                     "nC.Variable[Any]",
-                    curr_hierachy.createVariable(  # type: ignore[reportUnknownMemberType]
-                        dataset_name, "f4", self.dependency_dict[path], zlib=True, complevel=5, shuffle=True
+                    file.createVariable(  # type: ignore[reportUnknownMemberType]
+                        dataset_name, "f4", self.dependency_dict[dataset_name], zlib=True, complevel=5, shuffle=True
                     ),
                 )
 
                 data_set[:, ...] = value
 
-                if path in dict_to_save["metadata"]:
-                    metadata = dict_to_save["metadata"][path]
+                if dataset_name in dict_to_save["metadata"]:
+                    metadata = dict_to_save["metadata"][dataset_name]
                     data_set.units = metadata["unit"]
-                    data_set.source = metadata["source_files"]
                     data_set.history = metadata["processing_notes"]
                     data_set.description = metadata["description"]

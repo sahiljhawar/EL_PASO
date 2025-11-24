@@ -82,7 +82,7 @@ class SingleFileStrategy(SavingStrategy):
         """
         return self.file_path
 
-    def standardize_variable(self, variable: Variable, name_in_file: str) -> Variable:  # noqa: ARG002
+    def standardize_variable(self, variable: Variable, name_in_file: str, *, first_call_of_interval: bool) -> Variable:  # noqa: ARG002
         """Does not modify the variable.
 
         This strategy does not perform any specific standardization on the variables before saving.
@@ -90,6 +90,7 @@ class SingleFileStrategy(SavingStrategy):
         Parameters:
             variable (Variable): The variable instance to be standardized.
             name_in_file (str): The name of the variable as it appears in the file (ignored).
+            first_call_of_interval (bool): Flag to indicate if it is the first call of a time interval
 
         Returns:
             Variable: The original variable instance, unchanged.

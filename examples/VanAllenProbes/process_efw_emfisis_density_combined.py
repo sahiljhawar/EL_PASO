@@ -1,8 +1,3 @@
-# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
-# SPDX-FileContributor: Bernhard Haas
-#
-# SPDX-License-Identifier: Apache-2.0
-
 import argparse
 import logging
 import sys
@@ -15,7 +10,8 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
-from el_paso.processing.magnetic_field_utils.irbem import Coords
+
+logger = logging.getLogger(__name__)
 
 
 def process_efw_emfisis_density_combined(
@@ -27,7 +23,10 @@ def process_efw_emfisis_density_combined(
     raw_data_path: str | Path = ".",
     processed_data_path: str | Path = ".",
     num_cores: int = 4,
-) -> None:
+    *,
+    add_hiss_derived_densitites: bool = True,
+    hiss_derived_densities_data_path: str | Path = ".",
+):
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 
@@ -76,8 +75,11 @@ def process_efw_emfisis_density_combined(
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in binned_time_variable.get_data(ep.units.posixtime)]
 
-    xgeo_data = Coords(path=irbem_lib_path).transform(
-        datetimes, efw_variables["xGSE"].get_data(ep.units.RE), ep.IRBEM_SYSAXIS_GSE, ep.IRBEM_SYSAXIS_GEO
+    xgeo_data = ep.processing.magnetic_field_utils.Coords(lib_path=irbem_lib_path).transform(
+        datetimes,
+        efw_variables["xGSE"].get_data(ep.units.RE).astype(np.float64),
+        ep.IRBEM_SYSAXIS_GSE,
+        ep.IRBEM_SYSAXIS_GEO,
     )
 
     efw_variables["xGEO"] = ep.Variable(data=xgeo_data, original_unit=ep.units.RE)
@@ -85,16 +87,41 @@ def process_efw_emfisis_density_combined(
     # Calculate magnetic field variables
     irbem_options = [1, 1, 4, 4, 0]
 
-    var_names_to_compute = ["MLT_" + mag_field, "R_eq_" + mag_field]
+    variables_to_compute: ep.processing.VariableRequest = [
+        ("MLT", mag_field),
+        ("R_eq", mag_field),
+        ("xGEO_eq", mag_field),
+    ]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_variable,
         xgeo_var=efw_variables["xGEO"],
-        var_names_to_compute=var_names_to_compute,
+        variables_to_compute=variables_to_compute,
         irbem_lib_path=str(irbem_lib_path),
         irbem_options=irbem_options,
         num_cores=num_cores,
     )
+
+    efw_variables["Density_mapped"] = ep.processing.compute_equatorial_plasmaspheric_density(
+        efw_variables["Density"],
+        efw_variables["xGEO"],
+        magnetic_field_variables["xGEO_eq_" + mag_field],
+    )
+    emfisis_variables["Density_mapped"] = ep.processing.compute_equatorial_plasmaspheric_density(
+        emfisis_variables["Density"],
+        efw_variables["xGEO"],
+        magnetic_field_variables["xGEO_eq_" + mag_field],
+    )
+
+    if add_hiss_derived_densitites:
+        hiss_derived_densities_vars = _get_and_time_bin_hiss_derived_densities(
+            hiss_derived_densities_data_path, start_time, end_time, sat_str
+        )
+        hiss_derived_densities_vars["Density_mapped"] = ep.processing.compute_equatorial_plasmaspheric_density(
+            hiss_derived_densities_vars["Density"],
+            efw_variables["xGEO"],
+            magnetic_field_variables["xGEO_eq_" + mag_field],
+        )
 
     start_time_str = start_time.date().isoformat()
 
@@ -106,10 +133,20 @@ def process_efw_emfisis_density_combined(
         "time": binned_time_variable,
         "density_efw": efw_variables["Density"],
         "density_emfisis": emfisis_variables["Density"],
+        "density_eq_efw": efw_variables["Density_mapped"],
+        "density_eq_emfisis": emfisis_variables["Density_mapped"],
         "MLT_" + mag_field: magnetic_field_variables["MLT_" + mag_field],
         "R_eq_" + mag_field: magnetic_field_variables["R_eq_" + mag_field],
         "density_emfisis_digi_type": emfisis_variables["Digi_type"],
+        "xGEO": efw_variables["xGEO"],
+        "xGEO_eq": magnetic_field_variables["xGEO_eq_" + mag_field]
     }
+
+    if add_hiss_derived_densitites:
+        variables_to_save |= {
+            "density_hiss_derived": hiss_derived_densities_vars["Density"],
+            "density_hiss_derived_eq": hiss_derived_densities_vars["Density_mapped"],
+        }
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
 
@@ -214,6 +251,62 @@ def _get_emfisis_variables(
     return variables
 
 
+def _get_and_time_bin_hiss_derived_densities(
+    hiss_derived_densities_data_path: str | Path,
+    start_time: datetime,
+    end_time: datetime,
+    sat_str: Literal["a", "b"],
+) -> dict[str, ep.Variable]:
+    logger.info("Processing hiss-derived densities!")
+
+    if sat_str == "a":
+        file_name_stem = "rbsp-a_hiss_density_arase_recalibrated.txt"
+    else:
+        file_name_stem = "rbsp-b_hiss_density_arase_recalibrated_v2.txt"
+
+    extraction_infos = [
+        ep.ExtractionInfo(
+            result_key="Epoch",
+            name_or_column=0,
+            unit=u.dimensionless_unscaled,
+        ),
+        ep.ExtractionInfo(
+            result_key="Density",
+            name_or_column=1,
+            unit=u.cm**-3,
+        ),
+    ]
+
+    hiss_derived_vars = ep.extract_variables_from_files(
+        start_time=start_time,
+        end_time=end_time,
+        file_cadence="single_file",
+        data_path=hiss_derived_densities_data_path,
+        file_name_stem=file_name_stem,
+        extraction_infos=extraction_infos,
+        pd_read_csv_kwargs={"skiprows": 4, "sep": "\t", "dtype": {0: str, 1: np.float64}},
+    )
+
+    datetimes = ep.processing.convert_string_to_datetime(hiss_derived_vars["Epoch"], time_format="%Y-%m-%dT%H:%M:%S.%f")
+    timestamps = np.asarray([dt.timestamp() for dt in datetimes])
+    hiss_derived_vars["Epoch"].set_data(timestamps, unit=ep.units.posixtime)
+
+    time_bin_methods = {
+        "Density": ep.TimeBinMethod.NanMean,
+    }
+
+    _ = ep.processing.bin_by_time(
+        hiss_derived_vars["Epoch"],
+        variables=hiss_derived_vars,
+        time_bin_method_dict=time_bin_methods,
+        time_binning_cadence=timedelta(minutes=1),
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    return hiss_derived_vars
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description="Process density data from EFW and EMFISIS instrument on VanAllenProbes."
@@ -221,18 +314,21 @@ if __name__ == "__main__":
     parser.add_argument(
         "start_time",
         type=str,
+        nargs="?",
         help="Start time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2017, 4, 1, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2017, 4, 28, tzinfo=timezone.utc).isoformat(),
     )
     parser.add_argument(
         "end_time",
         type=str,
+        nargs="?",
         help="End time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
         default=datetime(2017, 4, 30, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
     )
     parser.add_argument(
         "irbem_lib_path",
         type=str,
+        nargs="?",
         help="Path towards the compiled IRBEM library..",
         default="../../IRBEM/libirbem.so",
     )
@@ -248,9 +344,11 @@ if __name__ == "__main__":
             dt_start,
             dt_end,
             sat_str,
-            args.irbem_lib_path,
-            "T89",  # type: ignore[reportArgumentType]
-            raw_data_path="/home/bhaas/el_paso_processing/raw_data/",
-            processed_data_path="/home/bhaas/el_paso_processing/data_processed/density/",
+            args.irbem_lib_path,  # type: ignore[reportArgumentType]
+            "TS04",
+            raw_data_path=".",
+            processed_data_path=".",
             num_cores=32,
+            add_hiss_derived_densitites=True,
+            hiss_derived_densities_data_path=".",
         )

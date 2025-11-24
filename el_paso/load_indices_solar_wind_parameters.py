@@ -7,6 +7,7 @@ import os
 import typing
 from collections.abc import Iterable
 from datetime import datetime, timedelta, timezone
+from functools import lru_cache
 from io import StringIO
 from pathlib import Path
 from typing import Literal, overload
@@ -136,13 +137,7 @@ def load_indices_solar_wind_parameters(  # noqa: C901, PLR0912, PLR0915
                 result = _create_variables_from_data_frame(output_df, "dst", u.nT, target_time_variable, "linear")
 
             case "Pdyn":
-                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
-                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(  # type: ignore[reportUnknownMemberType]
-                    start_time - timedelta(hours=1),
-                    end_time + timedelta(hours=1),
-                    model_order=sw_model_order,
-                    download=True,
-                )
+                output_df = _cache_omni_high_res(base_data_path, start_time, end_time)
                 assert isinstance(output_df, pd.DataFrame)
 
                 output_df["pdyn"] = output_df["pdyn"].interpolate(method="spline", order=3).ffill().bfill()
@@ -150,14 +145,8 @@ def load_indices_solar_wind_parameters(  # noqa: C901, PLR0912, PLR0915
                 result = _create_variables_from_data_frame(output_df, "pdyn", u.nPa, target_time_variable, "linear")
 
             case "IMF_Bz":
-                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
                 # we request two additional hours for interpolation
-                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(  # type: ignore[reportUnknownMemberType]
-                    start_time - timedelta(hours=1),
-                    end_time + timedelta(hours=1),
-                    model_order=sw_model_order,
-                    download=True,
-                )
+                output_df = _cache_omni_high_res(base_data_path, start_time, end_time)
                 assert isinstance(output_df, pd.DataFrame)
 
                 output_df["bz_gsm"] = output_df["bz_gsm"].interpolate(method="spline", order=3).ffill().bfill()
@@ -166,13 +155,7 @@ def load_indices_solar_wind_parameters(  # noqa: C901, PLR0912, PLR0915
 
             case "IMF_By":
                 # we request two additional hours for interpolation
-                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
-                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(  # type: ignore[reportUnknownMemberType]
-                    start_time - timedelta(hours=1),
-                    end_time + timedelta(hours=1),
-                    model_order=sw_model_order,
-                    download=True,
-                )
+                output_df = _cache_omni_high_res(base_data_path, start_time, end_time)
                 assert isinstance(output_df, pd.DataFrame)
 
                 output_df["by_gsm"] = output_df["by_gsm"].interpolate(method="spline", order=3).ffill().bfill()
@@ -181,13 +164,7 @@ def load_indices_solar_wind_parameters(  # noqa: C901, PLR0912, PLR0915
 
             case "SW_speed":
                 # we request two additional hours for interpolation
-                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
-                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(  # type: ignore[reportUnknownMemberType]
-                    start_time - timedelta(hours=1),
-                    end_time + timedelta(hours=1),
-                    model_order=sw_model_order,
-                    download=True,
-                )
+                output_df = _cache_omni_high_res(base_data_path, start_time, end_time)
                 assert isinstance(output_df, pd.DataFrame)
 
                 output_df["speed"] = output_df["speed"].interpolate(method="spline", order=3).ffill().bfill()
@@ -202,18 +179,13 @@ def load_indices_solar_wind_parameters(  # noqa: C901, PLR0912, PLR0915
 
             case "SW_density":
                 # we request two additional hours for interpolation
-                sw_model_order = [swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res")]
-                output_df = swvo_io.solar_wind.read_solar_wind_from_multiple_models(  # type: ignore[reportUnknownMemberType]
-                    start_time - timedelta(hours=1),
-                    end_time + timedelta(hours=1),
-                    model_order=sw_model_order,
-                    download=True,
-                )
+                output_df = _cache_omni_high_res(base_data_path, start_time, end_time)
                 assert isinstance(output_df, pd.DataFrame)
 
                 output_df["proton_density"] = (
                     output_df["proton_density"].interpolate(method="spline", order=3).ffill().bfill()
                 )
+                output_df["proton_density"] = output_df["proton_density"].clip(lower=0)
 
                 result = _create_variables_from_data_frame(
                     output_df, "proton_density", u.cm**-3, target_time_variable, "linear"
@@ -265,6 +237,15 @@ def _create_variables_from_data_frame(
 
     return result
 
+@lru_cache
+def _cache_omni_high_res(base_data_path:Path, start_time:datetime, end_time:datetime) -> pd.DataFrame:
+    output_df = swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res").read(
+        start_time - timedelta(hours=1),
+        end_time + timedelta(hours=1),
+        download=True,
+    )
+
+    return output_df
 
 def _calculate_g1(
     start_time: datetime, end_time: datetime, target_time_variable: ep.Variable | None
@@ -434,9 +415,12 @@ R = [0.383403, 0.648176, 0.318752e-01, 0.581168, 1.15070, 0.843004]
 def _calculate_w_parameters(
     start_time: datetime, end_time: datetime, target_time_variable: ep.Variable | None
 ) -> tuple[ep.Variable, ep.Variable]:
-    additional_required_inputs = typing.cast("list[SW_Index]", ["IMF_Bz", "SW_speed", "SW_density", "Dst"])
+    additional_required_inputs = typing.cast("list[SW_Index]", ["IMF_Bz", "SW_speed", "SW_density"])
 
-    start_timestamp = start_time.timestamp()
+    # shift by two weeks because the values are influenced by past conditions
+    start_time_sifted = start_time - timedelta(days=14)
+
+    start_timestamp = start_time_sifted.timestamp()
     end_timestamp = end_time.timestamp()
     cadence_minutes = 5
     timestamps = np.arange(start_timestamp, end_timestamp + 10, cadence_minutes * 60)
@@ -445,16 +429,15 @@ def _calculate_w_parameters(
     # calculation requires 5 min resolution
     time_var_calculation = ep.Variable(data=timestamps, original_unit=ep.units.posixtime)
 
-    inputs = load_indices_solar_wind_parameters(start_time, end_time, additional_required_inputs, time_var_calculation)
+    inputs = load_indices_solar_wind_parameters(start_time_sifted, end_time, additional_required_inputs, time_var_calculation)
 
     sw_speed = inputs["SW_speed"].get_data().astype(np.float64)
     sw_density = inputs["SW_density"].get_data().astype(np.float64)
     imf_bz = inputs["IMF_Bz"].get_data().astype(np.float64)
-    dst = inputs["Dst"].get_data().astype(np.float64)
 
     b_south = np.where(imf_bz < 0, -imf_bz, 0)
 
-    w_params = np.full((len(dst), 6), 0.0)
+    w_params = np.full((len(sw_speed), 6), 0.0)
 
     cutoff_value = -10  # same as in Tsyganenko's code
     sw_density_with_He = sw_density * 1.16  # same as in Tsyganenko's code  # noqa: N806
@@ -493,6 +476,8 @@ def _calculate_w_parameters(
         time_var_to_return = time_var_calculation
 
     w_var = ep.Variable(data=w_data_to_return, original_unit=u.dimensionless_unscaled)
+    w_var.truncate(time_var_to_return, start_time, end_time)
+    time_var_to_return.truncate(time_var_to_return, start_time, end_time)
 
     return (w_var, time_var_to_return)
 

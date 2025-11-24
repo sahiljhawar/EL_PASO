@@ -161,7 +161,9 @@ class MonthlyH5Strategy(SavingStrategy):
 
         return self.base_data_path / file_name
 
-    def standardize_variable(self, variable: ep.Variable, name_in_file: str) -> ep.Variable:
+    def standardize_variable(
+        self, variable: ep.Variable, name_in_file: str, *, first_call_of_interval: bool
+    ) -> ep.Variable:
         """Standardizes a variable's units and dimensions by delegating to a DataStandard instance.
 
         This method acts as a wrapper, passing the variable and its file name to the
@@ -169,8 +171,11 @@ class MonthlyH5Strategy(SavingStrategy):
         Parameters:
             variable (ep.Variable): The variable instance to be standardized.
             name_in_file (str): The name of the variable as it appears in the file.
+            first_call_of_interval (bool): Flag to indicate if it is the first call of a time interval
 
         Returns:
             ep.Variable: The standardized variable.
         """
-        return self.data_standard.standardize_variable(name_in_file, variable)
+        return self.data_standard.standardize_variable(
+            name_in_file, variable, reset_consistency_check=first_call_of_interval
+        )

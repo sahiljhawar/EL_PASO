@@ -99,7 +99,7 @@ class SavingStrategy(ABC):
         """
 
     @abstractmethod
-    def standardize_variable(self, variable: Variable, name_in_file: str) -> Variable:
+    def standardize_variable(self, variable: Variable, name_in_file: str, *, first_call_of_interval: bool) -> Variable:
         """Standardizes the given variable according to the specified name in the file.
 
         Standardization may include checking of units, dimensions, and size consistency.
@@ -107,6 +107,7 @@ class SavingStrategy(ABC):
         Args:
             variable (Variable): The variable instance to be standardized.
             name_in_file (str): The name of the variable as it appears in the file.
+            first_call_of_interval (bool): Flag to indicate if it is the first call of a time interval
 
         Returns:
             Variable: The standardized variable instance.
@@ -141,6 +142,7 @@ class SavingStrategy(ABC):
             - If a requested variable name is not found, a warning is issued and None is returned.
         """
         target_variables: dict[str, Variable] = {}
+        first_call_of_interval = True
 
         # if no variables have been specified, we save all of them
         if len(output_file.names_to_save) == 0:
@@ -149,7 +151,8 @@ class SavingStrategy(ABC):
 
                 if start_time is not None and end_time is not None and time_var is not None:
                     var_to_save.truncate(time_var, start_time.timestamp(), end_time.timestamp())
-                var_to_save = self.standardize_variable(var_to_save, key)
+                var_to_save = self.standardize_variable(var_to_save, key, first_call_of_interval=first_call_of_interval)
+                first_call_of_interval = False
 
                 target_variables[key] = var_to_save
 
@@ -161,7 +164,11 @@ class SavingStrategy(ABC):
 
                 if start_time is not None and end_time is not None and time_var is not None:
                     var_to_save.truncate(time_var, start_time.timestamp(), end_time.timestamp())
-                var_to_save = self.standardize_variable(var_to_save, name_to_save)
+
+                var_to_save = self.standardize_variable(
+                    var_to_save, name_to_save, first_call_of_interval=first_call_of_interval
+                )
+                first_call_of_interval = False
 
                 target_variables[name_to_save] = var_to_save
             else:
