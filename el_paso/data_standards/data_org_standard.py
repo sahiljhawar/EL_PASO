@@ -22,8 +22,12 @@ class DataOrgStandard(DataStandard):
         """Initializes the DataOrgStandard with a ConsistencyCheck object."""
         self.consistency_check = ConsistencyCheck()
 
-    def standardize_variable(   # noqa: C901, PLR0912, PLR0915
-        self, standard_name: str, variable: ep.Variable, *, reset_consistency_check: bool,
+    def standardize_variable(  # noqa: C901, PLR0912, PLR0915
+        self,
+        standard_name: str,
+        variable: ep.Variable,
+        *,
+        reset_consistency_check: bool,
     ) -> ep.Variable:
         """Standardizes a variable based on its specified standard name.
 

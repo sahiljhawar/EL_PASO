@@ -301,7 +301,7 @@ def _extract_data_from_cdf(
                 var_content = np.array([var_content])
 
             if np.issubdtype(var_content.dtype, np.floating) and "FILLVAL" in cdf_file.varattsget(info.name_or_column):
-                fill_value = cdf_file.attget("FILLVAL", info.name_or_column).Data  #type: ignore[reportUnknownMemberType]
+                fill_value = cdf_file.attget("FILLVAL", info.name_or_column).Data  # type: ignore[reportUnknownMemberType]
                 var_content[var_content == fill_value] = np.nan
 
             variable_data[info.name_or_column] = var_content

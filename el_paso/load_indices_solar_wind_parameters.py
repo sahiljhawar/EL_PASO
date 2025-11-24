@@ -237,8 +237,9 @@ def _create_variables_from_data_frame(
 
     return result
 
+
 @lru_cache
-def _cache_omni_high_res(base_data_path:Path, start_time:datetime, end_time:datetime) -> pd.DataFrame:
+def _cache_omni_high_res(base_data_path: Path, start_time: datetime, end_time: datetime) -> pd.DataFrame:
     output_df = swvo_io.solar_wind.SWOMNI(base_data_path / "OMNI_high_res").read(
         start_time - timedelta(hours=1),
         end_time + timedelta(hours=1),
@@ -246,6 +247,7 @@ def _cache_omni_high_res(base_data_path:Path, start_time:datetime, end_time:date
     )
 
     return output_df
+
 
 def _calculate_g1(
     start_time: datetime, end_time: datetime, target_time_variable: ep.Variable | None
@@ -429,7 +431,9 @@ def _calculate_w_parameters(
     # calculation requires 5 min resolution
     time_var_calculation = ep.Variable(data=timestamps, original_unit=ep.units.posixtime)
 
-    inputs = load_indices_solar_wind_parameters(start_time_sifted, end_time, additional_required_inputs, time_var_calculation)
+    inputs = load_indices_solar_wind_parameters(
+        start_time_sifted, end_time, additional_required_inputs, time_var_calculation
+    )
 
     sw_speed = inputs["SW_speed"].get_data().astype(np.float64)
     sw_density = inputs["SW_density"].get_data().astype(np.float64)

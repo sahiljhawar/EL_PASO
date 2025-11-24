@@ -3,13 +3,13 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-
+import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
 import pytest
-from swvo.io.RBMDataSet import RBMDataSet, RBMNcDataSet, VariableEnum
+from swvo.io.RBMDataSet import RBMDataSet, RBMNcDataSet
 
 from examples.VanAllenProbes.process_ect_combined import process_ect_combined
 
@@ -25,7 +25,11 @@ from examples.VanAllenProbes.process_ect_combined import process_ect_combined
     ],
 )
 def test_rbsp_ect_combined_snapshot(
-    mag_field: Literal["T89", "TS04", "OP77", "T96"], save_strategy: Literal["dataorg", "h5", "netcdf"], tmpdir: Path
+    mag_field: Literal["T89", "TS04", "OP77", "T96"],
+    save_strategy: Literal["dataorg", "h5", "netcdf"],
+    tmpdir: Path,
+    *,
+    renew_solution: bool,
 ) -> None:
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=0.4, seconds=-1)
@@ -60,23 +64,41 @@ def test_rbsp_ect_combined_snapshot(
                 / f"rbspa_ect_combined_{start_date:%Y%m%d}to{end_date:%Y%m%d}_flux_ver4.mat"
             )
             assert out_path.exists()
+
+            if renew_solution:
+                shutil.copytree(processed_data_path, Path(__file__).parent / "data" / "processed", dirs_exist_ok=True)
+
         case "h5":
             out_path = processed_data_path / f"rbspa_ect_combined_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.h5"
             assert out_path.exists()
+
+            if renew_solution:
+                shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "RBSP" / "rbspa")
+
         case "netcdf":
             out_path = processed_data_path / f"rbspa_ect_combined_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.nc"
             assert out_path.exists()
 
+            if renew_solution:
+                shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "RBSP" / "rbspa")
+
     if save_strategy == "dataorg":
-        rbsp_proc = RBMDataSet(start_time, end_time, tmpdir, "RBSPA", "ect_combined", mag_field)
+        rbsp_proc = RBMDataSet(
+            start_time=start_time,
+            end_time=end_time,
+            folder_path=tmpdir,
+            satellite="RBSPA",
+            instrument="ect_combined",
+            mfm=mag_field,
+        )
 
         rbsp_true = RBMDataSet(
-            start_time,
-            end_time,
-            Path(__file__).parent / "data" / "processed",
-            "RBSPA",
-            "ect_combined",
-            mag_field,
+            start_time=start_time,
+            end_time=end_time,
+            folder_path=Path(__file__).parent / "data" / "processed",
+            satellite="RBSPA",
+            instrument="ect_combined",
+            mfm=mag_field,
             preferred_extension="mat",
         )
     elif save_strategy == "netcdf":
@@ -89,32 +111,4 @@ def test_rbsp_ect_combined_snapshot(
         msg = "Test not implemented for this save strategy."
         raise NotImplementedError(msg)
 
-    print(rbsp_proc.InvK[0,:])
-    print(rbsp_true.InvK[0,:])
-    adsf
-
-    import numpy as np
-
-    for var in VariableEnum:
-        self_var = getattr(rbsp_proc, var.var_name)
-        other_var = getattr(rbsp_true, var.var_name)
-
-        print("Testing:", var)
-
-        if isinstance(self_var, list) and isinstance(other_var, list):
-            if len(self_var) != len(other_var):
-                print(var)
-                continue
-            for dt1, dt2 in zip(self_var, other_var):
-                if dt1 != dt2:
-                    print(var)
-                    continue
-        elif isinstance(self_var, np.ndarray) and isinstance(other_var, np.ndarray):
-            if self_var.shape != other_var.shape:
-                print(var)
-                continue
-            if not np.allclose(self_var, other_var, equal_nan=True):
-                print(var)
-    asdf
-
-    assert rbsp_proc == rbsp_true
+    assert rbsp_proc == rbsp_true, f"Different variables: {rbsp_proc.get_different_variables(rbsp_true)}"

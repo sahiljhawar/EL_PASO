@@ -822,7 +822,7 @@ class MagFields:
         time = copy.deepcopy(time)
         time = np.atleast_1d(np.asarray(time))
 
-        position = dict(copy.deepcopy(position))
+        position = dict(copy.deepcopy(position))  # type: ignore[no-matching-overload]
         position["x1"] = np.atleast_1d(np.asarray(position["x1"]))
         position["x2"] = np.atleast_1d(np.asarray(position["x2"]))
         position["x3"] = np.atleast_1d(np.asarray(position["x3"]))
@@ -878,7 +878,7 @@ class MagFields:
                 maginput[i] = -9999
             return maginput
 
-        ordered_keys: list[MagInputKeys] = [
+        ordered_keys = (
             "Kp",
             "Dst",
             "dens",
@@ -896,11 +896,11 @@ class MagFields:
             "W5",
             "W6",
             "AL",
-        ]
+        )
 
         # If the model inputs are arrays
         if isinstance(next(iter(input_dict.values())), list | np.ndarray):
-            input_dict = typing.cast("Mapping[MagInputKeys, list[np.number] | NDArray[np.number]]", input_dict)
+            input_dict = typing.cast("dict[MagInputKeys, list[np.number] | NDArray[np.number]]", input_dict)
             ntime = len(next(iter(input_dict.values())))
 
             maginput = ((ctypes.c_double * 25) * ntime)()
@@ -1021,9 +1021,10 @@ class Coords:
             time = typing.cast("list[str]", time)
             time = [dateutil.parser.parse(t) for t in time]
 
-        for it, t in enumerate(time):
-            assert isinstance(t, datetime)
+        assert isinstance(time[0], datetime)
+        time = typing.cast("list[datetime]", time)
 
+        for it, t in enumerate(time):
             iyear[it] = ctypes.c_int(t.year)
             idoy[it] = ctypes.c_int(t.timetuple().tm_yday)
             ut[it] = ctypes.c_double(3600 * t.hour + 60 * t.minute + t.second)

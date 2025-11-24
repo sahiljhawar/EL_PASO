@@ -26,6 +26,22 @@ logger = logging.getLogger(__name__)
 
 
 class DensityNetCDFStrategy(MonthlyH5Strategy):
+    """Saving strategy for writing plasma density and related data to monthly NetCDF files.
+
+    This strategy extends `MonthlyH5Strategy` but implements saving to the NetCDF
+    format (`.nc`), primarily targeting the time-series of density, position, and
+    coordinate variables (e.g., L-star, MLT).
+
+    The variables included and their dependencies are configured based on whether
+    the data is associated with the **"RBSP"** satellites or **"Other"**.
+
+    Attributes:
+        output_files (list[OutputFile]): List of file configurations to be produced.
+        file_path (Path): Base path for output files (inherited).
+        dependency_dict (dict[str, list[str]]): Defines the NetCDF dimension names
+            (e.g., 'time', 'xGEO_components') that each variable depends on.
+    """
+
     output_files: list[OutputFile]
 
     file_path: Path
@@ -46,11 +62,15 @@ class DensityNetCDFStrategy(MonthlyH5Strategy):
             file_name_stem (str): The base name for the output files (e.g., "my_data").
             mag_field (MagneticFieldLiteral | list[MagneticFieldLiteral]):
                 A string or list of strings specifying the magnetic field models used.
+            satellite (Literal["RBSP", "Other"], optional):
+                            Specifies the satellite associated with the data. This is often used to trigger
+                            specific metadata or formatting conventions. Defaults to "Other".
+            data_standard (DataStandard | None, optional):
             data_standard (DataStandard | None):
                 An optional `DataStandard` instance to use for standardizing variables.
                 If `None`, `ep.data_standards.PRBEMStandard` is used by default.
         """
-        if not isinstance(mag_field, list):
+        if isinstance(mag_field, str):
             mag_field = [mag_field]
 
         if data_standard is None:
@@ -58,7 +78,7 @@ class DensityNetCDFStrategy(MonthlyH5Strategy):
 
         self.base_data_path = Path(base_data_path)
         self.file_name_stem = file_name_stem
-        self.mag_field = mag_field
+        self.mag_field_list = mag_field
         self.standard = data_standard
 
         output_file_entries = [
@@ -129,14 +149,16 @@ class DensityNetCDFStrategy(MonthlyH5Strategy):
 
         file_name = f"{self.file_name_stem}_{start_year_month_day}to{end_year_month_day}"
 
-        for mag_field in self.mag_field:
+        for mag_field in self.mag_field_list:
             file_name += f"_{mag_field}"
 
         file_name += ".nc"
 
         return self.base_data_path / file_name
 
-    def standardize_variable(self, variable: ep.Variable, name_in_file: str, *, first_call_of_interval:bool) -> ep.Variable:
+    def standardize_variable(
+        self, variable: ep.Variable, name_in_file: str, *, first_call_of_interval: bool
+    ) -> ep.Variable:
         """Standardizes a variable based on the configured `DataStandard`.
 
         This method delegates the standardization process to a `DataStandard` instance,
@@ -151,7 +173,9 @@ class DensityNetCDFStrategy(MonthlyH5Strategy):
         Returns:
             ep.Variable: The standardized variable.
         """
-        return self.standard.standardize_variable(name_in_file, variable, reset_consistency_check=first_call_of_interval)
+        return self.standard.standardize_variable(
+            name_in_file, variable, reset_consistency_check=first_call_of_interval
+        )
 
     def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:
         """Saves a dictionary of variables to a single NetCDF file.
@@ -180,11 +204,11 @@ class DensityNetCDFStrategy(MonthlyH5Strategy):
 
         # a NETCDF4_CLASSIC format allows for loading mulitple files via netCDF4.MFDataset
         with nC.Dataset(file_path, "w", format="NETCDF4_CLASSIC") as file:
+            file.createDimension("time", size=None)  # time is unlimited
 
-            file.createDimension("time", size=None) # time is unlimited
-
-            if ("xGEO" in dict_to_save and dict_to_save["xGEO"].size) > 0 or \
-               ("xGEO_eq" in dict_to_save and dict_to_save["xGEO_eq"].size > 0):
+            if ("xGEO" in dict_to_save and dict_to_save["xGEO"].size) > 0 or (
+                "xGEO_eq" in dict_to_save and dict_to_save["xGEO_eq"].size > 0
+            ):
                 file.createDimension("xGEO_components", 3)
 
             for dataset_name, value in dict_to_save.items():

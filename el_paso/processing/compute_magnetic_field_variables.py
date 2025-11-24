@@ -154,7 +154,7 @@ def compute_magnetic_field_variables(
 
         maginput = mag_utils.construct_maginput(time_var, mag_field, indices_solar_wind_hashable)
 
-        irbem_input = mag_utils.IrbemInput(irbem_lib_path, mag_field, maginput, irbem_options, num_cores)
+        irbem_input = mag_utils.IrbemInput(irbem_lib_path, mag_field, maginput, irbem_options, num_cores)  # type: ignore[bad-argument-type]
 
         computed_variables |= _get_result(
             var_type, xgeo_var, time_var, pa_local_var, energy_var, computed_variables, irbem_input, particle_species

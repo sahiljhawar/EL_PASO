@@ -168,11 +168,11 @@ def process_mepe_level_3(  # noqa: PLR0915
             datetime.fromtimestamp(t, tz=timezone.utc) for t in binned_time_variable.get_data(ep.units.posixtime)
         ]
 
-        geo_data = Coords(path=irbem_lib_path).transform(
+        geo_data = Coords(lib_path=irbem_lib_path).transform(
             time=datetimes,
             pos=orb_variables["pos_sm"].get_data().astype(np.float64),
-            sysaxesIn=ep.IRBEM_SYSAXIS_SM,
-            sysaxesOut=ep.IRBEM_SYSAXIS_GEO,
+            sysaxes_in=ep.IRBEM_SYSAXIS_SM,
+            sysaxes_out=ep.IRBEM_SYSAXIS_GEO,
         )
         pos_geo_var = ep.Variable(data=geo_data, original_unit=ep.units.RE)
 

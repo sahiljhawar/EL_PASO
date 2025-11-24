@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import argparse
 import logging
 import sys
@@ -26,7 +31,7 @@ def process_efw_emfisis_density_combined(
     *,
     add_hiss_derived_densitites: bool = True,
     hiss_derived_densities_data_path: str | Path = ".",
-):
+) -> None:
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 
@@ -106,11 +111,13 @@ def process_efw_emfisis_density_combined(
         efw_variables["Density"],
         efw_variables["xGEO"],
         magnetic_field_variables["xGEO_eq_" + mag_field],
+        method="Denton_average",
     )
     emfisis_variables["Density_mapped"] = ep.processing.compute_equatorial_plasmaspheric_density(
         emfisis_variables["Density"],
         efw_variables["xGEO"],
         magnetic_field_variables["xGEO_eq_" + mag_field],
+        method="Denton_average",
     )
 
     if add_hiss_derived_densitites:
@@ -121,32 +128,34 @@ def process_efw_emfisis_density_combined(
             hiss_derived_densities_vars["Density"],
             efw_variables["xGEO"],
             magnetic_field_variables["xGEO_eq_" + mag_field],
+            method="Denton_average",
         )
-
-    start_time_str = start_time.date().isoformat()
-
-    saving_strategy = ep.saving_strategies.SingleFileStrategy(
-        processed_data_path / ("rbsp" + sat_str + "_efw_emfisis_density_combined_" + start_time_str + ".h5")
-    )
 
     variables_to_save = {
         "time": binned_time_variable,
-        "density_efw": efw_variables["Density"],
-        "density_emfisis": emfisis_variables["Density"],
-        "density_eq_efw": efw_variables["Density_mapped"],
-        "density_eq_emfisis": emfisis_variables["Density_mapped"],
-        "MLT_" + mag_field: magnetic_field_variables["MLT_" + mag_field],
-        "R_eq_" + mag_field: magnetic_field_variables["R_eq_" + mag_field],
+        "density_efw_local": efw_variables["Density"],
+        "density_emfisis_local": emfisis_variables["Density"],
+        "density_efw_eq": efw_variables["Density_mapped"],
+        "density_emfisis_eq": emfisis_variables["Density_mapped"],
+        "MLT": magnetic_field_variables["MLT_" + mag_field],
+        "R_eq": magnetic_field_variables["R_eq_" + mag_field],
         "density_emfisis_digi_type": emfisis_variables["Digi_type"],
         "xGEO": efw_variables["xGEO"],
-        "xGEO_eq": magnetic_field_variables["xGEO_eq_" + mag_field]
+        "xGEO_eq": magnetic_field_variables["xGEO_eq_" + mag_field],
     }
 
     if add_hiss_derived_densitites:
         variables_to_save |= {
-            "density_hiss_derived": hiss_derived_densities_vars["Density"],
+            "density_hiss_derived_local": hiss_derived_densities_vars["Density"],
             "density_hiss_derived_eq": hiss_derived_densities_vars["Density_mapped"],
         }
+
+    saving_strategy = ep.saving_strategies.DensityNetCDFStrategy(
+        base_data_path=processed_data_path,
+        file_name_stem=f"rbsp_{sat_str}_densities_combined",
+        mag_field=mag_field,
+        satellite="RBSP",
+    )
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
 
@@ -248,6 +257,14 @@ def _get_emfisis_variables(
     variables["Digi_type"].truncate(variables["Epoch"], start_time, end_time)
     variables["Epoch"].truncate(variables["Epoch"], start_time, end_time)
 
+    digi_type = variables["Digi_type"].get_data()
+    density = variables["Density"].get_data()
+
+    is_fpe = ["fpe" in dt for dt in digi_type]
+    density[is_fpe] = np.nan
+
+    variables["Density"].set_data(density, "same")
+
     return variables
 
 
@@ -316,14 +333,14 @@ if __name__ == "__main__":
         type=str,
         nargs="?",
         help="Start time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2017, 4, 28, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2013, 3, 1, tzinfo=timezone.utc).isoformat(),
     )
     parser.add_argument(
         "end_time",
         type=str,
         nargs="?",
         help="End time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2017, 4, 30, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2013, 3, 31, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
     )
     parser.add_argument(
         "irbem_lib_path",
@@ -339,16 +356,16 @@ if __name__ == "__main__":
     dt_end = dateutil.parser.parse(args.end_time)
 
     #    with tempfile.TemporaryDirectory() as tmpdir:
-    for sat_str in ["a", "b"]:
+    for sat_str in ["b"]:
         process_efw_emfisis_density_combined(
             dt_start,
             dt_end,
             sat_str,
             args.irbem_lib_path,  # type: ignore[reportArgumentType]
-            "TS04",
+            "T89",
             raw_data_path=".",
             processed_data_path=".",
             num_cores=32,
             add_hiss_derived_densitites=True,
-            hiss_derived_densities_data_path=".",
+            hiss_derived_densities_data_path="/home/bhaas/data/rbsp_hiss_densities/",
         )

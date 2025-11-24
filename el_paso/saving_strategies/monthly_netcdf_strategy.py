@@ -63,7 +63,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                 An optional `DataStandard` instance to use for standardizing variables.
                 If `None`, `ep.data_standards.PRBEMStandard` is used by default.
         """
-        if not isinstance(mag_field, list):
+        if isinstance(mag_field, str):
             mag_field = [mag_field]
 
         if data_standard is None:
@@ -71,7 +71,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
 
         self.base_data_path = Path(base_data_path)
         self.file_name_stem = file_name_stem
-        self.mag_field = mag_field
+        self.mag_field_list = mag_field
         self.standard = data_standard
 
         output_file_entries = [
@@ -85,7 +85,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             "density/density_local",
         ]
 
-        for single_mag_field in mag_field:
+        for single_mag_field in self.mag_field_list:
             output_file_entries.extend(
                 [
                     f"position/{single_mag_field}/MLT",
@@ -147,7 +147,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
 
         file_name = f"{self.file_name_stem}_{start_year_month_day}to{end_year_month_day}"
 
-        for mag_field in self.mag_field:
+        for mag_field in self.mag_field_list:
             file_name += f"_{mag_field}"
 
         file_name += ".nc"
