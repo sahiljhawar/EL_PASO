@@ -101,7 +101,7 @@ class Variable:
             description (str): A description of the variable. Defaults to "".
             processing_notes (str): Notes on how the data was processed. Defaults to "".
         """
-        self._data = np.array([], dtype=np.generic) if data is None else data
+        self._data = np.array([]) if data is None else data
 
         self.metadata = VariableMetadata(
             unit=original_unit,
