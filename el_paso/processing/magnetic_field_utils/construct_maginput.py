@@ -132,7 +132,7 @@ def construct_maginput(
             req_input_data = req_input_data.clip(clip_range[0], clip_range[1])
 
         if req_input == "Kp":
-            req_input_data = np.round(req_input_data*10)
+            req_input_data = np.round(req_input_data * 10)
 
         maginput[:, MAGINPUT_TO_INDEX[req_input]] = np.asarray(req_input_data, dtype=np.float64)
 

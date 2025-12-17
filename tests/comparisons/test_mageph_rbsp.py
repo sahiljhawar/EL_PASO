@@ -28,7 +28,7 @@ mag_field_list = ["TS04", "T89"]
 @pytest.mark.parametrize("sat_str", sat_str_list)
 @pytest.mark.parametrize("mag_field", mag_field_list)
 @pytest.mark.visual
-def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
+def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):  # noqa: PLR0915
     # process Lstar using el paso
     start_time = datetime(2013, 3, 17, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=0, hours=23, minutes=59)
@@ -36,16 +36,16 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
     Path("tests/comparisons/raw_data").mkdir(exist_ok=True)
     Path("tests/comparisons/processed_data").mkdir(exist_ok=True)
 
-    # process_hope_electrons(
-    #     start_time,
-    #     end_time,
-    #     sat_str,
-    #     "IRBEM/libirbem.so",
-    #     mag_field,
-    #     raw_data_path="tests/comparisons/raw_data",
-    #     processed_data_path="tests/comparisons/processed_data",
-    #     num_cores=12,
-    # )
+    process_hope_electrons(
+        start_time,
+        end_time,
+        sat_str,
+        "IRBEM/libirbem.so",
+        mag_field,
+        raw_data_path="tests/comparisons/raw_data",
+        processed_data_path="tests/comparisons/processed_data",
+        num_cores=12,
+    )
 
     match mag_field:
         case "T89":
@@ -110,8 +110,7 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
     )
 
     timestamps = [
-        datetime.fromisoformat(str(t)[2:-2]).replace(tzinfo=timezone.utc)
-        for t in variables["Epoch"].get_data()
+        datetime.fromisoformat(str(t)[2:-2]).replace(tzinfo=timezone.utc) for t in variables["Epoch"].get_data()
     ]
 
     el_paso_timestamps = rbsp_data.datetime
@@ -123,7 +122,7 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
 
     plt.style.use("seaborn-v0_8-bright")
 
-    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19/1.5, 12))
+    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19 / 1.5, 12))
 
     f.suptitle(mag_field)
 
@@ -132,8 +131,7 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
     ax_kp.set_ylabel("Kp")
     ax_kp.grid()
     ax_kp.set_xlim(timestamps[0], timestamps[-1])
-    ax_kp.xaxis.set_major_formatter(
-        mdates.ConciseDateFormatter(ax_kp.xaxis.get_major_locator()))
+    ax_kp.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax_kp.xaxis.get_major_locator()))
 
     ax_dst = ax_kp.twinx()
     ax_dst.plot(dst_data.index, dst_data["dst"], "b")
@@ -153,8 +151,7 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
     ax1.set_xlim(timestamps[0], timestamps[-1])
     ax1.grid()
     ax1.set_ylabel("L*")
-    ax1.xaxis.set_major_formatter(
-        mdates.ConciseDateFormatter(ax1.xaxis.get_major_locator()))
+    ax1.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax1.xaxis.get_major_locator()))
 
     variables["Lstar"].apply_thresholds_on_data(lower_threshold=0.0)
 
@@ -172,8 +169,7 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
     ax2.set_xlim(timestamps[0], timestamps[-1])
     ax2.grid()
     ax2.set_ylabel("L*")
-    ax2.xaxis.set_major_formatter(
-        mdates.ConciseDateFormatter(ax2.xaxis.get_major_locator()))
+    ax2.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax2.xaxis.get_major_locator()))
 
     variables["Lstar"].apply_thresholds_on_data(lower_threshold=0.0)
 
@@ -191,8 +187,7 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
     ax3.set_xlim(timestamps[0], timestamps[-1])
     ax3.grid()
     ax3.set_ylabel("L*")
-    ax3.xaxis.set_major_formatter(
-        mdates.ConciseDateFormatter(ax3.xaxis.get_major_locator()))
+    ax3.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax3.xaxis.get_major_locator()))
 
     plt.tight_layout()
 

@@ -13,9 +13,10 @@ import pytest
 import el_paso as ep
 
 mag_field_list = ["OP77", "T89", "T01s", "TS04"]
+
+
 @pytest.mark.parametrize("mag_field", mag_field_list)
 def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
-
     true_data = {
         "OP77": (92.31, 97.28, 106.8),
         "T89": (82.09, 90.64, 95.8),
@@ -26,7 +27,7 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     start_time = datetime(2024, 5, 10, 16, tzinfo=timezone.utc)
     end_time = datetime(2024, 5, 11, 0, tzinfo=timezone.utc)
 
-    time_list:list[float] = []
+    time_list: list[float] = []
     curr_time = start_time
 
     while curr_time <= end_time:
@@ -59,4 +60,3 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     assert min_value == true_data[mag_field][0]
     assert mean_value == true_data[mag_field][1]
     assert max_value == true_data[mag_field][2]
-
