@@ -3,12 +3,10 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# ruff: noqa: N999
-
 import logging
-import re
 import sys
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Literal
 
 import numpy as np
@@ -18,37 +16,20 @@ from numpy.typing import NDArray
 import el_paso as ep
 
 logging.captureWarnings(capture=True)
+logger = logging.getLogger(__name__)
 
-
-def _weight_energy_channels_exponentially(energy_ranges: list[str]) -> NDArray[np.float64]:
-    """Calculate the exponential weighing of the two numbers in the energy range string."""
-    b = 7.068e-3  # constant as in the MATLAB code
-
-    weighted_energy_channels: list[float] = []
-
-    for energy_range in energy_ranges:
-        if isinstance(energy_range, str):
-            match = re.match(r"(\d+)-(\d+)", energy_range)
-            if match:
-                E_min = float(match.group(1))
-                E_max = float(match.group(2))
-                # Calculate the exponential weighing, translated from MATLAB
-                E_mean = np.log(
-                    (((-1.0 / b) * np.exp(-b * E_max)) + (1.0 / b) * np.exp(-b * E_min)) / (E_max - E_min)
-                ) / (-b)
-
-                weighted_energy_channels.append(E_mean)
-
-    return np.asarray(weighted_energy_channels)
-
+def _remove_unit_from_energy_channels(energy_channels: list[str]) -> NDArray[np.int32]:
+    """Remove the unit from the energy ranges."""
+    return np.asarray([int(i.replace(" keV", "")) for i in energy_channels if "keV" in i])
 
 def process_goes_real_time(
-    satellite_str: Literal["primary", "secondary"],
-    save_data_dir: str,
-    download_data_dir: str,
-    irbem_lib_path: str,
+    sat_str: Literal["primary", "secondary"],
+    processed_data_path: str | Path,
+    raw_data_path: str | Path,
+    irbem_lib_path: str | Path,
     start_time: datetime,
     end_time: datetime,
+    save_strategy: Literal["dataorg", "netcdf"] = "netcdf",
     num_cores: int = 32,
 ) -> None:
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -80,9 +61,9 @@ def process_goes_real_time(
         ),
     ]
 
-    data_path_stem = f"{download_data_dir}goes/YYYY/MM/{satellite_str}/"
-    rename_file_name_stem = f"{satellite_str}_YYYYMMDD.json"
-    url = f"https://services.swpc.noaa.gov/json/goes/{satellite_str}/"
+    data_path_stem = f"{raw_data_path}/YYYY/MM/{sat_str}/"
+    rename_file_name_stem = f"{sat_str}_YYYYMMDD.json"
+    url = f"https://services.swpc.noaa.gov/json/goes/{sat_str}/"
 
     ep.download(
         start_time,
@@ -103,12 +84,15 @@ def process_goes_real_time(
         extraction_infos=extraction_infos,
     )
 
+    sat_name = "goes" + str(variables["sat_id"].get_data()[0])
+    logger.info(f"Processing satellite: {sat_name}")
+
     # parse time strings
     datetimes = ep.processing.convert_string_to_datetime(variables["Epoch"])
-    variables["Epoch"].set_data(np.asarray([t.timestamp() for t in datetimes]), u.posixtime)
+    variables["Epoch"].set_data(np.asarray([t.timestamp() for t in datetimes]), ep.units.posixtime)
 
     # generated weighted energy channels
-    variables["Energy"].set_data(_weight_energy_channels_exponentially(variables["Energy"].get_data()), "same")
+    variables["Energy"].set_data(_remove_unit_from_energy_channels(variables["Energy"].get_data()), "same")
 
     # Get the sorting order based on the row
     sorting_order = np.argsort(variables["Energy"].get_data())
@@ -130,8 +114,6 @@ def process_goes_real_time(
         time_binning_cadence=timedelta(minutes=5),
     )
 
-    sat_name = "goes" + str(variables["sat_id"].get_data()[0])
-
     variables["xGEO"] = ep.processing.get_real_time_tipsod(binned_time_var.get_data(), sat_name)
 
     # Local pitch angles from 5 to 90 deg
@@ -139,15 +121,17 @@ def process_goes_real_time(
     variables["PA_local_FEDU"] = ep.Variable(data=pa_local_data, original_unit=u.deg)
 
     # Calculate magnetic field variables
-    var_names_to_compute = [
-        "B_local_T89",
-        "MLT_T89",
-        "B_eq_T89",
-        "R_eq_T89",
-        "PA_eq_T89",
-        "invMu_T89",
-        "invK_T89",
-        "Lstar_T89",
+    variables_to_compute: ep.processing.VariableRequest = [
+        ("B_local", "T89"),
+        ("B_eq", "T89"),
+        ("MLT", "T89"),
+        ("B_eq", "T89"),
+        ("R_eq", "T89"),
+        ("PA_eq", "T89"),
+        ("Lstar", "T89"),
+        ("Lm", "T89"),
+        ("invMu", "T89"),
+        ("invK", "T89"),
     ]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
@@ -156,7 +140,7 @@ def process_goes_real_time(
         energy_var=variables["Energy"],
         pa_local_var=variables["PA_local_FEDU"],
         particle_species="electron",
-        var_names_to_compute=var_names_to_compute,
+        variables_to_compute=variables_to_compute,
         irbem_lib_path=irbem_lib_path,
         irbem_options=[1, 1, 4, 4, 0],
         num_cores=num_cores,
@@ -167,41 +151,70 @@ def process_goes_real_time(
     )
     FEDU_var.apply_thresholds_on_data(lower_threshold=0)
 
-    PSD_var = ep.processing.compute_phase_space_density(FEDU_var, variables["Energy"], particle_species="electron")
+    psd_var = ep.processing.compute_phase_space_density(FEDU_var, variables["Energy"], particle_species="electron")
 
-    variables_to_save = {
-        "time": variables["Epoch"],
-        "Flux": FEDU_var,
-        "xGEO": variables["xGEO"],
-        "energy_channels": variables["Energy"],
-        "alpha_local": variables["PA_local_FEDU"],
-        "PSD": PSD_var,
-        "alpha_eq_model": magnetic_field_variables["PA_eq_T89"],
-        "MLT": magnetic_field_variables["MLT_T89"],
-        "Lstar": magnetic_field_variables["Lstart_T89"],
-        "R0": magnetic_field_variables["R_eq_T89"],
-        "B_eq": magnetic_field_variables["B_eq_T89"],
-        "B_local": magnetic_field_variables["B_local_T89"],
-        "InvMu": magnetic_field_variables["invMu_T89"],
-        "InvK": magnetic_field_variables["invK_T89"],
-    }
+    if save_strategy == "dataorg":
 
-    saving_strategy = ep.saving_strategies.DataOrgStrategy(
-        save_data_dir, mission="GOES", satellite=satellite_str, instrument="MAGED", kext="T89", file_format=".pickle"
-    )
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=variables["Epoch"], append=True)
+        variables_to_save = {
+            "time": binned_time_var,
+            "Flux": FEDU_var,
+            "xGEO": variables["xGEO"],
+            "energy_channels": variables["Energy"],
+            "alpha_local": variables["PA_local_FEDU"],
+            "PSD": psd_var,
+            "alpha_eq_model": magnetic_field_variables["PA_eq_T89"],
+            "MLT": magnetic_field_variables["MLT_T89"],
+            "Lstar": magnetic_field_variables["Lstar_T89"],
+            "R0": magnetic_field_variables["R_eq_T89"],
+            "B_eq": magnetic_field_variables["B_eq_T89"],
+            "B_local": magnetic_field_variables["B_local_T89"],
+            "InvMu": magnetic_field_variables["invMu_T89"],
+            "InvK": magnetic_field_variables["invK_T89"],
+        }
+
+        saving_strategy = ep.saving_strategies.DataOrgStrategy(
+            processed_data_path, mission="GOES", satellite=sat_str, instrument="MAGED", kext="T89", file_format=".pickle"
+        )
+        append = True
+
+    elif save_strategy == "netcdf":
+
+        variables_to_save = {
+            "time": binned_time_var,
+            "flux/FEDU": FEDU_var,
+            "flux/energy": variables["Energy"],
+            "flux/alpha_local": variables["PA_local_FEDU"],
+            "flux/alpha_eq": magnetic_field_variables["PA_eq_T89"],
+            "position/T89/R0": magnetic_field_variables["R_eq_T89"],
+            "position/T89/MLT": magnetic_field_variables["MLT_T89"],
+            "position/T89/Lm": magnetic_field_variables["Lm_T89"],
+            "position/T89/Lstar": magnetic_field_variables["Lstar_T89"],
+            "mag_field/T89/B_local": magnetic_field_variables["B_local_T89"],
+            "mag_field/T89/B_eq": magnetic_field_variables["B_eq_T89"],
+            "psd/PSD": psd_var,
+            "psd/T89/inv_mu": magnetic_field_variables["invMu_T89"],
+            "psd/T89/inv_K": magnetic_field_variables["invK_T89"],
+            "position/xGEO": variables["xGEO"],
+        }
+
+        saving_strategy = ep.saving_strategies.MonthlyNetCDFStrategy(
+            base_data_path=Path(processed_data_path) / sat_str, file_name_stem=f"goes_{sat_str}", mag_field="T89",
+        )
+        append = False
+
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=append)
 
 
 if __name__ == "__main__":
     start_time = (datetime.now(timezone.utc)).replace(hour=0, minute=0, second=0, microsecond=0)
     end_time = start_time + timedelta(days=0.1)
 
-    for i in ["primary", "secondary"]:
+    for sat in ["primary", "secondary"]:
         process_goes_real_time(
-            satellite_str=i,
-            download_data_dir="goes/raw/",
-            save_data_dir="goes/processed/",
-            irbem_lib_path="../IRBEM/libirbem.so",
+            sat_str=sat,
+            raw_data_path="goes/raw/",
+            processed_data_path="goes/processed/",
+            irbem_lib_path="IRBEM/libirbem.so",
             start_time=start_time,
             end_time=end_time,
             num_cores=64,
