@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-
+import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -20,6 +20,8 @@ def test_arase_mepe_snapshot(
     mag_field: Literal["T89", "TS04", "OP77Q"],
     save_strategy: Literal["DataOrg", "h5", "netcdf"],
     tmpdir: Path,
+    *,
+    renew_solution: bool,
 ) -> None:
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=0.4, seconds=-1)
@@ -49,16 +51,27 @@ def test_arase_mepe_snapshot(
                 processed_data_path / "arase_mepe" / "level_3" / f"{start_date:%Y%m%d}to{end_date:%Y%m%d}" / mag_field
             )
             assert out_path.exists()
+
+            if renew_solution:
+                shutil.copytree(processed_data_path, Path(__file__).parent / "data" / "processed", dirs_exist_ok=True)
+
         case "h5":
             out_path = processed_data_path / f"arase_mepe-l3_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.h5"
             assert out_path.exists()
+
+            if renew_solution:
+                shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "ARASE" / "arase")
+
         case "netcdf":
             out_path = processed_data_path / f"arase_mepe-l3_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.nc"
             assert out_path.exists()
+
+            if renew_solution:
+                shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "ARASE" / "arase")
 
     arase_proc = RBMNcDataSet(start_time, end_time, tmpdir, "ARASE", "mepe", mag_field)
     arase_true = RBMNcDataSet(
         start_time, end_time, Path(__file__).parent / "data" / "processed", "ARASE", "mepe", mag_field
     )
 
-    assert arase_proc == arase_true
+    assert arase_proc == arase_true, f"Different variables: {arase_proc.get_different_variables(arase_true)}"
