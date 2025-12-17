@@ -7,11 +7,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
+import matplotlib.dates as mdates
 import numpy as np
 import pytest
 from astropy import units as u
 from matplotlib import pyplot as plt
 from swvo.io import RBMDataSet
+from swvo.io.dst import DSTOMNI
+from swvo.io.kp import KpOMNI
 
 import el_paso as ep
 from examples.VanAllenProbes.process_hope_electrons import process_hope_electrons
@@ -25,7 +28,7 @@ mag_field_list = ["TS04", "T89"]
 @pytest.mark.parametrize("sat_str", sat_str_list)
 @pytest.mark.parametrize("mag_field", mag_field_list)
 @pytest.mark.visual
-def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):  # noqa: C901, PLR0915
+def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
     # process Lstar using el paso
     start_time = datetime(2013, 3, 17, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=0, hours=23, minutes=59)
@@ -33,16 +36,16 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
     Path("tests/comparisons/raw_data").mkdir(exist_ok=True)
     Path("tests/comparisons/processed_data").mkdir(exist_ok=True)
 
-    process_hope_electrons(
-        start_time,
-        end_time,
-        sat_str,
-        "IRBEM/libirbem.so",
-        mag_field,
-        raw_data_path="tests/comparisons/raw_data",
-        processed_data_path="tests/comparisons/processed_data",
-        num_cores=12,
-    )
+    # process_hope_electrons(
+    #     start_time,
+    #     end_time,
+    #     sat_str,
+    #     "IRBEM/libirbem.so",
+    #     mag_field,
+    #     raw_data_path="tests/comparisons/raw_data",
+    #     processed_data_path="tests/comparisons/processed_data",
+    #     num_cores=12,
+    # )
 
     match mag_field:
         case "T89":
@@ -51,22 +54,12 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
             mfm_enum = RBMDataSet.MfmEnum.T04s
 
     rbsp_data = RBMDataSet.RBMDataSet(
-        start_time,
-        end_time,
-        Path("tests/comparisons/processed_data/"),
-        "RBSPA",
-        RBMDataSet.InstrumentEnum.HOPE,
-        mfm_enum,
-        verbose=True,
-    )
-
-    rbsp_data_server = RBMDataSet.RBMDataSet(
-        start_time,
-        end_time,
-        Path("/export/rbm6/data/data-dev/"),
-        "RBSPA",
-        RBMDataSet.InstrumentEnum.HOPE,
-        mfm_enum,
+        start_time=start_time,
+        end_time=end_time,
+        folder_path=Path("tests/comparisons/processed_data/"),
+        satellite="RBSPA",
+        instrument=RBMDataSet.InstrumentEnum.HOPE,
+        mfm=mfm_enum,
         verbose=True,
     )
 
@@ -117,23 +110,32 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
     )
 
     timestamps = [
-        datetime.fromisoformat(str(t)[2:-2]).replace(tzinfo=timezone.utc).timestamp()
+        datetime.fromisoformat(str(t)[2:-2]).replace(tzinfo=timezone.utc)
         for t in variables["Epoch"].get_data()
     ]
 
-    el_paso_timestamps = [t.timestamp() for t in rbsp_data.datetime]
+    el_paso_timestamps = rbsp_data.datetime
 
     variables["Lstar"].apply_thresholds_on_data(lower_threshold=0.0)
 
-    _, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(19, 10))
+    kp_data = KpOMNI("/home/bhaas/.el_paso/KpOmni").read(start_time, end_time, download=True)
+    dst_data = DSTOMNI("/home/bhaas/.el_paso/KpOmni").read(start_time, end_time, download=True)
 
-    server_Lstar = []
-    for it, _ in enumerate(el_paso_timestamps):
-        server_Lstar.append(
-            np.interp(20, np.rad2deg(rbsp_data_server.alpha_local[it, :]), rbsp_data_server.Lstar[it, :])
-        )
+    plt.style.use("seaborn-v0_8-bright")
 
-    server_timestamps = [t.timestamp() for t in rbsp_data_server.datetime]
+    _, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19/1.5, 12))
+
+    ax_kp.stairs(kp_data["kp"][:-1], kp_data.index, color="k", linewidth=1.5)
+    ax_kp.set_ylim(0, 9)
+    ax_kp.set_ylabel("Kp")
+    ax_kp.grid()
+    ax_kp.set_xlim(timestamps[0], timestamps[-1])
+    ax_kp.xaxis.set_major_formatter(
+        mdates.ConciseDateFormatter(ax_kp.xaxis.get_major_locator()))
+
+    ax_dst = ax_kp.twinx()
+    ax_dst.plot(dst_data.index, dst_data["dst"], "b")
+    ax_dst.set_ylabel("Dst [nT]", color="b")
 
     el_paso_Lstar = []
     for it, _ in enumerate(el_paso_timestamps):
@@ -143,17 +145,14 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
 
     ax1.plot(timestamps, variables["Lstar"].get_data()[:, deg_idx[0]], "k")
     ax1.plot(el_paso_timestamps, el_paso_Lstar, "r--")
-    ax1.plot(server_timestamps, server_Lstar, "b:")
-    ax1.legend(["MagEph", "EL PASO", "Data server"])
-    ax1.set_title("20 deg")
-
-    server_Lstar = []
-    for it, _ in enumerate(el_paso_timestamps):
-        server_Lstar.append(
-            np.interp(50, np.rad2deg(rbsp_data_server.alpha_local[it, :]), rbsp_data_server.Lstar[it, :])
-        )
-
-    server_timestamps = [t.timestamp() for t in rbsp_data_server.datetime]
+    ax1.legend(["ECT Team", "EL-PASO"])
+    ax1.set_title("Local pitch angle = 20°")
+    ax1.set_ylim(1, 7)
+    ax1.set_xlim(timestamps[0], timestamps[-1])
+    ax1.grid()
+    ax1.set_ylabel("L*")
+    ax1.xaxis.set_major_formatter(
+        mdates.ConciseDateFormatter(ax1.xaxis.get_major_locator()))
 
     variables["Lstar"].apply_thresholds_on_data(lower_threshold=0.0)
 
@@ -165,17 +164,14 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
 
     ax2.plot(timestamps, variables["Lstar"].get_data()[:, deg_idx[0]], "k")
     ax2.plot(el_paso_timestamps, el_paso_Lstar, "r--")
-    ax2.plot(server_timestamps, server_Lstar, "b:")
-    ax2.legend(["MagEph", "EL PASO", "Data server"])
-    ax2.set_title("50 deg")
-
-    server_Lstar: list[float] = []
-    for it, _ in enumerate(el_paso_timestamps):
-        server_Lstar.append(
-            np.interp(70, np.rad2deg(rbsp_data_server.alpha_local[it, :]), rbsp_data_server.Lstar[it, :])
-        )
-
-    server_timestamps = [t.timestamp() for t in rbsp_data_server.datetime]
+    ax2.legend(["ECT Team", "EL-PASO"])
+    ax2.set_title("Local pitch angle = 50°")
+    ax2.set_ylim(1, 7)
+    ax2.set_xlim(timestamps[0], timestamps[-1])
+    ax2.grid()
+    ax2.set_ylabel("L*")
+    ax2.xaxis.set_major_formatter(
+        mdates.ConciseDateFormatter(ax2.xaxis.get_major_locator()))
 
     variables["Lstar"].apply_thresholds_on_data(lower_threshold=0.0)
 
@@ -187,8 +183,15 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
 
     ax3.plot(timestamps, variables["Lstar"].get_data()[:, deg_idx[0]], "k")
     ax3.plot(el_paso_timestamps, el_paso_Lstar, "r--")
-    ax3.plot(server_timestamps, server_Lstar, "b:")
-    ax3.legend(["MagEph", "EL PASO", "Data server"])
-    ax3.set_title("70 deg")
+    ax3.legend(["ECT Team", "EL-PASO"])
+    ax3.set_title("Local pitch angle = 70°")
+    ax3.set_ylim(1, 7)
+    ax3.set_xlim(timestamps[0], timestamps[-1])
+    ax3.grid()
+    ax3.set_ylabel("L*")
+    ax3.xaxis.set_major_formatter(
+        mdates.ConciseDateFormatter(ax3.xaxis.get_major_locator()))
+
+    plt.tight_layout()
 
     plt.savefig(f"{Path(__file__).parent / f'mag_eph_test_{mag_field}.png'}")
