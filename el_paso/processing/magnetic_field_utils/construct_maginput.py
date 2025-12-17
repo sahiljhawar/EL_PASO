@@ -131,6 +131,9 @@ def construct_maginput(
             clip_range = clip_ranges[req_input]
             req_input_data = req_input_data.clip(clip_range[0], clip_range[1])
 
+        if req_input == "Kp":
+            req_input_data = np.round(req_input_data*10)
+
         maginput[:, MAGINPUT_TO_INDEX[req_input]] = np.asarray(req_input_data, dtype=np.float64)
 
     maginput_dict: dict[MagInputKeys, NDArray[np.float64]] = {
