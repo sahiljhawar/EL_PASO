@@ -242,7 +242,7 @@ def _extract_data_from_ascii(
 def _extract_data_from_json(
     file_path: str, extraction_infos: tuple[ExtractionInfo, ...]
 ) -> dict[str | int, NDArray[np.generic]]:
-    warnings.warn("Enountered JSON file. Please specify your dependent variables!", stacklevel=2)
+    logger.info("Enountered JSON file. Please specify your dependent variables!")
 
     with Path(file_path).open("r") as f:
         data = json.load(f)
@@ -353,4 +353,4 @@ def _find_files_with_regex(directory: Path, regex_pattern: str) -> list[Path]:
     """Find files in a directory that match a given regex pattern."""
     compiled_regex = re.compile(regex_pattern)  # Compile for efficiency
 
-    return [file for file in directory.glob("*") if compiled_regex.search(str(file))]
+    return [file for file in directory.glob("*") if compiled_regex.fullmatch(str(file.name))]

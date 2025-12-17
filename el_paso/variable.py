@@ -233,7 +233,7 @@ class Variable:
             end_time = enforce_utc_timezone(end_time).timestamp()
 
         if self._data.shape[0] != time_variable.get_data().shape[0]:
-            msg = "Encountered length missmatch between variable and time variable!"
+            msg = f"Encountered length missmatch between variable and time variable! Variable: {self}"
             raise ValueError(msg)
 
         time_var_data = time_variable.get_data(ep.units.posixtime)
