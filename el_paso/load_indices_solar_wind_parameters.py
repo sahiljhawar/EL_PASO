@@ -263,7 +263,7 @@ def _calculate_g1(
     imf_bz_time = inputs["IMF_Bz"][1].get_data(ep.units.posixtime).astype(np.float64)
 
     imf_by = inputs["IMF_By"][0].get_data().astype(np.float64)
-    imf_by_time = inputs["IMF_Bz"][1].get_data(ep.units.posixtime).astype(np.float64)
+    imf_by_time = inputs["IMF_By"][1].get_data(ep.units.posixtime).astype(np.float64)
 
     if not np.array_equal(sw_speed_time, imf_bz_time) or not np.array_equal(sw_speed_time, imf_by_time):
         msg = "Time variables of SW_speed, IMF_Bz, and IMF_By must be equal!"
