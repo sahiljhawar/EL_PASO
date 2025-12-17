@@ -50,7 +50,7 @@ def compute_invariant_mu(
     """
     energy = energy_var.get_data(u.MeV)
     alpha_local = alpha_local_var.get_data(u.radian)
-    magnetic_field = B_local_var.get_data(u.nT)
+    magnetic_field = B_local_var.get_data(u.G)
 
     if energy.ndim != 2 or alpha_local.ndim != 2 or magnetic_field.ndim != 1:  # noqa: PLR2004
         msg = (
