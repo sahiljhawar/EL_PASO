@@ -73,7 +73,9 @@ def test_gfz_old(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
 
     plt.style.use("seaborn-v0_8-bright")
 
-    _, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19/1.5, 12))
+    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19/1.5, 12))
+
+    f.suptitle(mag_field)
 
     ax_kp.stairs(kp_data["kp"][:-1], kp_data.index, color="k", linewidth=1.5)
     ax_kp.set_ylim(0, 9)
@@ -131,7 +133,9 @@ def test_gfz_old(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
     plt.savefig(f"{Path(__file__).parent / f'old_GFZ_test_{mag_field}_flux.png'}")
 
 
-    _, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19/1.5, 12))
+    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19/1.5, 12))
+
+    f.suptitle(mag_field)
 
     ax_kp.stairs(kp_data["kp"][:-1], kp_data.index, color="k", linewidth=1.5)
     ax_kp.set_ylim(0, 9)
