@@ -51,6 +51,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
         file_name_stem: str,
         mag_field: MagneticFieldLiteral | list[MagneticFieldLiteral],
         data_standard: DataStandard | None = None,
+        root_metadata: dict[str, str] | None = None,
     ) -> None:
         """Initializes the monthly NetCDF saving strategy.
 
@@ -73,6 +74,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
         self.file_name_stem = file_name_stem
         self.mag_field_list = mag_field
         self.standard = data_standard
+        self.root_metadata = root_metadata
 
         output_file_entries = [
             "time",
@@ -175,7 +177,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             name_in_file, variable, reset_consistency_check=first_call_of_interval
         )
 
-    def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:  # noqa: C901
+    def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:  # noqa: C901, PLR0912
         """Saves a dictionary of variables to a single NetCDF file.
 
         This method creates a new NetCDF4 file, defines dimensions based on the data,
@@ -201,6 +203,11 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             dict_to_save = self.append_data(file_path, dict_to_save)
 
         with nC.Dataset(file_path, "w", format="NETCDF4") as file:
+
+            if self.root_metadata is not None:
+                for key, value in self.root_metadata.items():
+                    setattr(file, key, value)
+
             size_time = dict_to_save["time"].shape[0]
             size_pitch_angle: int = 0
             size_energy: int = 0
