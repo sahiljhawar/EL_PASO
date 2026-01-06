@@ -35,6 +35,20 @@ def process_goes_real_time(
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     # Part 1: specify source files to extract variables
 
+    data_path_stem = f"{raw_data_path}/YYYY/MM/{sat_str}/"
+    rename_file_name_stem = f"{sat_str}_YYYYMMDD.json"
+    url = f"https://services.swpc.noaa.gov/json/goes/{sat_str}/"
+
+    ep.download(
+        start_time,
+        end_time,
+        save_path=data_path_stem,
+        file_cadence="single_file",
+        download_url=url,
+        file_name_stem="differential-electrons-3-day.json",
+        rename_file_name_stem=rename_file_name_stem,
+    )
+
     extraction_infos = [
         ep.ExtractionInfo(
             result_key="Epoch",
@@ -60,20 +74,6 @@ def process_goes_real_time(
             is_time_dependent=False,
         ),
     ]
-
-    data_path_stem = f"{raw_data_path}/YYYY/MM/{sat_str}/"
-    rename_file_name_stem = f"{sat_str}_YYYYMMDD.json"
-    url = f"https://services.swpc.noaa.gov/json/goes/{sat_str}/"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=data_path_stem,
-        file_cadence="single_file",
-        download_url=url,
-        file_name_stem="differential-electrons-3-day.json",
-        rename_file_name_stem=rename_file_name_stem,
-    )
 
     variables = ep.extract_variables_from_files(
         start_time,
@@ -112,6 +112,8 @@ def process_goes_real_time(
         variables=variables,
         time_bin_method_dict=time_bin_methods,
         time_binning_cadence=timedelta(minutes=5),
+        start_time=start_time,
+        end_time=end_time,
     )
 
     variables["xGEO"] = ep.processing.get_real_time_tipsod(binned_time_var.get_data(), sat_name)
@@ -207,14 +209,14 @@ def process_goes_real_time(
 
 if __name__ == "__main__":
     start_time = (datetime.now(timezone.utc)).replace(hour=0, minute=0, second=0, microsecond=0)
-    end_time = start_time + timedelta(days=0.1)
+    end_time = start_time + timedelta(hours=1)
 
     for sat in ["primary", "secondary"]:
         process_goes_real_time(
             sat_str=sat,
             raw_data_path="goes/raw/",
             processed_data_path="goes/processed/",
-            irbem_lib_path="IRBEM/libirbem.so",
+            irbem_lib_path="../../IRBEM/libirbem.so",
             start_time=start_time,
             end_time=end_time,
             num_cores=64,
