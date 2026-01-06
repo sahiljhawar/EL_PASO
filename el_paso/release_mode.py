@@ -50,7 +50,7 @@ def activate_release_mode(
 
     if el_paso_repo.is_dirty(index=True, working_tree=True, untracked_files=True):
         if dirty_ok:
-            logger.warning("Dirty repository used for processing data in release mode!")
+            logger.warning("Dirty repository used for processing data in release mode!", stacklevel=2)
         else:
             msg = "Your EL-PASO repository contains changes! Please push your changes to process data in release mode!"
             raise ValueError(msg)

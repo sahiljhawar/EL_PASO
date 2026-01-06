@@ -46,15 +46,16 @@ class VariableMetadata:
     processing_notes: str = ""
     standard_name: str = ""
 
-    if ep.is_in_release_mode():
-        processing_notes += ep.get_release_msg() + "\n"
-
     def __post_init__(self) -> None:
         """Initializes the processing_steps_counter attribute to 1 after the dataclass has been instantiated.
 
         This method is automatically called by the dataclass after the __init__ method.
         """
         self.processing_steps_counter = 1
+
+        if ep.is_in_release_mode():
+            self.processing_notes += ep.get_release_msg() + "\n"
+
 
     def add_processing_note(self, processing_note: str) -> None:
         """Adds a processing note to the metadata.
