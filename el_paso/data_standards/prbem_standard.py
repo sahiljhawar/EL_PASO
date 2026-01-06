@@ -47,7 +47,7 @@ class PRBEMStandard(DataStandard):
         if reset_consistency_check:
             self.consistency_check = ConsistencyCheck()
 
-        if standard_name == "FEDU":
+        if "FEDU" in standard_name:
             variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1))  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 3, standard_name)
@@ -56,13 +56,19 @@ class PRBEMStandard(DataStandard):
             self.consistency_check.check_energy_size(shape[1], standard_name)
             self.consistency_check.check_pitch_angle_size(shape[2], standard_name)
 
-        elif standard_name == "FEDO":
+            if len(variable.metadata.description) == 0:
+                variable.metadata.description = "Processed unidirectional differential electron flux"
+
+        elif "FEDO" in standard_name:
             variable.convert_to_unit((u.cm**2 * u.s * u.sr * u.keV) ** (-1))  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 2, standard_name)
             shape = variable.get_data().shape
             self.consistency_check.check_time_size(shape[0], standard_name)
             self.consistency_check.check_energy_size(shape[1], standard_name)
+
+            if len(variable.metadata.description) == 0:
+                variable.metadata.description = "Processed omnidirectional differential electron flux"
 
         elif "alpha" in standard_name:
             variable.convert_to_unit(u.deg)  # type: ignore[reportUnknownArgumentType]
