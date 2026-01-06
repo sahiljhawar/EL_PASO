@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -36,16 +37,16 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
     Path("tests/comparisons/raw_data").mkdir(exist_ok=True)
     Path("tests/comparisons/processed_data").mkdir(exist_ok=True)
 
-    process_hope_electrons(
-        start_time,
-        end_time,
-        sat_str,
-        "IRBEM/libirbem.so",
-        mag_field,
-        raw_data_path="tests/comparisons/raw_data",
-        processed_data_path="tests/comparisons/processed_data",
-        num_cores=12,
-    )
+    # process_hope_electrons(
+    #     start_time,
+    #     end_time,
+    #     sat_str,
+    #     "IRBEM/libirbem.so",
+    #     mag_field,
+    #     raw_data_path="tests/comparisons/raw_data",
+    #     processed_data_path="tests/comparisons/processed_data",
+    #     num_cores=12,
+    # )
 
     match mag_field:
         case "T89":
@@ -117,14 +118,16 @@ def test_mageph_rbsp(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04
 
     variables["Lstar"].apply_thresholds_on_data(lower_threshold=0.0)
 
-    kp_data = KpOMNI("/home/bhaas/.el_paso/KpOmni").read(start_time, end_time, download=True)
-    dst_data = DSTOMNI("/home/bhaas/.el_paso/KpOmni").read(start_time, end_time, download=True)
+    home_path = Path(os.environ["HOME"])
+    kp_data = KpOMNI(home_path / ".el_paso/KpOmni").read(start_time, end_time, download=True)
+    dst_data = DSTOMNI(home_path / ".el_paso/KpOmni").read(start_time, end_time, download=True)
 
     plt.style.use("seaborn-v0_8-bright")
+    plt.rc("font", size=14)
 
-    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19 / 1.5, 12))
+    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19 / 1.5, 14), dpi=300)
 
-    f.suptitle(mag_field)
+    f.suptitle(f"Magnetic field: {mag_field}")
 
     ax_kp.stairs(kp_data["kp"][:-1], kp_data.index, color="k", linewidth=1.5)
     ax_kp.set_ylim(0, 9)

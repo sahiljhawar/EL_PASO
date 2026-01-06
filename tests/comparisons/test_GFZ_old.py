@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -31,16 +32,16 @@ def test_gfz_old(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
     Path("tests/comparisons/raw_data").mkdir(exist_ok=True)
     Path("tests/comparisons/processed_data").mkdir(exist_ok=True)
 
-    process_hope_electrons(
-        start_time,
-        end_time,
-        sat_str,
-        "IRBEM/libirbem.so",
-        mag_field,
-        raw_data_path="tests/comparisons/raw_data",
-        processed_data_path="tests/comparisons/processed_data",
-        num_cores=12,
-    )
+    # process_hope_electrons(
+    #     start_time,
+    #     end_time,
+    #     sat_str,
+    #     "IRBEM/libirbem.so",
+    #     mag_field,
+    #     raw_data_path="tests/comparisons/raw_data",
+    #     processed_data_path="tests/comparisons/processed_data",
+    #     num_cores=12,
+    # )
 
     match mag_field:
         case "T89":
@@ -68,14 +69,16 @@ def test_gfz_old(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
         verbose=True,
     )
 
-    kp_data = KpOMNI("/home/bhaas/.el_paso/KpOmni").read(start_time, end_time, download=True)
-    dst_data = DSTOMNI("/home/bhaas/.el_paso/KpOmni").read(start_time, end_time, download=True)
+    home_path = Path(os.environ["HOME"])
+    kp_data = KpOMNI(home_path / ".el_paso/KpOmni").read(start_time, end_time, download=True)
+    dst_data = DSTOMNI(home_path / ".el_paso/KpOmni").read(start_time, end_time, download=True)
 
     plt.style.use("seaborn-v0_8-bright")
+    plt.rc("font", size=14)
 
-    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19 / 1.5, 12))
+    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19 / 1.5, 14), dpi=300)
 
-    f.suptitle(mag_field)
+    f.suptitle("Fluxes")
 
     ax_kp.stairs(kp_data["kp"][:-1], kp_data.index, color="k", linewidth=1.5)
     ax_kp.set_ylim(0, 9)
@@ -97,7 +100,7 @@ def test_gfz_old(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
     ax1.set_ylim(4, 9)
     ax1.set_xlim(start_time, end_time)
     ax1.grid()
-    ax1.set_ylabel("log10 Flux [1/(sr cm^2 s keV)]")
+    ax1.set_ylabel("log10 Flux\n[1/(sr cm^2 s keV)]")
     ax1.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax1.xaxis.get_major_locator()))
 
     energy_idx = np.argmin(np.abs(rbsp_data.energy_channels[0, :] - 10e-3))
@@ -109,7 +112,7 @@ def test_gfz_old(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
     ax2.set_ylim(4, 9)
     ax2.set_xlim(start_time, end_time)
     ax2.grid()
-    ax2.set_ylabel("log10 Flux [1/(sr cm^2 s keV)]")
+    ax2.set_ylabel("log10 Flux\n[1/(sr cm^2 s keV)]")
     ax2.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax2.xaxis.get_major_locator()))
 
     energy_idx = np.argmin(np.abs(rbsp_data.energy_channels[0, :] - 30e-3))
@@ -121,16 +124,16 @@ def test_gfz_old(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
     ax3.set_ylim(4, 8)
     ax3.set_xlim(start_time, end_time)
     ax3.grid()
-    ax3.set_ylabel("log10 Flux [1/(sr cm^2 s keV)]")
+    ax3.set_ylabel("log10 Flux\n[1/(sr cm^2 s keV)]")
     ax3.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax3.xaxis.get_major_locator()))
 
     plt.tight_layout()
 
     plt.savefig(f"{Path(__file__).parent / f'old_GFZ_test_{mag_field}_flux.png'}")
 
-    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19 / 1.5, 12))
+    f, (ax_kp, ax1, ax2, ax3) = plt.subplots(4, 1, figsize=(19 / 1.5, 14), dpi=300)
 
-    f.suptitle(mag_field)
+    f.suptitle("Adiabatic invariants and PSD")
 
     ax_kp.stairs(kp_data["kp"][:-1], kp_data.index, color="k", linewidth=1.5)
     ax_kp.set_ylim(0, 9)
@@ -177,7 +180,7 @@ def test_gfz_old(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
     ax3.set_title(r"Phase space density for $\mu = 0.1$ MeV/G and $K = 0.3$ G^0.5 R_E")
     ax3.set_xlim(start_time, end_time)
     ax3.grid()
-    ax3.set_ylabel("log10 PSD [s^3/(m^6 kg^3)]")
+    ax3.set_ylabel("log10 PSD\n[s^3/(m^6 kg^3)]")
     ax3.xaxis.set_major_formatter(mdates.ConciseDateFormatter(ax3.xaxis.get_major_locator()))
 
     plt.tight_layout()

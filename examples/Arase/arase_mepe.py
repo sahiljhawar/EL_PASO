@@ -17,6 +17,8 @@ from astropy import units as u
 
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils.irbem import Coords
+
+sys.path.append(str(Path(__file__).parent / ".." / ".."))
 from examples.Arase.get_arase_orbit_variables import (
     get_arase_orbit_level_2_variables,
     get_arase_orbit_level_3_variables,
@@ -273,6 +275,7 @@ if __name__ == "__main__":
             "../../IRBEM/libirbem.so",
             "T89",
             raw_data_path=tmp_dir,
-            processed_data_path="/home/bhaas/data/da_data/",
+            processed_data_path=".",
             num_cores=32,
+            save_strategy="DataOrg",
         )
