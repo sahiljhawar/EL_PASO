@@ -9,7 +9,6 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 import cdflib
-import cdflib.epochs_astropy
 import numpy as np
 from astropy import units as u
 from astropy.constants import R_earth  # type:ignore [reportAttributeAccessIssue]
