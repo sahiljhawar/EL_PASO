@@ -548,9 +548,9 @@ def _make_lstar_shell_splitting_parallel(
     for i, pa in enumerate(pa_local[it, :]):
         Lstar_output_single = model.make_lstar_shell_splitting(datetimes[it], x_dict_single, maginput, pa)
 
-        Lm[i] = Lstar_output_single.lm
-        Lstar[i] = Lstar_output_single.lstar
-        xj[i] = Lstar_output_single.xj
+        Lm[i] = np.squeeze(Lstar_output_single.lm)
+        Lstar[i] = np.squeeze(Lstar_output_single.lstar)
+        xj[i] = np.squeeze(Lstar_output_single.xj)
 
     return (Lm.astype(np.float64), Lstar.astype(np.float64), xj.astype(np.float64))
 
