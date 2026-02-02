@@ -225,8 +225,8 @@ def _create_variables_from_data_frame(
     time_interp_method: str,
 ) -> ep.Variable | tuple[ep.Variable, ep.Variable]:
     data_var = ep.Variable(data=df_in[data_key].to_numpy(), original_unit=unit)
-    timestamps = np.asarray(df_in.index.astype(np.int64) // 10**9)  # convert from ns to s
-    time_var = ep.Variable(data=timestamps, original_unit=ep.units.posixtime)
+    timestamps = np.asarray([t.timestamp() for t in df_in.index.to_pydatetime()])  # type: ignore[reportUnknownMemberType]
+    time_var = ep.Variable(data=timestamps, original_unit=ep.units.posixtime)  # type: ignore[reportUnknownArgumentType]
 
     if target_time_variable is None:
         result = (data_var, time_var)
