@@ -33,7 +33,7 @@ Begin by cloning the EL-PASO repository and navigating into its directory.
 
 ```bash
 git clone https://github.com/GFZ/EL_PASO.git
-cd el_paso
+cd EL_PASO
 ```
 
 ### Step 2: Set up a Python Virtual Environment
