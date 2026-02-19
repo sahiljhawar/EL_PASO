@@ -15,22 +15,22 @@ authors = [{name="Bernhard Haas", email="bhaas@gfz.de"}]
 readme = "README.md"
 requires-python=">=3.11"
 dependencies = [
-    "astropy@git+https://github.com/astropy/astropy.git@v7.2.x",
+    "astropy>=7.2.0",
     "cdflib==1.3.8",
     "gitpython==3.1.46",
-    "matplotlib==3.10.8",
-    "netcdf4==1.7.2",
-    "numpy==2.4.2",
-    "pandas==3.0.0",
-    "pytest==9.0.2",
+    "matplotlib>=3.10.8",
+    "netcdf4>=1.7.2",
+    "numpy>=2.4.2",
+    "pandas>=3.0.0",
+    "pytest>=9.0.2",
     "python-dateutil>=2.9.0.post0",
-    "requests==2.32.5",
-    "scipy==1.17",
+    "requests>=2.32.5",
+    "scipy>=1.17",
     "sscws==2.4.6",
     "swvo@git+https://github.com/GFZ/SWVO.git",
     "tabulate==0.9.0",
-    "tqdm==4.67.2",
-    "wget==3.2",
+    "tqdm>=4.67.2",
+    "wget>=3.2",
     "wheel==0.46.3",
     "skyfield==1.54"
 ]
