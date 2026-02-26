@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -10,7 +11,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "el_paso"
-version = "0.1"
+version = "1.0.0"
+description = "EL-PASO is a Python framework designed to streamline the download, processing, and saving of satellite particle observation data."
 authors = [{name="Bernhard Haas", email="bhaas@gfz.de"}]
 readme = "README.md"
 requires-python=">=3.11"
@@ -34,6 +36,36 @@ dependencies = [
     "wheel==0.46.3",
     "skyfield==1.54"
 ]
+license = "(Apache-2.0 OR CC0-1.0 OR CC-BY-NC-4.0 OR LGPL-3.0-only)"
+license-files = ["LICENSES/*"]
+
+classifiers = [
+    "Programming Language :: Python :: 3",
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: 3.14',
+    'Operating System :: POSIX',
+    'Operating System :: Unix',
+    'Operating System :: MacOS',
+]
 
 [tool.setuptools.packages.find]
 include = ["el_paso*"]
+
+[project.urls]
+Homepage = "https://github.com/GFZ/EL_PASO"
+Tracker = "https://github.com/GFZ/EL_PASO/issues"
+Documentation = "https://el-paso.readthedocs.io/en/latest/"
+
+[tool.bumpver]
+current_version = "1.0.0"
+version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
+commit_message = "bump version {old_version} -> {new_version}"
+commit = true
+tag = true
+push = true
+
+[tool.bumpver.file_patterns]
+"pyproject.toml" = ['version = "{version}"']
+"el_paso/__init__.py" = ['__version__ = "{version}"']

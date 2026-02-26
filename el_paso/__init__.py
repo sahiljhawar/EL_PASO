@@ -27,7 +27,6 @@ from el_paso.download import download
 from el_paso.extract_variables_from_files import extract_variables_from_files, ExtractionInfo
 from el_paso.load_indices_solar_wind_parameters import load_indices_solar_wind_parameters
 
-
 __all__ = [
     # Public constants
     "IRBEM_SYSAXIS_GDZ",
@@ -53,3 +52,5 @@ __all__ = [
     "saving_strategies",
     "units",
 ]
+
+__version__ = "1.0.0"
