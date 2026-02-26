@@ -5,6 +5,7 @@
 
 import typing
 
+import netCDF4  # noqa: F401
 import pytest
 from _pytest.config.argparsing import ArgumentError, NotSet, Parser
 
