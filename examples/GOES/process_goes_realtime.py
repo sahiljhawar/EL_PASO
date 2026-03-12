@@ -18,9 +18,11 @@ import el_paso as ep
 logging.captureWarnings(capture=True)
 logger = logging.getLogger(__name__)
 
+
 def _remove_unit_from_energy_channels(energy_channels: list[str]) -> NDArray[np.int32]:
     """Remove the unit from the energy ranges."""
     return np.asarray([int(i.replace(" keV", "")) for i in energy_channels if "keV" in i])
+
 
 def process_goes_real_time(
     sat_str: Literal["primary", "secondary"],
@@ -156,7 +158,6 @@ def process_goes_real_time(
     psd_var = ep.processing.compute_phase_space_density(FEDU_var, variables["Energy"], particle_species="electron")
 
     if save_strategy == "dataorg":
-
         variables_to_save = {
             "time": binned_time_var,
             "Flux": FEDU_var,
@@ -175,12 +176,16 @@ def process_goes_real_time(
         }
 
         saving_strategy = ep.saving_strategies.DataOrgStrategy(
-            processed_data_path, mission="GOES", satellite=sat_str, instrument="MAGED", kext="T89", file_format=".pickle"
+            processed_data_path,
+            mission="GOES",
+            satellite=sat_str,
+            instrument="MAGED",
+            kext="T89",
+            file_format=".pickle",
         )
         append = True
 
     elif save_strategy == "netcdf":
-
         variables_to_save = {
             "time": binned_time_var,
             "flux/FEDU": FEDU_var,
@@ -200,7 +205,9 @@ def process_goes_real_time(
         }
 
         saving_strategy = ep.saving_strategies.MonthlyNetCDFStrategy(
-            base_data_path=Path(processed_data_path) / sat_str, file_name_stem=f"goes_{sat_str}", mag_field="T89",
+            base_data_path=Path(processed_data_path) / "GOES" / sat_str,
+            file_name_stem=f"{sat_str}_MAGED",
+            mag_field="T89",
         )
         append = False
 
