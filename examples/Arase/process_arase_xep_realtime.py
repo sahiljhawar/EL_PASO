@@ -1,0 +1,346 @@
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache-2.0
+
+
+from __future__ import annotations
+
+import logging
+import sys
+import typing
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import TYPE_CHECKING, Literal
+
+import numpy as np
+from astropy import units as u
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+import el_paso as ep
+
+
+def process_arase_xep_real_time(
+    processed_data_path: str | Path,
+    download_data_dir: str | Path,
+    irbem_lib_path: str | Path,
+    start_time: datetime,
+    end_time: datetime,
+    erg_user: str,
+    erg_password: str,
+    num_cores: int = 32,
+    save_strategy: Literal["dataorg", "netcdf"] = "netcdf",
+    *,
+    download: bool = True,
+) -> None:
+    logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
+    xep_variables = _get_xep_variables(
+        download_data_dir, start_time, end_time, erg_user, erg_password, download=download
+    )
+    orb_variables = _get_orb_variables(
+        download_data_dir, start_time, end_time, irbem_lib_path, erg_user, erg_password, download=download
+    )
+
+    time_bin_methods_xep = {
+        "FEDO": ep.TimeBinMethod.NanMedian,
+        "Energy_FEDO": ep.TimeBinMethod.Repeat,
+        "PA_local_FEDU": ep.TimeBinMethod.Repeat,
+    }
+    binned_time_var = ep.processing.bin_by_time(
+        xep_variables["Epoch"],
+        xep_variables,
+        time_bin_methods_xep,
+        time_binning_cadence=timedelta(minutes=5),
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    time_bin_methods_orb = {
+        "xGEO": ep.TimeBinMethod.NanMedian,
+    }
+    _ = ep.processing.bin_by_time(
+        orb_variables["Epoch"],
+        orb_variables,
+        time_bin_methods_orb,
+        time_binning_cadence=timedelta(minutes=5),
+        start_time=start_time,
+        end_time=end_time,
+    )
+
+    variables_combined = xep_variables | orb_variables
+
+    variables_to_compute: ep.processing.VariableRequest = [
+        ("B_local", "T89"),
+        ("B_eq", "T89"),
+        ("MLT", "T89"),
+        ("B_eq", "T89"),
+        ("R_eq", "T89"),
+        ("PA_eq", "T89"),
+        ("Lstar", "T89"),
+        ("Lm", "T89"),
+        ("invMu", "T89"),
+        ("invK", "T89"),
+    ]
+
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+        time_var=binned_time_var,
+        xgeo_var=variables_combined["xGEO"],
+        energy_var=variables_combined["Energy_FEDO"],
+        pa_local_var=variables_combined["PA_local_FEDU"],
+        particle_species="electron",
+        variables_to_compute=variables_to_compute,
+        irbem_lib_path=str(irbem_lib_path),
+        irbem_options=[1, 1, 4, 4, 0],
+        num_cores=num_cores,
+    )
+
+    variables_combined |= magnetic_field_variables
+
+    FEDU_var = ep.processing.construct_pitch_angle_distribution(
+        variables_combined["FEDO"], variables_combined["PA_local_FEDU"], magnetic_field_variables["PA_eq_T89"]
+    )
+    FEDU_var.apply_thresholds_on_data(lower_threshold=0)
+
+    psd_var = ep.processing.compute_phase_space_density(
+        FEDU_var, variables_combined["Energy_FEDO"], particle_species="electron"
+    )
+
+    if save_strategy == "dataorg":
+        variables_to_save = {
+            "time": binned_time_var,
+            "Flux": FEDU_var,
+            "xGEO": variables_combined["xGEO"],
+            "energy_channels": variables_combined["Energy_FEDO"],
+            "alpha_local": variables_combined["PA_local_FEDU"],
+            "PSD": psd_var,
+            "alpha_eq_model": magnetic_field_variables["PA_eq_T89"],
+            "MLT": magnetic_field_variables["MLT_T89"],
+            "Lstar": magnetic_field_variables["Lstar_T89"],
+            "R0": magnetic_field_variables["R_eq_T89"],
+            "B_eq": magnetic_field_variables["B_eq_T89"],
+            "B_local": magnetic_field_variables["B_local_T89"],
+            "InvMu": magnetic_field_variables["invMu_T89"],
+            "InvK": magnetic_field_variables["invK_T89"],
+        }
+
+        saving_strategy = ep.saving_strategies.DataOrgStrategy(
+            processed_data_path,
+            mission="Arase",
+            satellite="Arase",
+            instrument="XEP",
+            kext="T89",
+            file_format=".pickle",
+        )
+        append = True
+
+    elif save_strategy == "netcdf":
+        variables_to_save = {
+            "time": binned_time_var,
+            "flux/FEDU": FEDU_var,
+            "flux/energy": variables_combined["Energy_FEDO"],
+            "flux/alpha_local": variables_combined["PA_local_FEDU"],
+            "flux/alpha_eq": magnetic_field_variables["PA_eq_T89"],
+            "position/T89/R0": magnetic_field_variables["R_eq_T89"],
+            "position/T89/MLT": magnetic_field_variables["MLT_T89"],
+            "position/T89/Lm": magnetic_field_variables["Lm_T89"],
+            "position/T89/Lstar": magnetic_field_variables["Lstar_T89"],
+            "mag_field/T89/B_local": magnetic_field_variables["B_local_T89"],
+            "mag_field/T89/B_eq": magnetic_field_variables["B_eq_T89"],
+            "psd/PSD": psd_var,
+            "psd/T89/inv_mu": magnetic_field_variables["invMu_T89"],
+            "psd/T89/inv_K": magnetic_field_variables["invK_T89"],
+            "position/xGEO": variables_combined["xGEO"],
+        }
+
+        saving_strategy = ep.saving_strategies.MonthlyNetCDFStrategy(
+            base_data_path=Path(processed_data_path) / "ARASE" / "arase",
+            file_name_stem="arase_XEP",
+            mag_field="T89",
+        )
+        append = False
+
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=append)
+
+
+def _get_xep_variables(
+    download_data_dir: str | Path,
+    start_time: datetime,
+    end_time: datetime,
+    erg_user: str,
+    erg_password: str,
+    *,
+    download: bool,
+) -> dict[str, ep.Variable]:
+    # Energies from the User's guide
+    energy_min = np.asarray((400.0, 600.0, 1000.0, 1500.0, 2200.0, 3500.0, 4300.0, 5400.0))
+    energy_max = np.asarray((600.0, 1000.0, 1500.0, 2200.0, 3500.0, 4300.0, 5400.0, 9800.0))
+    energy_mean = _get_mean_energy(energy_min, energy_max)
+
+    data_path_stem = f"{download_data_dir}arase/YYYY/MM/"
+    file_name_stem = "erg_real_xep_YYYYMMDD_v002.txt"
+    url = "https://ergsc.isee.nagoya-u.ac.jp/data/ergsc/satellite/erg/swx/xep/l2/"
+
+    if download:
+        ep.download(
+            start_time,
+            end_time,
+            save_path=data_path_stem,
+            file_cadence="daily",
+            download_url=url,
+            authentification_info=(erg_user, erg_password),
+            file_name_stem=file_name_stem,
+            skip_existing=False,
+        )
+
+    fedo_unit = typing.cast("u.Unit", (u.cm**2 * u.s * u.sr * u.keV) ** (-1))
+
+    extraction_infos = [
+        ep.ExtractionInfo(name_or_column="time", unit=u.dimensionless_unscaled, result_key="Epoch"),
+        ep.ExtractionInfo(name_or_column="ch1", unit=fedo_unit, result_key="FEDO_ch1"),
+        ep.ExtractionInfo(name_or_column="ch2", unit=fedo_unit, result_key="FEDO_ch2"),
+        ep.ExtractionInfo(name_or_column="ch3", unit=fedo_unit, result_key="FEDO_ch3"),
+        ep.ExtractionInfo(name_or_column="ch4", unit=fedo_unit, result_key="FEDO_ch4"),
+        ep.ExtractionInfo(name_or_column="ch5", unit=fedo_unit, result_key="FEDO_ch5"),
+        ep.ExtractionInfo(name_or_column="ch6", unit=fedo_unit, result_key="FEDO_ch6"),
+        ep.ExtractionInfo(name_or_column="ch7", unit=fedo_unit, result_key="FEDO_ch7"),
+        ep.ExtractionInfo(name_or_column="ch8", unit=fedo_unit, result_key="FEDO_ch8"),
+    ]
+
+    # Bernhard: the header is also in the file, but there is a comment after it, so it cannot be read by pd.read_csv
+    xep_header = ("time", "ch1", "ch2", "ch3", "ch4", "ch5", "ch6", "ch7", "ch8")
+    xep_variables = ep.extract_variables_from_files(
+        extraction_infos=extraction_infos,
+        data_path=data_path_stem,
+        file_name_stem=file_name_stem,
+        start_time=start_time,
+        end_time=end_time,
+        file_cadence="daily",
+        pd_read_csv_kwargs={"skiprows": 6, "names": xep_header},
+    )
+
+    # convert time variable
+    # parse time strings
+    datetimes = ep.processing.convert_string_to_datetime(xep_variables["Epoch"])
+    xep_variables["Epoch"].set_data(np.asarray([t.timestamp() for t in datetimes]), unit=ep.units.posixtime)
+
+    # add energy variable
+    energy_var = ep.Variable(original_unit=u.keV, data=energy_mean)
+    xep_variables["Energy_FEDO"] = energy_var
+
+    # add local pitch angle variable
+    pa_local_data = np.arange(5, 91, 5)
+    xep_variables["PA_local_FEDU"] = ep.Variable(data=pa_local_data, original_unit=u.deg)
+
+    # build flux variable from channels
+    fedo_data = np.vstack(
+        (
+            xep_variables["FEDO_ch1"].get_data().astype(np.float64),
+            xep_variables["FEDO_ch2"].get_data().astype(np.float64),
+            xep_variables["FEDO_ch3"].get_data().astype(np.float64),
+            xep_variables["FEDO_ch4"].get_data().astype(np.float64),
+            xep_variables["FEDO_ch5"].get_data().astype(np.float64),
+            xep_variables["FEDO_ch6"].get_data().astype(np.float64),
+            xep_variables["FEDO_ch7"].get_data().astype(np.float64),
+            xep_variables["FEDO_ch8"].get_data().astype(np.float64),
+        )
+    ).T
+
+    fedo_var = ep.Variable(
+        original_unit=fedo_unit,
+        data=fedo_data,
+    )
+    fedo_var.apply_thresholds_on_data(lower_threshold=0)
+    xep_variables["FEDO"] = fedo_var
+
+    # delete unused variables
+    del xep_variables["FEDO_ch1"]
+    del xep_variables["FEDO_ch2"]
+    del xep_variables["FEDO_ch3"]
+    del xep_variables["FEDO_ch4"]
+    del xep_variables["FEDO_ch5"]
+    del xep_variables["FEDO_ch6"]
+    del xep_variables["FEDO_ch7"]
+    del xep_variables["FEDO_ch8"]
+
+    return xep_variables
+
+
+def _get_orb_variables(
+    download_data_dir: str | Path,
+    start_time: datetime,
+    end_time: datetime,
+    irbem_lib_path: str | Path,
+    erg_user: str,
+    erg_password: str,
+    *,
+    download: bool,
+) -> dict[str, ep.Variable]:
+    data_path_stem = f"{download_data_dir}arase/YYYY/MM/"
+    file_name_stem = "erg_orb_pre_l2_YYYYMMDD_v01.txt"
+    url = "https://ergsc.isee.nagoya-u.ac.jp/data/ergsc/satellite/erg/swx/orb/"
+
+    if download:
+        ep.download(
+            start_time,
+            end_time,
+            save_path=data_path_stem,
+            file_cadence="daily",
+            download_url=url,
+            authentification_info=(erg_user, erg_password),
+            file_name_stem=file_name_stem,
+            skip_existing=False,
+        )
+
+    extraction_infos = [
+        ep.ExtractionInfo(name_or_column="time", unit=u.dimensionless_unscaled, result_key="Epoch"),
+        ep.ExtractionInfo(name_or_column="sm_x", unit=ep.units.RE, result_key="sm_x"),
+        ep.ExtractionInfo(name_or_column="sm_y", unit=ep.units.RE, result_key="sm_y"),
+        ep.ExtractionInfo(name_or_column="sm_z", unit=ep.units.RE, result_key="sm_z"),
+    ]
+
+    orb_variables = ep.extract_variables_from_files(
+        extraction_infos=extraction_infos,
+        data_path=data_path_stem,
+        file_name_stem=file_name_stem,
+        start_time=start_time,
+        end_time=end_time,
+        file_cadence="daily",
+    )
+
+    datetimes = ep.processing.convert_string_to_datetime(orb_variables["Epoch"])
+    orb_variables["Epoch"].set_data(np.asarray([t.timestamp() for t in datetimes]), unit=ep.units.posixtime)
+
+    # convert SM to GEO
+    xsm_arr = np.stack(
+        (
+            orb_variables["sm_x"].get_data(),
+            orb_variables["sm_y"].get_data(),
+            orb_variables["sm_z"].get_data(),
+        )
+    ).T.astype(np.float64)
+
+    model_coord = ep.processing.magnetic_field_utils.Coords(lib_path=irbem_lib_path)
+
+    xgeo_arr = model_coord.transform(list(datetimes), xsm_arr, ep.IRBEM_SYSAXIS_SM, ep.IRBEM_SYSAXIS_GEO)
+    orb_variables["xGEO"] = ep.Variable(data=xgeo_arr, original_unit=ep.units.RE)
+
+    # delete unused variables
+    del orb_variables["sm_x"]
+    del orb_variables["sm_y"]
+    del orb_variables["sm_z"]
+
+    return orb_variables
+
+
+def _get_mean_energy(e_min: NDArray[np.float64], e_max: NDArray[np.float64]) -> NDArray[np.float64]:
+    b = 7.068e-3  # Bernhard: copied from Ingo's scripts. Don't know where this comes from
+
+    weighted_max = (1 / b) * np.exp(-b * e_max)
+    weighted_min = (1 / b) * np.exp(-b * e_min)
+
+    tmp = (weighted_min - weighted_max) / (e_max - e_min)
+
+    return -np.log(tmp) / b
