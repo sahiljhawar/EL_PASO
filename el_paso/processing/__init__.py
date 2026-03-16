@@ -15,14 +15,14 @@ from el_paso.processing.convert_string_to_datetime import convert_string_to_date
 from el_paso.processing.fold_pitch_angles_and_flux import fold_pitch_angles_and_flux
 from el_paso.processing.get_real_time_tipsod import get_real_time_tipsod
 from el_paso.processing.magnetic_field_utils import MagFieldVarTypes
-from el_paso.processing.tle import TLE
+from el_paso.processing.tle import calculate_geo_coords
 
 __all__ = [
-    "TLE",
     "MagFieldVarTypes",
     "TimeBinMethod",
     "VariableRequest",
     "bin_by_time",
+    "calculate_geo_coords",
     "compute_equatorial_plasmaspheric_density",
     "compute_invariant_K",
     "compute_invariant_mu",
