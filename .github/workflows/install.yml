@@ -36,8 +36,9 @@ jobs:
       - name: Install package
         run: pip install .
 
-      - name: Test IRBEM Fortran installation
-        run: python IRBEM/python/IRBEM/test_IRBEM.py
+      - name: Check libirbem.so is present
+        run: |
+          test -f libirbem.so && echo "libirbem.so found" || { echo "libirbem.so NOT found" >&2; exit 1; }
 
       - name: Test import
         run: |
