@@ -58,6 +58,7 @@ nav:
           - API_reference/processing/construct_pitch_angle_distribution.md
           - API_reference/processing/convert_string_to_datetime.md
           - API_reference/processing/fold_pitch_angles_and_flux.md
+          - API_reference/processing/calculate_geo_coords_from_tle.md
       - Utilities:
           - General Utilities: API_reference/utilities/general_utilities.md
           - Loading Geomagnetic Indices and Solar Wind Parameters: API_reference/utilities/load_indices_solar_wind_parameters.md
