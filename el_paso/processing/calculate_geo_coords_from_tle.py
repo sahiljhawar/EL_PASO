@@ -8,33 +8,36 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
+from astropy import units as u
 from numpy.typing import NDArray
 from skyfield.api import EarthSatellite, load
+
+import el_paso as ep
 
 logger = logging.getLogger(__name__)
 
 
-def calculate_geo_coords(
+def calculate_geo_coords_from_tle(
     tle_filename: str | Path,
-) -> tuple[str, list[datetime], NDArray[np.float64]]:
+) -> tuple[str, list[datetime], ep.Variable]:
     """Calculate GEO coordinates (x, y, z) in kilometers from a TLE file.
 
     Args:
         tle_filename (str | Path): The file path containing the TLE data.
 
     Returns:
-        tuple[str, list[datetime], NDArray[np.float64]]: A tuple of:
+        tuple[str, list[datetime], ep.Variable]: A tuple of:
             - satellite_name: The name of the satellite.
             - tle_times: UTC datetime for each TLE epoch.
-            - geo_coordinates: Shape ``(n, 3)`` array of ``(x, y, z)`` in kilometers.
+            - geo_coordinate variable.
     """
     lines = Path(tle_filename).read_text().splitlines()
     tle_data = [(lines[i].strip(), lines[i + 1].strip()) for i in range(0, len(lines), 2)]
     satellite_name = tle_data[0][0].split()[1]
 
     timescale = load.timescale()
-    tle_times = []
-    geo_coordinates = []
+    tle_times: list[datetime] = []
+    geo_coordinates: list[NDArray[np.float64]] = []
 
     for line1, line2 in tle_data:
         year = int(line1.split()[3][:2])
@@ -56,4 +59,8 @@ def calculate_geo_coords(
             "Check the TLE file at these indices."
         )
 
-    return satellite_name, tle_times, result
+    xgeo_var = ep.Variable(data=result, original_unit=u.km)
+    xgeo_var.metadata.add_processing_note("Created from TLE file.")
+    xgeo_var.metadata.source_files.append(Path(tle_filename).name)
+
+    return satellite_name, tle_times, xgeo_var
