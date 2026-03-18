@@ -34,7 +34,7 @@ def test_rbsp_ect_combined_snapshot(
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=0.4, seconds=-1)
 
-    irbem_lib_path = Path(__file__).parent / "../../IRBEM/libirbem.so"
+    irbem_lib_path = Path(__file__).parent / "../../libirbem.so"
 
     processed_data_path = tmpdir / "RBSP" / "rbspa" if save_strategy != "dataorg" else tmpdir
 
