@@ -5,6 +5,8 @@
 
 # ruff: noqa: INP001
 
+import argparse
+
 import cdflib
 from tabulate import tabulate
 
@@ -57,5 +59,15 @@ def inspect_cdf_file(file_path: str) -> None:
 
 
 if __name__ == "__main__":
-    file_name = "X"
-    inspect_cdf_file(file_name)
+
+    parser = argparse.ArgumentParser(
+        description="Inspect CDF file based on file path."
+    )
+    parser.add_argument(
+        "file_path",
+        type=str,
+        help="File path of cdf file to inspect.",
+    )
+    args = parser.parse_args()
+
+    inspect_cdf_file(args.file_path)
