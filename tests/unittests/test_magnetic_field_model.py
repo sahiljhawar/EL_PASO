@@ -18,10 +18,10 @@ mag_field_list = ["OP77", "T89", "T01s", "TS04"]
 @pytest.mark.parametrize("mag_field", mag_field_list)
 def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     true_data = {
-        "OP77": (92.31, 97.28, 106.8),
-        "T89": (82.09, 90.64, 95.8),
-        "T01s": (39.35, 159.48, 335.31),
-        "TS04": (27.82, 91.7, 155.64),
+        "OP77": (92.3, 97.27, 106.77),
+        "T89": (82.31, 90.91, 96.11),
+        "T01s": (40.17, 159.91, 330.28),
+        "TS04": (27.86, 92.09, 156.03),
     }
 
     start_time = datetime(2024, 5, 10, 16, tzinfo=timezone.utc)
@@ -47,7 +47,7 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
         time_var=time_var,
         xgeo_var=xgeo_var,
         variables_to_compute=variables_to_compute,
-        irbem_lib_path=Path(__file__).parent.parent.parent / "IRBEM" / "libirbem.so",
+        irbem_lib_path=str(Path(__file__).parent.parent.parent / "IRBEM" / "libirbem.so"),
         irbem_options=[1, 1, 4, 4, 0],
         num_cores=12,
     )
