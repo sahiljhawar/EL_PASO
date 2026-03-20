@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
+#
+# SPDX-License-Identifier: Apache-2.0
 import os
 
 import requests
@@ -35,6 +40,7 @@ access_token = token_data["access_token"]
 catalog_response = requests.get(
     "https://swe.ssa.esa.int/hapi/catalog",
     headers={"Authorization": f"Bearer {access_token}"},
+    timeout=5,
 )
 
 catalog = catalog_response.json()

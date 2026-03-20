@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache-2.0
 import argparse
 import logging
 import os
@@ -37,7 +41,6 @@ def process_ngrm_electron_fluxes(
     num_cores: int = 32,
     bin_cadence: timedelta = timedelta(seconds=10),
 ) -> None:
-
     data_path_stem = f"{raw_data_path}/{satellite}/YYYY/MM/"
     file_name_stem = f"{satellite}_ngrm_YYYYMMDD_L1d.csv"
 
@@ -115,14 +118,16 @@ def process_ngrm_electron_fluxes(
         data_path=data_path_stem,
         file_name_stem=file_name_stem,
         extraction_infos=extraction_infos,
-        pd_read_csv_kwargs={"index_col": False}
+        pd_read_csv_kwargs={"index_col": False},
     )
 
     time_format = "%Y-%m-%dT%H:%M:%S.%fZ" if satellite in ["MTG-I1", "MTG-S1"] else "%Y-%m-%dT%H:%M:%SZ"
 
     # convert iso strings to posixtime
     datetimes = ep.processing.convert_string_to_datetime(variables["Epoch_iso"], time_format=time_format)
-    variables["Epoch"] = ep.Variable(data=np.asarray([t.timestamp() for t in datetimes]), original_unit=ep.units.posixtime)
+    variables["Epoch"] = ep.Variable(
+        data=np.asarray([t.timestamp() for t in datetimes]), original_unit=ep.units.posixtime
+    )
     del variables["Epoch_iso"]
 
     # convert ECI coordinates to GEO using astropy
@@ -157,8 +162,8 @@ def process_ngrm_electron_fluxes(
     # convert to proper omnidirectional units
     flux_data = flux_data * 4 * np.pi
 
-    variables["FEDO"] = ep.Variable(data=flux_data , original_unit=flux_unit * u.sr)
-    for i in range(1,11):
+    variables["FEDO"] = ep.Variable(data=flux_data, original_unit=flux_unit * u.sr)
+    for i in range(1, 11):
         del variables[f"FEDO_ch{i}"]
     variables["FEDO"].apply_thresholds_on_data(lower_threshold=0)
     variables["FEDO"].convert_to_unit((u.cm**2 * u.s * u.keV) ** (-1))
@@ -239,51 +244,51 @@ def process_ngrm_electron_fluxes(
         "psd/PSD": psd_var,
     }
 
-    from matplotlib import pyplot as plt
+    # from matplotlib import pyplot as plt
 
-    datetimes = [datetime.fromtimestamp(t) for t in binned_time_var.get_data()]
+    # datetimes = [datetime.fromtimestamp(t) for t in binned_time_var.get_data()]
 
-    fig, axs = plt.subplots(3, 1, figsize=(20, 9), sharex=True, layout="constrained")
-    sc = axs[0].scatter(
-        datetimes,
-        variables["L"].get_data()[:],
-        s=5,
-        c=np.log10(variables["FEDO"].get_data()[:, 2]),
-        cmap="jet",
-        vmin=-3,
-        vmax=5,
-    )
-    axs[0].set_ylim(1, 8)
-    axs[0].set_title(f"Energy = {NGRM_ENERGIES[2]} MeV")
+    # fig, axs = plt.subplots(3, 1, figsize=(20, 9), sharex=True, layout="constrained")
+    # sc = axs[0].scatter(
+    #     datetimes,
+    #     variables["L"].get_data()[:],
+    #     s=5,
+    #     c=np.log10(variables["FEDO"].get_data()[:, 2]),
+    #     cmap="jet",
+    #     vmin=-3,
+    #     vmax=5,
+    # )
+    # axs[0].set_ylim(1, 8)
+    # axs[0].set_title(f"Energy = {NGRM_ENERGIES[2]} MeV")
 
-    sc = axs[1].scatter(
-        datetimes,
-        variables["R_eq_T89"].get_data()[:],
-        s=5,
-        c=np.log10(variables["FEDO"].get_data()[:, 4]),
-        cmap="jet",
-        vmin=-3,
-        vmax=5,
-    )
-    axs[1].set_ylim(1, 8)
-    axs[1].set_title(f"Energy = {NGRM_ENERGIES[4]} MeV")
+    # sc = axs[1].scatter(
+    #     datetimes,
+    #     variables["R_eq_T89"].get_data()[:],
+    #     s=5,
+    #     c=np.log10(variables["FEDO"].get_data()[:, 4]),
+    #     cmap="jet",
+    #     vmin=-3,
+    #     vmax=5,
+    # )
+    # axs[1].set_ylim(1, 8)
+    # axs[1].set_title(f"Energy = {NGRM_ENERGIES[4]} MeV")
 
-    sc = axs[2].scatter(
-        datetimes,
-        variables["R_eq_T89"].get_data()[:],
-        s=5,
-        c=np.log10(variables["FEDO"].get_data()[:, 6]),
-        cmap="jet",
-        vmin=-3,
-        vmax=5,
-    )
-    axs[2].set_ylim(1, 8)
-    axs[2].set_title(f"Energy = {NGRM_ENERGIES[6]} MeV")
-    axs[2].set_xlim(datetimes[0], datetimes[-1])
+    # sc = axs[2].scatter(
+    #     datetimes,
+    #     variables["R_eq_T89"].get_data()[:],
+    #     s=5,
+    #     c=np.log10(variables["FEDO"].get_data()[:, 6]),
+    #     cmap="jet",
+    #     vmin=-3,
+    #     vmax=5,
+    # )
+    # axs[2].set_ylim(1, 8)
+    # axs[2].set_title(f"Energy = {NGRM_ENERGIES[6]} MeV")
+    # axs[2].set_xlim(datetimes[0], datetimes[-1])
 
-    fig.colorbar(sc, ax=axs)
+    # fig.colorbar(sc, ax=axs)
 
-    plt.savefig(f"test_{satellite}_R_eq.png")
+    # plt.savefig(f"test_{satellite}_R_eq.png")
 
     saving_strategy = ep.saving_strategies.MonthlyNetCDFStrategy(
         base_data_path=Path(processed_data_path) / "NGRM" / satellite.lower(),

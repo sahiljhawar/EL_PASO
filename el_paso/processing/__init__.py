@@ -5,6 +5,7 @@
 
 from el_paso.processing import magnetic_field_utils
 from el_paso.processing.bin_by_time import TimeBinMethod, bin_by_time
+from el_paso.processing.calculate_geo_coords_from_tle import calculate_geo_coords_from_tle
 from el_paso.processing.compute_equatorial_plasmaspheric_density import compute_equatorial_plasmaspheric_density
 from el_paso.processing.compute_invariant_K import compute_invariant_K
 from el_paso.processing.compute_invariant_mu import compute_invariant_mu
@@ -15,7 +16,6 @@ from el_paso.processing.convert_string_to_datetime import convert_string_to_date
 from el_paso.processing.fold_pitch_angles_and_flux import fold_pitch_angles_and_flux
 from el_paso.processing.get_real_time_tipsod import get_real_time_tipsod
 from el_paso.processing.magnetic_field_utils import MagFieldVarTypes
-from el_paso.processing.calculate_geo_coords_from_tle import calculate_geo_coords_from_tle
 
 __all__ = [
     "MagFieldVarTypes",

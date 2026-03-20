@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -83,7 +84,11 @@ def download(
 
     curr_time = start_time
 
-    while True:
+    while curr_time < end_time:
+
+        next_time = _get_next_time(curr_time, file_cadence)
+        next_time = end_time if next_time is None else min(next_time, end_time)
+
         match method:
             case "request":
                 _requests_download(
@@ -101,14 +106,6 @@ def download(
                     curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes
                 )
             case "esa_swe":
-                match file_cadence:
-                    case "daily":
-                        next_time = min(end_time, curr_time + timedelta(days=1))
-                    case "single_file":
-                        next_time = end_time
-                    case _:
-                        msg = "Not implemented yet"
-                        raise NotImplementedError(msg)
 
                 _esa_swe_download(
                     authentification_info,
@@ -120,22 +117,26 @@ def download(
                     skip_existing=skip_existing,
                 )
 
-        match file_cadence:
-            case "daily":
-                curr_time += timedelta(days=1)
-                if curr_time > end_time:
-                    break
+        curr_time = next_time
 
-            case "monthly":
-                msg = "Monthly file cadence has not been implemented yet!"
-                raise NotImplementedError(msg)
+def _get_next_time(curr_time: datetime, file_cadence: Literal["daily", "monthly", "single_file"]) -> datetime|None:
 
-            case "single_file":
-                break
+    match file_cadence:
+        case "daily":
+            curr_time += timedelta(days=1)
+            return curr_time
 
-            case _:
-                msg = "File cadence must be 'single_file', 'daily', or 'monthly'"
-                raise NotImplementedError(msg)
+        case "monthly":
+            msg = "Monthly file cadence has not been implemented yet!"
+            raise NotImplementedError(msg)
+
+        case "single_file":
+            return None
+
+        case _:
+            msg = "File cadence must be 'single_file', 'daily', or 'monthly'"
+            raise NotImplementedError(msg)
+
 
 
 def _requests_download(
@@ -255,8 +256,7 @@ def _esa_swe_download(
     file_name_stem: str,
     *,
     skip_existing: bool,
-):
-
+    ) -> None:
     start_time_str = start_time.isoformat(timespec="seconds").split("+")[0] + "Z"
     end_time_str = end_time.isoformat(timespec="seconds").split("+")[0] + "Z"
 
@@ -299,7 +299,6 @@ def _esa_swe_download(
 
 @cache
 def _get_esa_swe_access_token(client_id: str, client_secret: str) -> str:
-
     response = requests.post(
         "https://sso.s2p.esa.int/realms/swe/protocol/openid-connect/token",
         data={

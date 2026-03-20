@@ -6,7 +6,6 @@
 import logging
 import pickle
 import typing
-import warnings
 from abc import ABC, abstractmethod
 from copy import deepcopy
 from datetime import datetime
@@ -173,7 +172,7 @@ class SavingStrategy(ABC):
                 target_variables[name_to_save] = var_to_save
             else:
                 msg = f"Could not find target variable {name_to_save}!"
-                warnings.warn(msg, stacklevel=2)
+                logger.info(msg, stacklevel=2)
                 if output_file.save_incomplete:
                     target_variables[name_to_save] = Variable(original_unit=u.dimensionless_unscaled, data=np.array([]))
                 else:

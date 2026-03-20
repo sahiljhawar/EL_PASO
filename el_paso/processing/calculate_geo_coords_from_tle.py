@@ -6,13 +6,16 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
-from astropy import units as u
-from numpy.typing import NDArray
-from skyfield.api import EarthSatellite, load
+from astropy import units as u  # type: ignore[reportMissingTypeStubs]
+from skyfield.api import EarthSatellite, load  # type: ignore[reportMissingTypeStubs]
 
 import el_paso as ep
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +51,7 @@ def calculate_geo_coords_from_tle(
         geocentric = satellite.at(timescale.from_datetime(tle_time))
 
         tle_times.append(tle_time)
-        geo_coordinates.append(geocentric.xyz.km)
+        geo_coordinates.append(geocentric.xyz.km)  # type: ignore[reportArgumentType]
 
     result = np.asarray(geo_coordinates, dtype=np.float64)
 
