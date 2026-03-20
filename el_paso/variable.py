@@ -193,6 +193,24 @@ class Variable:
         """
         self._data = np.transpose(self._data, axes=seq)
 
+    def apply_mask(self, mask: NDArray[np.bool_]) -> None:
+        """Applies a boolean mask to the data.
+
+        Elements where the mask is False are invalidated by setting them to NaN.
+
+        Args:
+            mask (NDArray[np.bool_]): Boolean array of the same shape as the data.
+                False indicates values to be masked.
+
+        Raises:
+            TypeError: If the data is not a floating-point numeric type.
+        """
+        if not np.issubdtype(self._data.dtype, np.floating):
+            msg = f"Masking is only supported for floating-point types! Encountered for variable {self}."
+            raise TypeError(msg)
+
+        self._data[~mask] = np.nan
+
     def apply_thresholds_on_data(self, lower_threshold: float = -np.inf, upper_threshold: float = np.inf) -> None:
         """Applies lower and upper thresholds to the data.
 
@@ -205,12 +223,12 @@ class Variable:
                 positive infinity.
 
         Raises:
-            TypeError: If the data is not numeric.
+            TypeError: If the data is not a floating-point numeric type.
         """
-        if not np.issubdtype(self._data.dtype, np.number):
-            msg = f"Thresholds are only supported for numeric types! Encountered for variable {self}."
+        if not np.issubdtype(self._data.dtype, np.floating):
+            msg = f"Thresholds are only supported for floating-point types! Encountered for variable {self}."
             raise TypeError(msg)
-        self._data = typing.cast("NDArray[np.number]", self._data)
+        self._data = typing.cast("NDArray[np.floating]", self._data)
 
         self._data = np.where((self._data > lower_threshold) & (self._data < upper_threshold), self._data, np.nan)
 
