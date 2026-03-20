@@ -32,16 +32,16 @@ def test_gfz_old(sat_str: Literal["a", "b"], mag_field: Literal["T89", "TS04"]):
     Path("tests/comparisons/raw_data").mkdir(exist_ok=True)
     Path("tests/comparisons/processed_data").mkdir(exist_ok=True)
 
-    # process_hope_electrons(
-    #     start_time,
-    #     end_time,
-    #     sat_str,
-    #     "IRBEM/libirbem.so",
-    #     mag_field,
-    #     raw_data_path="tests/comparisons/raw_data",
-    #     processed_data_path="tests/comparisons/processed_data",
-    #     num_cores=12,
-    # )
+    process_hope_electrons(
+        start_time,
+        end_time,
+        sat_str,
+        "IRBEM/libirbem.so",
+        mag_field,
+        raw_data_path="tests/comparisons/raw_data",
+        processed_data_path="tests/comparisons/processed_data",
+        num_cores=12,
+    )
 
     match mag_field:
         case "T89":

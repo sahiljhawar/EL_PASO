@@ -71,7 +71,7 @@ def save(
             )
 
             if target_variables is None:
-                logger.warning(
+                logger.info(
                     f"Saving attempted, but product is missing some required variables for output {output_file.name}!",
                     stacklevel=2,
                 )
