@@ -80,6 +80,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             "time",
             "flux/FEDU",
             "flux/FEDO",
+            "flux/FEIU",
             "flux/alpha_eq",
             "flux/energy",
             "flux/alpha_local",
@@ -109,6 +110,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             "time": ["time"],
             "flux/FEDU": ["time", "energy", "alpha"],
             "flux/FEDO": ["time", "energy"],
+            "flux/FEIU": ["time", "energy", "alpha"],
             "flux/alpha_eq": ["time", "alpha"],
             "flux/energy": ["time", "energy"],
             "flux/alpha_local": ["time", "alpha"],
@@ -248,7 +250,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                 data_set = typing.cast(
                     "nC.Variable[Any]",
                     curr_hierachy.createVariable(  # type: ignore[reportUnknownMemberType]
-                        dataset_name, "f4", self.dependency_dict[path], zlib=True, complevel=5, shuffle=True
+                        dataset_name, "float64", self.dependency_dict[path], zlib=True, complevel=5, shuffle=True
                     ),
                 )
 

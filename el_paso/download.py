@@ -33,7 +33,7 @@ def download(
     file_name_stem: str,
     download_arguments_prefixes: str = "",
     download_arguments_suffixes: str = "",
-    method: Literal["request", "wget"] = "request",
+    method: Literal["request", "wget", "esa_swe"] = "request",
     authentification_info: tuple[str, str] = ("", ""),
     rename_file_name_stem: str | None = None,
     *,
@@ -99,6 +99,25 @@ def download(
             case "wget":
                 _wget_download(
                     curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes
+                )
+            case "esa_swe":
+                match file_cadence:
+                    case "daily":
+                        next_time = min(end_time, curr_time + timedelta(days=1))
+                    case "single_file":
+                        next_time = end_time
+                    case _:
+                        msg = "Not implemented yet"
+                        raise NotImplementedError(msg)
+
+                _esa_swe_download(
+                    authentification_info,
+                    download_url,
+                    start_time=curr_time,
+                    end_time=next_time,
+                    save_path=save_path,
+                    file_name_stem=file_name_stem,
+                    skip_existing=skip_existing,
                 )
 
         match file_cadence:
@@ -225,3 +244,74 @@ def _wget_download(
         os.system(download_command)  # noqa: S605
     except Exception as e:  # noqa: BLE001
         logger.info(f"Error downloading file using command {download_command}: {e}")
+
+
+def _esa_swe_download(
+    authentification_info: tuple[str, str],
+    data_id: str,
+    start_time: datetime,
+    end_time: datetime,
+    save_path: Path,
+    file_name_stem: str,
+    *,
+    skip_existing: bool,
+):
+
+    start_time_str = start_time.isoformat(timespec="seconds").split("+")[0] + "Z"
+    end_time_str = end_time.isoformat(timespec="seconds").split("+")[0] + "Z"
+
+    url_filled = f"https://swe.ssa.esa.int/hapi/data?id=spase://SSA/NumericalData/{data_id}&time.min={start_time_str}&time.max={end_time_str}&format=csv"
+
+    save_path = Path(fill_str_template_with_time(str(save_path), start_time))
+    save_path.mkdir(exist_ok=True, parents=True)
+
+    save_file_name = fill_str_template_with_time(file_name_stem, start_time)
+
+    if skip_existing and (save_path / save_file_name).exists():
+        logger.info(f"File already exists, skipping download: {save_path / save_file_name}")
+        return
+
+    try:
+        access_token = _get_esa_swe_access_token(authentification_info[0], authentification_info[1])
+
+        data_response = requests.get(
+            url_filled,
+            headers={"Authorization": f"Bearer {access_token}"},
+            timeout=5,
+        )
+
+        if data_response.status_code == ERROR_NOT_FOUND:
+            msg = f"File not found on server: {url_filled}"
+            logger.warning(msg)
+            return
+
+        data_response.raise_for_status()
+
+        with (save_path / save_file_name).open("wb") as file:
+            for chunk in data_response.iter_content(chunk_size=8192):
+                file.write(chunk)
+
+        logger.info(f"Downloaded successfully: {save_path / save_file_name}")
+
+    except requests.exceptions.RequestException as e:
+        logger.info(f"Error downloading file from {url_filled}: {e}")
+
+
+@cache
+def _get_esa_swe_access_token(client_id: str, client_secret: str) -> str:
+
+    response = requests.post(
+        "https://sso.s2p.esa.int/realms/swe/protocol/openid-connect/token",
+        data={
+            "client_id": client_id,
+            "client_secret": client_secret,
+            "grant_type": "client_credentials",
+            "scope": "swe_hapiserver",
+        },
+        timeout=5,
+    )
+
+    token_data = response.json()
+    access_token = token_data["access_token"]
+
+    return access_token

@@ -27,7 +27,7 @@ if TYPE_CHECKING:
     from collections.abc import Iterable
 
     from astropy import units as u  # type: ignore[reportMissingTypeStubs]
-    from numpy.typing import NDArray
+    from numpy.typing import DTypeLike, NDArray
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +41,7 @@ class ExtractionInfo:
     is_time_dependent: bool = True
     result_key: str | None = None
     dependent_variables: list[str] | None = None
+    np_dtype: DTypeLike | None = None
 
 
 def extract_variables_from_files(
@@ -78,12 +79,16 @@ def extract_variables_from_files(
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
 
+    if start_time > end_time:
+        msg = "start_time must be before end_time!"
+        raise ValueError(msg)
+
     data_path = Path(data_path)
 
     files_list, _ = _construct_file_list(start_time, end_time, file_cadence, data_path / file_name_stem)
 
     if len(files_list) == 0:
-        msg = "No file found to extract variables!"
+        msg = f"No file found to extract variables! Search at: {data_path / file_name_stem}"
         raise ValueError(msg)
 
     variable_data = _extract_data_from_files(files_list, extraction_infos, pd_read_csv_kwargs)
@@ -154,7 +159,7 @@ def _construct_file_list(
     return file_paths, time_intervals
 
 
-def _extract_data_from_files(  # noqa: C901
+def _extract_data_from_files(  # noqa: C901, PLR0912
     files_list: list[Path],
     extraction_infos: Iterable[ExtractionInfo],
     pd_read_csv_kwargs: dict[str, Any] | None,
@@ -165,7 +170,7 @@ def _extract_data_from_files(  # noqa: C901
         match file_path.suffix:
             case ".cdf":
                 new_data = _extract_data_from_cdf(str(file_path), tuple(extraction_infos))
-            case ".txt" | ".asc" | ".csv" | ".tab":
+            case ".txt" | ".asc" | ".csv" | ".tab" | ".dat":
                 new_data = _extract_data_from_ascii(str(file_path), tuple(extraction_infos), pd_read_csv_kwargs)
             case ".nc":
                 msg = "NetCDF reading is not supported yet!"
@@ -184,6 +189,10 @@ def _extract_data_from_files(  # noqa: C901
         # Update the data content of variables
         for info in extraction_infos:
             key = info.name_or_column
+
+            if info.np_dtype is not None:
+                variable_data[key] = variable_data[key].astype(info.np_dtype)
+
             if variable_data[key].size == 0:
                 variable_data[key] = new_data[key]
 

@@ -44,21 +44,23 @@ def construct_pitch_angle_distribution(
                      and the units are updated accordingly (e.g., flux per steradian).
     """
     omni_flux = omni_flux_var.get_data()
-    pa_local = pa_local_var.get_data()
+    pa_local = pa_local_var.get_data(u.rad)
 
-    pa_eq_max = np.max(pa_eq_var.get_data(), axis=1)
+    pa_eq_max = np.max(pa_eq_var.get_data(u.rad), axis=1)
+
+    omni_flux = np.atleast_3d(omni_flux)
 
     match method:
         case "sin":
             # Create a sin distribution
             # Calculate the factor outside the loops
-            sin_pa = np.sin(np.deg2rad(pa_local))
+            sin_pa = np.sin(pa_local)
             mean_sin = np.mean(np.sin(np.linspace(0, np.pi, 36)))
 
             # Calculate the factor matrix
-            fact_matrix = sin_pa / (mean_sin * np.reciprocal(np.sin(np.deg2rad(pa_eq_max[:, np.newaxis]))))
+            fact_matrix = sin_pa / (mean_sin * np.reciprocal(np.sin(pa_eq_max[:, np.newaxis])))
 
-            differential_flux = omni_flux[:, :, np.newaxis] * fact_matrix[:, np.newaxis, :]
+            differential_flux = omni_flux * fact_matrix[:, np.newaxis, :]
 
         case _:
             msg = f"Encountered invalid method to constrouct pitch angle distribution: {method}!"
