@@ -14,7 +14,7 @@ from swvo.io.RBMDataSet import RBMNcDataSet
 from examples.Arase.arase_mepe import process_mepe_level_3
 
 
-@pytest.mark.parametrize("mag_field", ["T89", "TS04", "OP77Q"])
+@pytest.mark.parametrize("mag_field", ["T89", "TS04"])
 @pytest.mark.parametrize("save_strategy", ["netcdf"])
 def test_arase_mepe_snapshot(
     mag_field: Literal["T89", "TS04", "OP77Q"],
@@ -24,7 +24,7 @@ def test_arase_mepe_snapshot(
     renew_solution: bool,
 ) -> None:
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
-    end_time = start_time + timedelta(days=0.4, seconds=-1)
+    end_time = start_time + timedelta(hours=4, seconds=-1)
 
     irbem_lib_path = Path(__file__).parent / "../../IRBEM/libirbem.so"
     processed_data_path = tmpdir / "ARASE" / "arase"

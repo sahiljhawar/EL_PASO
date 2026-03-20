@@ -7,7 +7,7 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from swvo.io.RBMDataSet import InstrumentEnum, RBMNcDataSet
+from swvo.io.RBMDataSet import Instrument, RBMNcDataSet, Satellite
 
 from examples.GOES.process_goes_realtime import process_goes_real_time
 
@@ -22,7 +22,7 @@ def test_goes_realtime_snapshot(
 
     irbem_lib_path = Path(__file__).parent / "../../IRBEM/libirbem.so"
 
-    processed_data_path = tmpdir
+    processed_data_path = Path(tmpdir)
 
     process_goes_real_time(
         start_time=start_time,
@@ -32,22 +32,25 @@ def test_goes_realtime_snapshot(
         raw_data_path=Path(__file__).parent / "data" / "raw",
         processed_data_path=processed_data_path,
         num_cores=32,
+        save_strategy="netcdf",
     )
 
-    out_path = processed_data_path / "primary" / "goes_primary_20251201to20251231_T89.nc"
-    assert out_path.exists()
+    out_path = processed_data_path / "GOES" / "primary" / "goes_primary_mps_high_20251201to20251231_T89.nc"
+    assert out_path.exists(), "Output path does not exist!"
 
     if renew_solution:
         shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "GOES" / "primary")
 
-    goes_proc = RBMNcDataSet(start_time, end_time, tmpdir, "GOESPrimary", InstrumentEnum.MAGEDandEPEAD, "T89")
+    goes_proc = RBMNcDataSet(
+        start_time, end_time, processed_data_path, Satellite("goes_primary", "GOES"), Instrument("mps_high"), "T89"
+    )
 
     goes_true = RBMNcDataSet(
         start_time,
         end_time,
         Path(__file__).parent / "data" / "processed",
-        "GOESPrimary",
-        InstrumentEnum.MAGEDandEPEAD,
+        Satellite("goes_primary", "GOES"),
+        Instrument("mps_high"),
         "T89",
     )
 
