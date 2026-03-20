@@ -85,6 +85,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             "flux/energy",
             "flux/alpha_local",
             "position/xGEO",
+            "psd/PSD",
             "density/density_local",
         ]
 
