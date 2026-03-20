@@ -103,7 +103,7 @@ tt2000_posixtime_equiv = [
         tt2000,
         posixtime,
         lambda x: cdflib.cdfepoch.unixtime(x.astype(np.int64)),
-        lambda x: cdflib.cdfepoch.timestamp_to_tt2000(x),
+        cdflib.cdfepoch.timestamp_to_tt2000,
     )
 ]
 
@@ -112,8 +112,8 @@ posixtime_datenum_equiv = [
     (
         posixtime,
         datenum,
-        lambda x: posixtime_to_datenum(x),
-        lambda x: datenum_to_posixtime(x),
+        posixtime_to_datenum,
+        datenum_to_posixtime,
     )
 ]
 
@@ -122,8 +122,8 @@ tt2000_datenum_equiv = [
     (
         tt2000,
         datenum,
-        lambda x: tt2000_to_datenum(x),
-        lambda x: datenum_to_tt2000(x),
+        tt2000_to_datenum,
+        datenum_to_tt2000,
     )
 ]
 
@@ -142,8 +142,8 @@ datenum_cdf_epoch_equiv = [
     (
         datenum,
         cdf_epoch,
-        lambda x: datenum_to_cdf_epoch(x),
-        lambda x: cdf_epoch_to_datenum(x),
+        datenum_to_cdf_epoch,
+        cdf_epoch_to_datenum,
     )
 ]
 

@@ -56,7 +56,6 @@ class VariableMetadata:
         if ep.is_in_release_mode():
             self.processing_notes += ep.get_release_msg() + "\n"
 
-
     def add_processing_note(self, processing_note: str) -> None:
         """Adds a processing note to the metadata.
 

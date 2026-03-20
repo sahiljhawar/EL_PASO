@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 import logging
-import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -102,7 +101,7 @@ def _get_data_dict_to_save(target_variables: dict[str, Variable]) -> dict[str, A
         data_content = variable.get_data()
 
         if data_content.size == 0:
-            warnings.warn(f"Variable {save_name} does not hold any content! Skipping ...", stacklevel=2)
+            logger.debug(f"Variable {save_name} does not hold any content! Skipping ...", stacklevel=2)
             continue
         if data_content.ndim == 1:
             data_content = data_content.reshape(-1, 1)

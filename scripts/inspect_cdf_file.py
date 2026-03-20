@@ -59,10 +59,7 @@ def inspect_cdf_file(file_path: str) -> None:
 
 
 if __name__ == "__main__":
-
-    parser = argparse.ArgumentParser(
-        description="Inspect CDF file based on file path."
-    )
+    parser = argparse.ArgumentParser(description="Inspect CDF file based on file path.")
     parser.add_argument(
         "file_path",
         type=str,

@@ -205,7 +205,6 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             dict_to_save = self.append_data(file_path, dict_to_save)
 
         with nC.Dataset(file_path, "w", format="NETCDF4") as file:
-
             if self.root_metadata is not None:
                 for key, value in self.root_metadata.items():
                     setattr(file, key, value)
