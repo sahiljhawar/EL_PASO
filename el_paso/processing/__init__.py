@@ -11,6 +11,7 @@ from el_paso.processing.compute_invariant_K import compute_invariant_K
 from el_paso.processing.compute_invariant_mu import compute_invariant_mu
 from el_paso.processing.compute_magnetic_field_variables import VariableRequest, compute_magnetic_field_variables
 from el_paso.processing.compute_phase_space_density import compute_phase_space_density
+from el_paso.processing.compute_pitch_angles_for_telescopes import compute_pitch_angles_for_telescopes
 from el_paso.processing.construct_pitch_angle_distribution import construct_pitch_angle_distribution
 from el_paso.processing.convert_string_to_datetime import convert_string_to_datetime
 from el_paso.processing.fold_pitch_angles_and_flux import fold_pitch_angles_and_flux
@@ -28,6 +29,7 @@ __all__ = [
     "compute_invariant_mu",
     "compute_magnetic_field_variables",
     "compute_phase_space_density",
+    "compute_pitch_angles_for_telescopes",
     "construct_pitch_angle_distribution",
     "convert_string_to_datetime",
     "fold_pitch_angles_and_flux",
