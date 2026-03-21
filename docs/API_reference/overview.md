@@ -49,23 +49,14 @@ This section provides a detailed reference for all modules, classes, and functio
 
 [compute_phase_space_density](processing/compute_phase_space_density.md)
 
+[compute_pitch_angles_for_telescopes](processing/compute_pitch_angles_for_telescopes.md)
+
 [construct_pitch_angle_distribution](processing/construct_pitch_angle_distribution.md)
 
 [fold_pitch_angles_and_flux](processing/fold_pitch_angles_and_flux.md)
 
 [convert_string_to_datetime](processing/convert_string_to_datetime.md)
 
-<!-- ::: el_paso.processing.compute_equatorial_plasmaspheric_density
-
-::: el_paso.processing.construct_pitch_angle_distribution
-
-::: el_paso.processing.convert_string_to_datetime
-
-::: el_paso.processing.extrapolate_leo_to_equatorial
-
-::: el_paso.processing.get_real_time_tipsod
-
-::: el_paso.processing.magnetic_field_functions -->
 
 ## Saving standards
 
