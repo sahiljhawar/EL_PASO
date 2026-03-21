@@ -23,10 +23,10 @@ CHI2_BAD_QUALITY_THRESHOLD = 2
 EPT_ENERGY_LIMITS = [0.5, 0.6, 0.7, 0.8, 1.0, 2.4, 8.0]
 
 SATELLITE_TO_ID = {
-    "EDRS-C": "D3S/d3s_edrsc_ngrm_spid204030252_science_ep_l1_gc_v3",
-    "S6-MF": "D3S/d3s_sentinel6mf_ngrm_science_ep_l1_gc_v1",
-    "MTG-S1": "D3S/d3s_mtgs1_ngrm_science_ep_l1_gc_v1",
-    "MTG-I1": "D3S/d3s_mtgi1_ngrm_science_ep_l1_gc_v1",
+    "EDRS-C": "https://swe.ssa.esa.int/hapi/data?id=spase://SSA/NumericalData/D3S/d3s_edrsc_ngrm_spid204030252_science_ep_l1_gc_v3",
+    "S6-MF": "https://swe.ssa.esa.int/hapi/data?id=spase://SSA/NumericalData/D3S/d3s_sentinel6mf_ngrm_science_ep_l1_gc_v1",
+    "MTG-S1": "https://swe.ssa.esa.int/hapi/data?id=spase://SSA/NumericalData/D3S/d3s_mtgs1_ngrm_science_ep_l1_gc_v1",
+    "MTG-I1": "https://swe.ssa.esa.int/hapi/data?id=spase://SSA/NumericalData/D3S/d3s_mtgi1_ngrm_science_ep_l1_gc_v1",
 }
 NGRM_ENERGIES = [0.18, 0.27, 0.40, 0.60, 0.88, 1.30, 1.93, 2.90, 3.40, 4.00]
 
@@ -63,10 +63,13 @@ def process_ngrm_electron_fluxes(
         save_path=data_path_stem,
         file_cadence="daily",
         download_url=SATELLITE_TO_ID[satellite],
-        file_name_stem=file_name_stem,
+        file_name_stem="",
+        rename_file_name_stem=file_name_stem,
         authentification_info=(client_id, client_secret),
         method="esa_swe",
+        skip_existing=False,
     )
+    asdf
 
     flux_unit = typing.cast("u.Unit", (u.cm**2 * u.s * u.sr * u.MeV) ** (-1))
 
@@ -244,51 +247,51 @@ def process_ngrm_electron_fluxes(
         "psd/PSD": psd_var,
     }
 
-    # from matplotlib import pyplot as plt
+    from matplotlib import pyplot as plt
 
-    # datetimes = [datetime.fromtimestamp(t) for t in binned_time_var.get_data()]
+    datetimes = [datetime.fromtimestamp(t) for t in binned_time_var.get_data()]
 
-    # fig, axs = plt.subplots(3, 1, figsize=(20, 9), sharex=True, layout="constrained")
-    # sc = axs[0].scatter(
-    #     datetimes,
-    #     variables["L"].get_data()[:],
-    #     s=5,
-    #     c=np.log10(variables["FEDO"].get_data()[:, 2]),
-    #     cmap="jet",
-    #     vmin=-3,
-    #     vmax=5,
-    # )
-    # axs[0].set_ylim(1, 8)
-    # axs[0].set_title(f"Energy = {NGRM_ENERGIES[2]} MeV")
+    fig, axs = plt.subplots(3, 1, figsize=(20, 9), sharex=True, layout="constrained")
+    sc = axs[0].scatter(
+        datetimes,
+        variables["R_eq_T89"].get_data()[:],
+        s=5,
+        c=np.log10(variables["FEDO"].get_data()[:, 2]),
+        cmap="jet",
+        vmin=-3,
+        vmax=5,
+    )
+    axs[0].set_ylim(1, 8)
+    axs[0].set_title(f"Energy = {NGRM_ENERGIES[2]} MeV")
 
-    # sc = axs[1].scatter(
-    #     datetimes,
-    #     variables["R_eq_T89"].get_data()[:],
-    #     s=5,
-    #     c=np.log10(variables["FEDO"].get_data()[:, 4]),
-    #     cmap="jet",
-    #     vmin=-3,
-    #     vmax=5,
-    # )
-    # axs[1].set_ylim(1, 8)
-    # axs[1].set_title(f"Energy = {NGRM_ENERGIES[4]} MeV")
+    sc = axs[1].scatter(
+        datetimes,
+        variables["R_eq_T89"].get_data()[:],
+        s=5,
+        c=np.log10(variables["FEDO"].get_data()[:, 4]),
+        cmap="jet",
+        vmin=-3,
+        vmax=5,
+    )
+    axs[1].set_ylim(1, 8)
+    axs[1].set_title(f"Energy = {NGRM_ENERGIES[4]} MeV")
 
-    # sc = axs[2].scatter(
-    #     datetimes,
-    #     variables["R_eq_T89"].get_data()[:],
-    #     s=5,
-    #     c=np.log10(variables["FEDO"].get_data()[:, 6]),
-    #     cmap="jet",
-    #     vmin=-3,
-    #     vmax=5,
-    # )
-    # axs[2].set_ylim(1, 8)
-    # axs[2].set_title(f"Energy = {NGRM_ENERGIES[6]} MeV")
-    # axs[2].set_xlim(datetimes[0], datetimes[-1])
+    sc = axs[2].scatter(
+        datetimes,
+        variables["R_eq_T89"].get_data()[:],
+        s=5,
+        c=np.log10(variables["FEDO"].get_data()[:, 6]),
+        cmap="jet",
+        vmin=-3,
+        vmax=5,
+    )
+    axs[2].set_ylim(1, 8)
+    axs[2].set_title(f"Energy = {NGRM_ENERGIES[6]} MeV")
+    axs[2].set_xlim(datetimes[0], datetimes[-1])
 
-    # fig.colorbar(sc, ax=axs)
+    fig.colorbar(sc, ax=axs)
 
-    # plt.savefig(f"test_{satellite}_R_eq.png")
+    plt.savefig(f"test_{satellite}_R_eq.png")
 
     saving_strategy = ep.saving_strategies.MonthlyNetCDFStrategy(
         base_data_path=Path(processed_data_path) / "NGRM" / satellite.lower(),
@@ -310,14 +313,14 @@ if __name__ == "__main__":
         "--start_time",
         type=str,
         help="Start time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2026, 2, 18, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2026, 3, 18, tzinfo=timezone.utc).isoformat(),
         required=False,
     )
     parser.add_argument(
         "--end_time",
         type=str,
         help="End time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2026, 2, 22, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2026, 3, 20, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
         required=False,
     )
     parser.add_argument(
