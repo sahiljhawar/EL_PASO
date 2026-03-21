@@ -41,6 +41,8 @@ This section provides a detailed reference for all modules, classes, and functio
 
 [bin_by_time](processing/bin_by_time.md)
 
+[calculate_geo_coords_from_tle](processing/calculate_geo_coords_from_tle.md)
+
 [compute_invariank_K](processing/compute_invariant_K.md)
 
 [compute_invariank_mu](processing/compute_invariant_mu.md)
