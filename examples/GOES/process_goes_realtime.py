@@ -206,7 +206,7 @@ def process_goes_real_time(
 
         saving_strategy = ep.saving_strategies.MonthlyNetCDFStrategy(
             base_data_path=Path(processed_data_path) / "GOES" / sat_str,
-            file_name_stem=f"goes_{sat_str}_mps_high",
+            file_name_stem=f"{sat_str}_MAGED",
             mag_field="T89",
         )
         append = False
