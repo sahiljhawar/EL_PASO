@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import netCDF4 as nC
+import numpy as np
 
 import el_paso as ep
 from el_paso.saving_strategies.monthly_h5_strategy import MonthlyH5Strategy
@@ -180,6 +181,88 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             name_in_file, variable, reset_consistency_check=first_call_of_interval
         )
 
+    def append_data(self, file_path: Path, data_dict_to_save: dict[str, Any]) -> dict[str, Any]:  # noqa: C901, PLR0912
+        """Append only the new time slice to an existing NetCDF file.
+
+        This avoids rewriting the whole file by opening it in append mode and writing into
+        `[start_index:end_index, ...]` for each variable.
+
+        Parameters:
+            file_path (Path): The path to the existing NetCDF file to which data will be appended.
+            data_dict_to_save (dict[str, Any]): The dictionary containing variable data to append. Must include a "time"
+            key with the new time slice.
+
+        Returns:
+            dict[str, Any]: The same `data_dict_to_save` that was passed in, for consistency with the method signature.
+
+        Raises:
+            FileNotFoundError: If the specified file does not exist.
+            KeyError: If the "time" key is missing from `data_dict_to_save`.
+            ValueError: If the existing NetCDF file does not have an unlimited "time" dimension.
+
+        """
+        if not file_path.exists():
+            msg = f"Cannot append: file does not exist: {file_path}"
+            raise FileNotFoundError(msg)
+
+        if "time" not in data_dict_to_save:
+            msg = "Cannot append: missing 'time' in data_dict_to_save."
+            raise KeyError(msg)
+
+        # NetCDF4 requires the dimension to be created as "unlimited" (size=None).
+        with nC.Dataset(file_path, "a", format="NETCDF4") as file:
+            time_dim = file.dimensions.get("time")
+            if time_dim is None or not time_dim.isunlimited():
+                msg = (
+                    "Cannot append: the existing NetCDF file does not have an "
+                    "unlimited 'time' dimension. Recreate the file with 'time' "
+                    "created as unlimited (None)."
+                )
+                raise ValueError(msg)
+
+            new_time = data_dict_to_save["time"]
+            new_time_len = int(new_time.shape[0])
+            if new_time_len == 0:
+                return data_dict_to_save
+
+            start_index = int(time_dim.size)
+            end_index = start_index + new_time_len
+
+            metadata_dict = typing.cast("dict[str, Any]", data_dict_to_save.get("metadata", {}))
+
+            for path, value in data_dict_to_save.items():
+                if path == "metadata":
+                    continue
+                if getattr(value, "size", 0) == 0:
+                    continue
+
+                path_parts = path.split("/")
+                groups = path_parts[:-1]
+                dataset_name = path_parts[-1]
+
+                curr_hierachy: nC.Group | nC.Dataset = file
+                for group in groups:
+                    if group not in curr_hierachy.groups:
+                        curr_hierachy = curr_hierachy.createGroup(group)  # type: ignore[reportUnknownVariableType]
+                    else:
+                        curr_hierachy = typing.cast("nC.Group", curr_hierachy[group])
+
+                data_set = curr_hierachy.variables[dataset_name]
+                # All variables defined in this strategy depend on the 'time' dimension first.
+                if path == "time":
+                    data_set[start_index:end_index, ...] = np.squeeze(value)
+                else:
+                    data_set[start_index:end_index, ...] = value
+
+                if path in metadata_dict:
+                    metadata = typing.cast("dict[str, Any]", metadata_dict[path])
+                    data_set.units = metadata["unit"]
+                    data_set.source = metadata["source_files"]
+                    data_set.history = metadata["processing_notes"]
+                    data_set.description = metadata["description"]
+
+        return data_dict_to_save
+
     def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:  # noqa: C901, PLR0912
         """Saves a dictionary of variables to a single NetCDF file.
 
@@ -191,19 +274,20 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             file_path (Path): The path to the file where the data will be saved.
             dict_to_save (dict[str, Any]): The dictionary containing variable data.
             append (bool, optional): If `True`, attempts to append data to an existing file.
-                Currently, this functionality is not fully implemented for NetCDF,
-                so it defaults to creating a new file.
+                If the existing file has an unlimited `time` dimension, only the new time
+                slice is appended.
 
         Note:
-            This method only supports creating new files (`append=False`) and does not
-            handle appending to an existing NetCDF file.
+            For appending to work, the original file must have been created with an
+            unlimited `time` dimension.
         """
         logger.info(f"Saving file {file_path.name}...")
 
         file_path.parent.mkdir(parents=True, exist_ok=True)
 
         if file_path.exists() and append:
-            dict_to_save = self.append_data(file_path, dict_to_save)
+            self.append_data(file_path, dict_to_save)
+            return
 
         with nC.Dataset(file_path, "w", format="NETCDF4") as file:
             if self.root_metadata is not None:
@@ -211,6 +295,9 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                     setattr(file, key, value)
 
             size_time = dict_to_save["time"].shape[0]
+            if size_time == 0:
+                logger.info(f"Skipping empty save for {file_path.name} (time has length 0).")
+                return
             size_pitch_angle: int = 0
             size_energy: int = 0
 
@@ -222,7 +309,8 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             if "flux/energy" in dict_to_save and dict_to_save["flux/energy"].size > 0:
                 size_energy = dict_to_save["flux/energy"].shape[1]
 
-            file.createDimension("time", size_time)
+            # Make time unlimited so future runs can append without rewriting.
+            file.createDimension("time", None)
             file.createDimension("alpha", size_pitch_angle)
             file.createDimension("energy", size_energy)
 
