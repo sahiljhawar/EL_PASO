@@ -55,6 +55,7 @@ nav:
           - API_reference/processing/compute_invariant_mu.md
           - API_reference/processing/compute_magnetic_field_variables.md
           - API_reference/processing/compute_phase_space_density.md
+          - API_reference/processing/compute_pitch_angles_for_telescopes.md
           - API_reference/processing/construct_pitch_angle_distribution.md
           - API_reference/processing/convert_string_to_datetime.md
           - API_reference/processing/fold_pitch_angles_and_flux.md
