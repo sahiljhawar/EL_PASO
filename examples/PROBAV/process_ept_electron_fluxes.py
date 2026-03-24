@@ -43,7 +43,7 @@ def process_ept_electron_fluxes(
         msg = "Client secret not found!"
         raise ValueError(msg)
 
-    data_path_stem = f"{raw_data_path}/YYYY/MM/"
+    data_path_stem = f"{raw_data_path}/probav/YYYY/MM/"
 
     url = "https://sso-csr-ucl-ac-be.content.swe.s2p.esa.int/r109_111/ascii/YYYYMM/PROBAV_EPT_YYYYMMDD_L1d.dat.gz"
     rename_file_name_stem = "PROBAV_ept_YYYYMMDD_L1d.csv"

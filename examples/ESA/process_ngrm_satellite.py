@@ -44,8 +44,7 @@ def process_ngrm_electron_fluxes(
     data_path_stem = f"{raw_data_path}/{satellite}/YYYY/MM/"
     file_name_stem = f"{satellite}_ngrm_YYYYMMDD_L1d.csv"
 
-    load_dotenv("esa.env")
-
+    # loaded environment variables from .env file
     client_id = os.environ.get("CLIENT_ID")
     client_secret = os.environ.get("CLIENT_SECRET")
 
