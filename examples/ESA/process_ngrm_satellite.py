@@ -69,7 +69,6 @@ def process_ngrm_electron_fluxes(
         method="esa_swe",
         skip_existing=False,
     )
-    asdf
 
     flux_unit = typing.cast("u.Unit", (u.cm**2 * u.s * u.sr * u.MeV) ** (-1))
 
