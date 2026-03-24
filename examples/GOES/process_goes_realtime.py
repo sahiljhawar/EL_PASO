@@ -37,7 +37,7 @@ def process_goes_real_time(
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     # Part 1: specify source files to extract variables
 
-    data_path_stem = f"{raw_data_path}/goes/YYYY/MM/{sat_str}/"
+    data_path_stem = f"{raw_data_path}/GOES/YYYY/MM/{sat_str}/"
     rename_file_name_stem = f"{sat_str}_YYYYMMDD.json"
     url = f"https://services.swpc.noaa.gov/json/goes/{sat_str}/"
 

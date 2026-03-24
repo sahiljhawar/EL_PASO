@@ -179,7 +179,7 @@ def _get_xep_variables(
     energy_max = np.asarray((600.0, 1000.0, 1500.0, 2200.0, 3500.0, 4300.0, 5400.0, 9800.0))
     energy_mean = _get_mean_energy(energy_min, energy_max)
 
-    data_path_stem = f"{download_data_dir}arase/YYYY/MM/"
+    data_path_stem = f"{download_data_dir}/ARASE/YYYY/MM/"
     file_name_stem = "erg_real_xep_YYYYMMDD_v002.txt"
     url = "https://ergsc.isee.nagoya-u.ac.jp/data/ergsc/satellite/erg/swx/xep/l2/"
 
