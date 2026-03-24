@@ -6,12 +6,15 @@
 from __future__ import annotations
 
 import logging
+import shutil
+import tempfile
 import typing
 from pathlib import Path
 from typing import Any
 
 import netCDF4 as nC
 import numpy as np
+from swvo.io.RBMDataSet.RBMNcDataSet import _read_all_datasets_netcdf
 
 import el_paso as ep
 from el_paso.saving_strategies.monthly_h5_strategy import MonthlyH5Strategy
@@ -181,25 +184,251 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             name_in_file, variable, reset_consistency_check=first_call_of_interval
         )
 
-    def append_data(self, file_path: Path, data_dict_to_save: dict[str, Any]) -> dict[str, Any]:  # noqa: C901, PLR0912
-        """Append only the new time slice to an existing NetCDF file.
+    def _load_netcdf_data(self, file_path: Path) -> dict[str, Any]:
+        """Load all data from an existing NetCDF file, including metadata.
 
-        This avoids rewriting the whole file by opening it in append mode and writing into
-        `[start_index:end_index, ...]` for each variable.
+        Uses _read_all_datasets_netcdf from swvo if available for efficient recursive loading,
+        otherwise falls back to custom implementation.
 
         Parameters:
-            file_path (Path): The path to the existing NetCDF file to which data will be appended.
-            data_dict_to_save (dict[str, Any]): The dictionary containing variable data to append. Must include a "time"
-            key with the new time slice.
+            file_path (Path): The path to the NetCDF file to load.
 
         Returns:
-            dict[str, Any]: The same `data_dict_to_save` that was passed in, for consistency with the method signature.
+            dict[str, Any]: A dictionary containing all variables and metadata from the file.
+        """
+        loaded_data: dict[str, Any] = {"metadata": {}}
+
+        datasets = _read_all_datasets_netcdf(file_path)
+        loaded_data.update(datasets)
+
+        # load metadata
+
+        with nC.Dataset(file_path, "r", format="NETCDF4") as file:
+
+            def _recursively_load_metadata(group: nC.Group | nC.Dataset, prefix: str = "") -> None:
+                """Recursively load metadata from groups and subgroups."""
+                for var_name, var in group.variables.items():
+                    full_path = f"{prefix}{var_name}" if prefix else var_name
+                    if full_path not in loaded_data:
+                        continue
+                    loaded_data["metadata"][full_path] = {
+                        "unit": getattr(var, "units", "unknown"),
+                        "source_files": getattr(var, "source", "unknown"),
+                        "processing_notes": getattr(var, "history", "unknown"),
+                        "description": getattr(var, "description", "unknown"),
+                    }
+
+                for group_name, subgroup in group.groups.items():
+                    _recursively_load_metadata(subgroup, f"{prefix}{group_name}/")
+
+            _recursively_load_metadata(file)
+
+        return loaded_data
+
+    def _merge_and_sort_data(self, existing_data: dict[str, Any], new_data: dict[str, Any]) -> dict[str, Any]:  # noqa: C901, PLR0912
+        """Merge new data with existing data, sort by time, and remove duplicates.
+
+        Parameters:
+            existing_data (dict[str, Any]): The existing data loaded from the file.
+            new_data (dict[str, Any]): The new data to be inserted.
+
+        Returns:
+            dict[str, Any]: The merged dictionary sorted by time with duplicates removed based on time values.
+                When duplicate time values are found, the newer data (from new_data) is kept.
+        """
+        if "time" not in existing_data or existing_data["time"].size == 0:
+            return new_data
+
+        if "time" not in new_data or new_data["time"].size == 0:
+            return existing_data
+
+        existing_time = existing_data["time"]
+        new_time = new_data["time"]
+
+        existing_time_flat = np.asarray(existing_time).flatten()
+        new_time_flat = np.asarray(new_time).flatten()
+
+        # Combine times and find sort indices
+        combined_time = np.concatenate([existing_time_flat, new_time_flat])
+        sort_indices = np.argsort(combined_time)
+
+        sorted_combined_time = combined_time[sort_indices]
+
+        unique_time, unique_indices = np.unique(sorted_combined_time, return_index=True)
+
+        # get last occurrence indices for each unique time value to keep the newer data in case of duplicates
+        last_occurrence_indices = []
+        for i in range(len(unique_time)):
+            # Find the last occurrence of this unique time value
+            last_idx = np.where(sorted_combined_time == unique_time[i])[0][-1]
+            last_occurrence_indices.append(last_idx)
+
+        unique_indices = np.array(last_occurrence_indices)
+
+        merged_data: dict[str, Any] = {"metadata": existing_data.get("metadata", {})}
+
+        if "metadata" in new_data:
+            merged_data["metadata"].update(new_data["metadata"])
+
+        new_time_ndim = np.asarray(new_time).ndim
+
+        all_keys = set(existing_data.keys()) | set(new_data.keys())
+        for key in all_keys:
+            if key == "metadata":
+                continue
+
+            if key not in existing_data:
+                merged_data[key] = new_data[key]
+            elif key not in new_data:
+                merged_data[key] = existing_data[key]
+            else:
+                existing_array = existing_data[key]
+                new_array = new_data[key]
+
+                existing_flat = np.asarray(existing_array).reshape(existing_array.shape[0], -1)
+                new_flat = np.asarray(new_array).reshape(new_array.shape[0], -1)
+
+                # Concatenate along first dimension (time)
+                combined_array = np.concatenate([existing_flat, new_flat], axis=0)
+
+                # Apply sorting along time axis
+                sorted_array = combined_array[sort_indices]
+
+                # Remove duplicates based on time (keep last occurrence)
+                deduplicated_array = sorted_array[unique_indices]
+
+                if key == "time":
+                    if new_time_ndim == 2:  # noqa: PLR2004
+                        merged_data[key] = deduplicated_array
+                    else:
+                        merged_data[key] = deduplicated_array.flatten()
+                else:
+                    original_shape = (deduplicated_array.shape[0],) + new_array.shape[1:]  # noqa: RUF005
+                    merged_data[key] = deduplicated_array.reshape(original_shape)
+
+        return merged_data
+
+    def _calculate_dimensions(self, data_dict: dict[str, Any]) -> dict[str, int]:
+        """Calculate dimension sizes from the data dictionary.
+
+        Parameters:
+            data_dict (dict[str, Any]): The data dictionary containing variables.
+
+        Returns:
+            dict[str, int]: Dictionary with dimension names as keys and sizes as values.
+        """
+        dimensions = {
+            "time": data_dict["time"].shape[0],
+            "alpha": 0,
+            "energy": 0,
+        }
+
+        if "flux/alpha_eq" in data_dict and data_dict["flux/alpha_eq"].size > 0:
+            dimensions["alpha"] = data_dict["flux/alpha_eq"].shape[1]
+        elif "flux/alpha_local" in data_dict and data_dict["flux/alpha_local"].size > 0:
+            dimensions["alpha"] = data_dict["flux/alpha_local"].shape[1]
+
+        if "flux/energy" in data_dict and data_dict["flux/energy"].size > 0:
+            dimensions["energy"] = data_dict["flux/energy"].shape[1]
+
+        if "position/xGEO" in data_dict and data_dict["position/xGEO"].size > 0:
+            dimensions["xGEO_components"] = 3
+
+        return dimensions
+
+    def _write_data_to_netcdf_file(self, file: nC.Dataset | nC.Group, data_dict: dict[str, Any]) -> None:
+        """Write variables to a NetCDF file or group.
+
+        Parameters:
+            file (nC.Dataset | nC.Group): The NetCDF dataset or group to write to.
+            data_dict (dict[str, Any]): The data dictionary containing variables to write.
+        """
+        for path, value in data_dict.items():
+            if path == "metadata":
+                continue
+
+            if getattr(value, "size", 0) == 0:
+                continue
+
+            path_parts = path.split("/")
+            groups = path_parts[:-1]
+            dataset_name = path_parts[-1]
+
+            curr_hierarchy: nC.Group | nC.Dataset = file
+            for group in groups:
+                if group not in curr_hierarchy.groups:
+                    curr_hierarchy = curr_hierarchy.createGroup(group)
+                else:
+                    curr_hierarchy = typing.cast("nC.Group", curr_hierarchy[group])
+
+            data_set = typing.cast(
+                "nC.Variable[Any]",
+                curr_hierarchy.createVariable(
+                    dataset_name, "float64", self.dependency_dict[path], zlib=True, complevel=5, shuffle=True
+                ),
+            )
+
+            data_set[:, ...] = value
+
+            if path in data_dict.get("metadata", {}):
+                metadata = data_dict["metadata"][path]
+                data_set.units = metadata["unit"]
+                data_set.source = metadata["source_files"]
+                data_set.history = metadata["processing_notes"]
+                data_set.description = metadata["description"]
+
+    def _write_netcdf_file(self, file_path: Path, data_dict: dict[str, Any]) -> None:
+        """Create and write a NetCDF file from a data dictionary.
+
+        Parameters:
+            file_path (Path): The path to the file where the data will be saved.
+            data_dict (dict[str, Any]): The data dictionary containing variables and metadata.
+        """
+        with nC.Dataset(file_path, "w", format="NETCDF4") as file:
+            if self.root_metadata is not None:
+                for key, value in self.root_metadata.items():
+                    setattr(file, key, value)
+
+            size_time = data_dict["time"].shape[0]
+            if size_time == 0:
+                logger.info(f"Skipping write for {file_path.name} (time has length 0).")
+                return
+
+            # Calculate and create dimensions
+            dimensions = self._calculate_dimensions(data_dict)
+            file.createDimension("time", None)  # Unlimited dimension
+            for dim_name, dim_size in dimensions.items():
+                if dim_name != "time":
+                    file.createDimension(dim_name, dim_size)
+
+            # Write variables
+            self._write_data_to_netcdf_file(file, data_dict)
+
+    def append_data(self, file_path: Path, data_dict_to_save: dict[str, Any]) -> dict[str, Any]:
+        """Insert new data into an existing NetCDF file, maintaining sorted order by timestamp.
+
+        This method loads the existing data, merges it with new data, sorts by timestamp,
+        and writes back to the file. If any step fails, the original file remains intact.
+
+        The process is atomic:
+        1. Load existing data from the file
+        2. Merge new data with existing data
+        3. Sort combined data by time
+        4. Write to a temporary file
+        5. Only if successful, replace the original file
+
+        Parameters:
+            file_path (Path): The path to the existing NetCDF file to which data will be inserted.
+            data_dict_to_save (dict[str, Any]): The dictionary containing variable data to insert.
+                Must include a "time" key.
+
+        Returns:
+            dict[str, Any]: The merged and sorted `data_dict_to_save`.
 
         Raises:
             FileNotFoundError: If the specified file does not exist.
             KeyError: If the "time" key is missing from `data_dict_to_save`.
             ValueError: If the existing NetCDF file does not have an unlimited "time" dimension.
-
         """
         if not file_path.exists():
             msg = f"Cannot append: file does not exist: {file_path}"
@@ -209,8 +438,8 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             msg = "Cannot append: missing 'time' in data_dict_to_save."
             raise KeyError(msg)
 
-        # NetCDF4 requires the dimension to be created as "unlimited" (size=None).
-        with nC.Dataset(file_path, "a", format="NETCDF4") as file:
+        # Validate that the time dimension is unlimited
+        with nC.Dataset(file_path, "r", format="NETCDF4") as file:
             time_dim = file.dimensions.get("time")
             if time_dim is None or not time_dim.isunlimited():
                 msg = (
@@ -220,50 +449,43 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
                 )
                 raise ValueError(msg)
 
-            new_time = data_dict_to_save["time"]
-            new_time_len = int(new_time.shape[0])
-            if new_time_len == 0:
-                return data_dict_to_save
+        new_time = data_dict_to_save["time"]
+        new_time_len = int(new_time.shape[0])
+        if new_time_len == 0:
+            logger.info(f"No new time data to insert for {file_path.name}")
+            return data_dict_to_save
 
-            start_index = int(time_dim.size)
-            end_index = start_index + new_time_len
+        try:
+            logger.info(f"Loading existing data from {file_path.name}...")
+            existing_data = self._load_netcdf_data(file_path)
 
-            metadata_dict = typing.cast("dict[str, Any]", data_dict_to_save.get("metadata", {}))
+            logger.info(f"Merging and sorting data for {file_path.name}...")
+            merged_data = self._merge_and_sort_data(existing_data, data_dict_to_save)
 
-            for path, value in data_dict_to_save.items():
-                if path == "metadata":
-                    continue
-                if getattr(value, "size", 0) == 0:
-                    continue
+            with tempfile.NamedTemporaryFile(suffix=".nc", delete=False, dir=file_path.parent) as tmp_file:
+                tmp_path = Path(tmp_file.name)
 
-                path_parts = path.split("/")
-                groups = path_parts[:-1]
-                dataset_name = path_parts[-1]
+            try:
+                logger.info(f"Writing merged data to temporary file {tmp_path.name}...")
+                self._write_netcdf_file(tmp_path, merged_data)
 
-                curr_hierachy: nC.Group | nC.Dataset = file
-                for group in groups:
-                    if group not in curr_hierachy.groups:
-                        curr_hierachy = curr_hierachy.createGroup(group)  # type: ignore[reportUnknownVariableType]
-                    else:
-                        curr_hierachy = typing.cast("nC.Group", curr_hierachy[group])
+                logger.info(f"Replacing original file with merged data for {file_path.name}...")
+                shutil.move(str(tmp_path), str(file_path))
+                logger.info(f"Successfully inserted data into {file_path.name}")
 
-                data_set = curr_hierachy.variables[dataset_name]
-                # All variables defined in this strategy depend on the 'time' dimension first.
-                if path == "time":
-                    data_set[start_index:end_index, ...] = np.squeeze(value)
-                else:
-                    data_set[start_index:end_index, ...] = value
+                return merged_data  # noqa: TRY300
 
-                if path in metadata_dict:
-                    metadata = typing.cast("dict[str, Any]", metadata_dict[path])
-                    data_set.units = metadata["unit"]
-                    data_set.source = metadata["source_files"]
-                    data_set.history = metadata["processing_notes"]
-                    data_set.description = metadata["description"]
+            except Exception:
+                if tmp_path.exists():
+                    tmp_path.unlink()
+                logger.exception("Failed to write merged data to temporary file")
+                raise
 
-        return data_dict_to_save
+        except Exception:
+            logger.exception(f"Failed to insert data into {file_path.name}")
+            raise
 
-    def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:  # noqa: C901, PLR0912
+    def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:
         """Saves a dictionary of variables to a single NetCDF file.
 
         This method creates a new NetCDF4 file, defines dimensions based on the data,
@@ -274,8 +496,8 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             file_path (Path): The path to the file where the data will be saved.
             dict_to_save (dict[str, Any]): The dictionary containing variable data.
             append (bool, optional): If `True`, attempts to append data to an existing file.
-                If the existing file has an unlimited `time` dimension, only the new time
-                slice is appended.
+                If the existing file has an unlimited `time` dimension, the data will be
+                inserted in sorted order by timestamp, replacing any duplicate entries.
 
         Note:
             For appending to work, the original file must have been created with an
@@ -289,64 +511,4 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
             self.append_data(file_path, dict_to_save)
             return
 
-        with nC.Dataset(file_path, "w", format="NETCDF4") as file:
-            if self.root_metadata is not None:
-                for key, value in self.root_metadata.items():
-                    setattr(file, key, value)
-
-            size_time = dict_to_save["time"].shape[0]
-            if size_time == 0:
-                logger.info(f"Skipping empty save for {file_path.name} (time has length 0).")
-                return
-            size_pitch_angle: int = 0
-            size_energy: int = 0
-
-            if "flux/alpha_eq" in dict_to_save and dict_to_save["flux/alpha_eq"].size > 0:
-                size_pitch_angle = dict_to_save["flux/alpha_eq"].shape[1]
-            elif "flux/alpha_local" in dict_to_save and dict_to_save["flux/alpha_local"].size > 0:
-                size_pitch_angle = dict_to_save["flux/alpha_local"].shape[1]
-
-            if "flux/energy" in dict_to_save and dict_to_save["flux/energy"].size > 0:
-                size_energy = dict_to_save["flux/energy"].shape[1]
-
-            # Make time unlimited so future runs can append without rewriting.
-            file.createDimension("time", None)
-            file.createDimension("alpha", size_pitch_angle)
-            file.createDimension("energy", size_energy)
-
-            if "position/xGEO" in dict_to_save and dict_to_save["position/xGEO"].size > 0:
-                file.createDimension("xGEO_components", 3)
-
-            for path, value in dict_to_save.items():
-                if path == "metadata":
-                    continue
-
-                if value.size == 0:
-                    continue
-
-                path_parts = path.split("/")
-                groups = path_parts[:-1]
-                dataset_name = path_parts[-1]
-
-                curr_hierachy = file
-                for group in groups:
-                    if group not in curr_hierachy.groups:
-                        curr_hierachy = curr_hierachy.createGroup(group)  # type: ignore[reportUnknownVariableType]
-                    else:
-                        curr_hierachy = typing.cast("nC.Group", curr_hierachy[group])
-
-                data_set = typing.cast(
-                    "nC.Variable[Any]",
-                    curr_hierachy.createVariable(  # type: ignore[reportUnknownMemberType]
-                        dataset_name, "float64", self.dependency_dict[path], zlib=True, complevel=5, shuffle=True
-                    ),
-                )
-
-                data_set[:, ...] = value
-
-                if path in dict_to_save["metadata"]:
-                    metadata = dict_to_save["metadata"][path]
-                    data_set.units = metadata["unit"]
-                    data_set.source = metadata["source_files"]
-                    data_set.history = metadata["processing_notes"]
-                    data_set.description = metadata["description"]
+        self._write_netcdf_file(file_path, dict_to_save)
