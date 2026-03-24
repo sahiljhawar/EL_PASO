@@ -298,7 +298,7 @@ def process_ngrm_electron_fluxes(
         mag_field="T89",
         data_standard=ep.data_standards.PRBEMStandard(),
     )
-    append = False
+    append = True
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=append)
 
