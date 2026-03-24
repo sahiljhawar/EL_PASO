@@ -209,7 +209,7 @@ def process_goes_real_time(
             file_name_stem=f"{sat_str}_MAGED",
             mag_field="T89",
         )
-        append = False
+        append = True
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=append)
 

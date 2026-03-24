@@ -160,7 +160,7 @@ def process_arase_xep_real_time(
             file_name_stem="arase_XEP",
             mag_field="T89",
         )
-        append = False
+        append = True
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=append)
 
