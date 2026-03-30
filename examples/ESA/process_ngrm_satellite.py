@@ -17,6 +17,7 @@ from astropy import units as u
 from astropy.coordinates import GCRS, ITRS, CartesianRepresentation
 
 import el_paso as ep
+from el_paso.utils import timed_function
 
 CHI2_BAD_QUALITY_THRESHOLD = 2
 EPT_ENERGY_LIMITS = [0.5, 0.6, 0.7, 0.8, 1.0, 2.4, 8.0]
@@ -30,6 +31,7 @@ SATELLITE_TO_ID = {
 NGRM_ENERGIES = [0.18, 0.27, 0.40, 0.60, 0.88, 1.30, 1.93, 2.90, 3.40, 4.00]
 
 
+@timed_function("process_ngrm_electron_fluxes")
 def process_ngrm_electron_fluxes(
     satellite: Literal["EDRS-C", "S6-MF", "MTG-S1", "MTG-I1"],
     raw_data_path: str | Path,
