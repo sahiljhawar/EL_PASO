@@ -17,8 +17,9 @@ import el_paso as ep
 logging.captureWarnings(capture=True)
 logger = logging.getLogger(__name__)
 
-TELE_ALPHA_ANGLES = np.array([0., 0., 0., 0., 0.])
-TELE_BETA_ANGLES = np.array([-35., 35., -70., 0, 70.])
+TELE_ALPHA_ANGLES = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
+TELE_BETA_ANGLES = np.array([-35.0, 35.0, -70.0, 0, 70.0])
+
 
 def process_goes_r_mps_high(
     sat_str: Literal["goes18", "goes19"],
@@ -82,7 +83,7 @@ def process_goes_r_mps_high(
         end_time=end_time,
     )
 
-    mps_vars["diff_flux"].transpose_data((0,2,1))
+    mps_vars["diff_flux"].transpose_data((0, 2, 1))
     mps_vars["diff_flux"].apply_thresholds_on_data(lower_threshold=0)
 
     # calculate xGEO
@@ -99,19 +100,23 @@ def process_goes_r_mps_high(
     tele_alpha_angles_var = ep.Variable(data=TELE_ALPHA_ANGLES, original_unit=u.deg)
     tele_beta_angles_var = ep.Variable(data=TELE_BETA_ANGLES, original_unit=u.deg)
     local_pa_var = ep.processing.compute_pitch_angles_for_telescopes(
-        magn_vars["b_brf"], tele_alpha_angles_var, tele_beta_angles_var,
+        magn_vars["b_brf"],
+        tele_alpha_angles_var,
+        tele_beta_angles_var,
     )
 
     # fold pitch angles around 90 degree
     local_pa = local_pa_var.get_data(u.degree)
-    local_pa_folded = np.where(local_pa > 90, local_pa - 90, local_pa)
+    local_pa_folded = np.where(local_pa > 90, local_pa - 90, local_pa)  # noqa: PLR2004
     local_pa_var.set_data(local_pa_folded, unit=u.degree)
 
     # sort pitch angles in ascending order and apply to fluxes
     idx_sorted = np.argsort(local_pa_var.get_data(), axis=1)
     sorted_local_pa = np.take_along_axis(local_pa_var.get_data(), idx_sorted, axis=1)
     n_energy = mps_vars["diff_flux"].get_data().shape[1]
-    sorted_diff_flux = np.take_along_axis(mps_vars["diff_flux"].get_data(), np.tile(idx_sorted[:, np.newaxis, :], [1, n_energy, 1]), axis=2)
+    sorted_diff_flux = np.take_along_axis(
+        mps_vars["diff_flux"].get_data(), np.tile(idx_sorted[:, np.newaxis, :], [1, n_energy, 1]), axis=2
+    )
 
     local_pa_var.set_data(sorted_local_pa, unit="same")
     mps_vars["diff_flux"].set_data(sorted_diff_flux, unit="same")
@@ -147,7 +152,8 @@ def process_goes_r_mps_high(
     )
 
     psd_var = ep.processing.compute_phase_space_density(
-        mps_vars["diff_flux"], mps_vars["diff_energy"], particle_species="electron")
+        mps_vars["diff_flux"], mps_vars["diff_energy"], particle_species="electron"
+    )
 
     if save_strategy == "dataorg":
         variables_to_save = {
@@ -212,7 +218,6 @@ def _get_magn_variables(
     start_time: datetime,
     end_time: datetime,
 ) -> dict[str, ep.Variable]:
-
     url = f"https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/{sat_str}/l2/data/magn-l2-avg1m/YYYY/MM/"
 
     sat_stem = "g18" if sat_str == "goes18" else "g19"
@@ -242,13 +247,13 @@ def _get_magn_variables(
         extraction_infos=extraction_infos,
     )
 
+
 def _get_ephe_variables(
     sat_str: Literal["goes18", "goes19"],
     data_path_stem: str | Path,
     start_time: datetime,
     end_time: datetime,
 ) -> dict[str, ep.Variable]:
-
     url = f"https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/{sat_str}/l2/data/ephe-l2-orb1m/YYYY/MM/"
 
     sat_stem = "g18" if sat_str == "goes18" else "g19"
@@ -278,14 +283,12 @@ def _get_ephe_variables(
     )
 
 
-
 def _get_mps_high_variables(
     sat_str: Literal["goes18", "goes19"],
     data_path_stem: str | Path,
     start_time: datetime,
     end_time: datetime,
 ) -> dict[str, ep.Variable]:
-
     url = f"https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/{sat_str}/l2/data/mpsh-l2-avg5m/YYYY/MM/"
 
     sat_stem = "g18" if sat_str == "goes18" else "g19"

@@ -29,8 +29,9 @@ def process_ept_electron_fluxes(
     end_time: datetime,
     num_cores: int = 32,
     bin_cadence: timedelta = timedelta(seconds=10),
+    skip_existing: bool = True,  # noqa: FBT001, FBT002,
 ) -> None:
-    load_dotenv("/home/jhawar/EL_PASO_GH/esa.env")
+    load_dotenv(".env")
 
     client_id = os.environ.get("CLIENT_ID")
     client_secret = os.environ.get("CLIENT_SECRET")
@@ -58,6 +59,7 @@ def process_ept_electron_fluxes(
         file_name_stem="",
         rename_file_name_stem=rename_file_name_stem,
         authentification_info=(client_id, client_secret),
+        skip_existing=skip_existing,
     )
 
     flux_unit = typing.cast("u.Unit", (u.cm**2 * u.s * u.sr * u.MeV) ** (-1))

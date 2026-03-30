@@ -19,6 +19,18 @@ logging.captureWarnings(capture=True)
 logger = logging.getLogger(__name__)
 
 
+LONGITUDES_DICT: dict[Literal["primary", "secondary"], float] = {
+    "primary": 72.5,  # goes19
+    "secondary": 137.0,  # goes18
+}
+
+
+GEOCOORDS_DICT: dict[Literal["primary", "secondary"], np.ndarray] = {
+    "primary": np.array([1.690, -6.391, 0]),  # goes19
+    "secondary": np.array([-4.83367734, -4.50943888, 0]),  # goes18
+}
+
+
 def _remove_unit_from_energy_channels(energy_channels: list[str]) -> NDArray[np.int32]:
     """Remove the unit from the energy ranges."""
     return np.asarray([int(i.replace(" keV", "")) for i in energy_channels if "keV" in i])
@@ -33,6 +45,7 @@ def process_goes_real_time(
     end_time: datetime,
     save_strategy: Literal["dataorg", "netcdf"] = "netcdf",
     num_cores: int = 32,
+    skip_existing: bool = True,  # noqa: FBT001, FBT002,
 ) -> None:
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
     # Part 1: specify source files to extract variables
@@ -45,10 +58,11 @@ def process_goes_real_time(
         start_time,
         end_time,
         save_path=data_path_stem,
-        file_cadence="single_file",
+        file_cadence="daily",
         download_url=url,
         file_name_stem="differential-electrons-3-day.json",
         rename_file_name_stem=rename_file_name_stem,
+        skip_existing=skip_existing,
     )
 
     extraction_infos = [
@@ -80,7 +94,7 @@ def process_goes_real_time(
     variables = ep.extract_variables_from_files(
         start_time,
         end_time,
-        file_cadence="single_file",
+        file_cadence="daily",
         data_path=data_path_stem,
         file_name_stem=rename_file_name_stem,
         extraction_infos=extraction_infos,
@@ -90,7 +104,7 @@ def process_goes_real_time(
     logger.info(f"Processing satellite: {sat_name}")
 
     # parse time strings
-    datetimes = ep.processing.convert_string_to_datetime(variables["Epoch"])
+    datetimes = ep.processing.convert_string_to_datetime(variables["Epoch"], time_format="%Y-%m-%dT%H:%M:%SZ")
     variables["Epoch"].set_data(np.asarray([t.timestamp() for t in datetimes]), ep.units.posixtime)
 
     # generated weighted energy channels
@@ -118,7 +132,9 @@ def process_goes_real_time(
         end_time=end_time,
     )
 
-    variables["xGEO"] = ep.processing.get_real_time_tipsod(binned_time_var.get_data(), sat_name)
+    binned_datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in binned_time_var.get_data()]
+    geo_coords = GEOCOORDS_DICT[sat_str]
+    variables["xGEO"] = ep.Variable(data=np.tile(geo_coords, (len(binned_datetimes), 1)), original_unit=ep.units.RE)
 
     # Local pitch angles from 5 to 90 deg
     pa_local_data = np.tile(np.arange(5, 91, 5), (len(binned_time_var.get_data()), 1)).astype(np.float64)
@@ -227,4 +243,5 @@ if __name__ == "__main__":
             start_time=start_time,
             end_time=end_time,
             num_cores=64,
+            skip_existing=True,
         )

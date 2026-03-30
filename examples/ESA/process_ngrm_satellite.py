@@ -15,7 +15,6 @@ import dateutil
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import GCRS, ITRS, CartesianRepresentation
-from dotenv import load_dotenv
 
 import el_paso as ep
 
@@ -40,6 +39,7 @@ def process_ngrm_electron_fluxes(
     end_time: datetime,
     num_cores: int = 32,
     bin_cadence: timedelta = timedelta(seconds=10),
+    skip_existing: bool = True,  # noqa: FBT001, FBT002,
 ) -> None:
     data_path_stem = f"{raw_data_path}/{satellite}/YYYY/MM/"
     file_name_stem = f"{satellite}_ngrm_YYYYMMDD_L1d.csv"
@@ -66,7 +66,7 @@ def process_ngrm_electron_fluxes(
         rename_file_name_stem=file_name_stem,
         authentification_info=(client_id, client_secret),
         method="esa_swe",
-        skip_existing=False,
+        skip_existing=skip_existing,
     )
 
     flux_unit = typing.cast("u.Unit", (u.cm**2 * u.s * u.sr * u.MeV) ** (-1))
@@ -107,9 +107,6 @@ def process_ngrm_electron_fluxes(
         ep.ExtractionInfo(result_key="y_ECI", name_or_column="Y", unit=u.km),
         ep.ExtractionInfo(result_key="z_ECI", name_or_column="Z", unit=u.km),
         ep.ExtractionInfo(result_key="L", name_or_column="L", unit=ep.units.RE),
-        # ep.ExtractionInfo(result_key="PA_eq", name_or_column="Equatorial pitch angle", unit=u.deg),
-        # ep.ExtractionInfo(result_key="B_local", name_or_column="B", unit=u.nT),
-        # ep.ExtractionInfo(result_key="B_eq", name_or_column="Beq", unit=u.nT),
     ]
 
     variables = ep.extract_variables_from_files(
@@ -169,15 +166,6 @@ def process_ngrm_electron_fluxes(
     variables["FEDO"].apply_thresholds_on_data(lower_threshold=0)
     variables["FEDO"].convert_to_unit((u.cm**2 * u.s * u.keV) ** (-1))
 
-    # calculate local PA
-    # pa_eq = variables["PA_eq"].get_data(u.rad)
-    # B_local = variables["B_local"].get_data(u.nT)
-    # B_eq = variables["B_eq"].get_data(u.nT)
-    # pa_local = np.asin(np.sin(pa_eq) * np.sqrt(B_local / B_eq))
-
-    # variables["PA_local"] = ep.Variable(data=pa_local, original_unit=u.rad)
-    # del variables["PA_eq"], variables["B_local"], variables["B_eq"]
-
     # get energies
     variables["Energy"] = ep.Variable(data=np.asarray(NGRM_ENERGIES), original_unit=u.MeV)
 
@@ -203,8 +191,8 @@ def process_ngrm_electron_fluxes(
         ("B_eq", "T89"),
         ("R_eq", "T89"),
         ("PA_eq", "T89"),
-        # ("Lstar", "T89"),
-        # ("Lm", "T89"),
+        ("Lstar", "T89"),
+        ("Lm", "T89"),
     ]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
@@ -237,59 +225,13 @@ def process_ngrm_electron_fluxes(
         "flux/alpha_eq": magnetic_field_variables["PA_eq_T89"],
         "position/T89/R0": magnetic_field_variables["R_eq_T89"],
         "position/T89/MLT": magnetic_field_variables["MLT_T89"],
-        # "position/T89/Lm": magnetic_field_variables["Lm_T89"],
-        # "position/T89/Lstar": magnetic_field_variables["Lstar_T89"],
+        "position/T89/Lm": magnetic_field_variables["Lm_T89"],
+        "position/T89/Lstar": magnetic_field_variables["Lstar_T89"],
         "mag_field/T89/B_local": magnetic_field_variables["B_local_T89"],
         "mag_field/T89/B_eq": magnetic_field_variables["B_eq_T89"],
         "position/xGEO": variables["xGEO"],
         "psd/PSD": psd_var,
     }
-
-    from matplotlib import pyplot as plt
-
-    datetimes = [datetime.fromtimestamp(t) for t in binned_time_var.get_data()]
-
-    fig, axs = plt.subplots(3, 1, figsize=(20, 9), sharex=True, layout="constrained")
-    sc = axs[0].scatter(
-        datetimes,
-        variables["R_eq_T89"].get_data()[:],
-        s=5,
-        c=np.log10(variables["FEDO"].get_data()[:, 2]),
-        cmap="jet",
-        vmin=-3,
-        vmax=5,
-    )
-    axs[0].set_ylim(1, 8)
-    axs[0].set_title(f"Energy = {NGRM_ENERGIES[2]} MeV")
-
-    sc = axs[1].scatter(
-        datetimes,
-        variables["R_eq_T89"].get_data()[:],
-        s=5,
-        c=np.log10(variables["FEDO"].get_data()[:, 4]),
-        cmap="jet",
-        vmin=-3,
-        vmax=5,
-    )
-    axs[1].set_ylim(1, 8)
-    axs[1].set_title(f"Energy = {NGRM_ENERGIES[4]} MeV")
-
-    sc = axs[2].scatter(
-        datetimes,
-        variables["R_eq_T89"].get_data()[:],
-        s=5,
-        c=np.log10(variables["FEDO"].get_data()[:, 6]),
-        cmap="jet",
-        vmin=-3,
-        vmax=5,
-    )
-    axs[2].set_ylim(1, 8)
-    axs[2].set_title(f"Energy = {NGRM_ENERGIES[6]} MeV")
-    axs[2].set_xlim(datetimes[0], datetimes[-1])
-
-    fig.colorbar(sc, ax=axs)
-
-    plt.savefig(f"test_{satellite}_R_eq.png")
 
     saving_strategy = ep.saving_strategies.MonthlyNetCDFStrategy(
         base_data_path=Path(processed_data_path) / "NGRM" / satellite.lower(),
