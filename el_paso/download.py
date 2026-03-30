@@ -121,7 +121,6 @@ def download(
 
 
 def _get_next_time(curr_time: datetime, file_cadence: Literal["daily", "monthly", "single_file"]) -> datetime | None:
-
     match file_cadence:
         case "daily":
             curr_time += timedelta(days=1)
@@ -204,7 +203,7 @@ def _requests_download(
             for chunk in response.iter_content(chunk_size=8192):
                 file.write(chunk)
 
-        logger.info(f"Downloaded successfully: {save_path / latest_file_name}")
+        logger.info(f"Downloaded successfully: {save_path / save_file_name}")
 
     except requests.exceptions.RequestException as e:
         logger.info(f"Error downloading file from {url}: {e}")
@@ -257,7 +256,6 @@ def _esa_swe_download(
     *,
     skip_existing: bool,
 ) -> None:
-
     if rename_file_name_stem is None:
         msg = "'rename_file_name_stem' is required for method 'esa_swe'!"
         raise ValueError(msg)
@@ -329,7 +327,6 @@ def _esa_swe_download(
 def _get_esa_swe_access_token(
     client_id: str, client_secret: str, token_scope: Literal["swe_hapiserver", "swe_contentproxy"]
 ) -> str:
-
     response = requests.post(
         "https://sso.s2p.esa.int/realms/swe/protocol/openid-connect/token",
         data={
