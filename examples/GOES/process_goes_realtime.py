@@ -14,6 +14,7 @@ from astropy import units as u
 from numpy.typing import NDArray
 
 import el_paso as ep
+from el_paso.utils import timed_function
 
 logging.captureWarnings(capture=True)
 logger = logging.getLogger(__name__)
@@ -36,6 +37,7 @@ def _remove_unit_from_energy_channels(energy_channels: list[str]) -> NDArray[np.
     return np.asarray([int(i.replace(" keV", "")) for i in energy_channels if "keV" in i])
 
 
+@timed_function("process_goes_real_time")
 def process_goes_real_time(
     sat_str: Literal["primary", "secondary"],
     processed_data_path: str | Path,

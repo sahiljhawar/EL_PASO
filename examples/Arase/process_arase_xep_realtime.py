@@ -16,12 +16,15 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 from astropy import units as u
 
+from el_paso.utils import timed_function
+
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 import el_paso as ep
 
 
+@timed_function("process_arase_xep_real_time")
 def process_arase_xep_real_time(
     processed_data_path: str | Path,
     download_data_dir: str | Path,

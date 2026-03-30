@@ -16,11 +16,13 @@ from astropy import units as u
 from dotenv import load_dotenv
 
 import el_paso as ep
+from el_paso.utils import timed_function
 
 CHI2_BAD_QUALITY_THRESHOLD = 2
 EPT_ENERGY_LIMITS = [0.5, 0.6, 0.7, 0.8, 1.0, 2.4, 8.0]
 
 
+@timed_function("process_ept_electron_fluxes")
 def process_ept_electron_fluxes(
     raw_data_path: str | Path,
     processed_data_path: str | Path,
