@@ -34,14 +34,22 @@ def process_arase_xep_real_time(
     save_strategy: Literal["dataorg", "netcdf"] = "netcdf",
     *,
     download: bool = True,
+    skip_existing: bool = True,
 ) -> None:
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     xep_variables = _get_xep_variables(
-        download_data_dir, start_time, end_time, erg_user, erg_password, download=download
+        download_data_dir, start_time, end_time, erg_user, erg_password, download=download, skip_existing=skip_existing
     )
     orb_variables = _get_orb_variables(
-        download_data_dir, start_time, end_time, irbem_lib_path, erg_user, erg_password, download=download
+        download_data_dir,
+        start_time,
+        end_time,
+        irbem_lib_path,
+        erg_user,
+        erg_password,
+        download=download,
+        skip_existing=skip_existing,
     )
 
     time_bin_methods_xep = {
@@ -173,6 +181,7 @@ def _get_xep_variables(
     erg_password: str,
     *,
     download: bool,
+    skip_existing: bool,
 ) -> dict[str, ep.Variable]:
     # Energies from the User's guide
     energy_min = np.asarray((400.0, 600.0, 1000.0, 1500.0, 2200.0, 3500.0, 4300.0, 5400.0))
@@ -192,7 +201,7 @@ def _get_xep_variables(
             download_url=url,
             authentification_info=(erg_user, erg_password),
             file_name_stem=file_name_stem,
-            skip_existing=False,
+            skip_existing=skip_existing,
         )
 
     fedo_unit = typing.cast("u.Unit", (u.cm**2 * u.s * u.sr * u.keV) ** (-1))
@@ -277,8 +286,9 @@ def _get_orb_variables(
     erg_password: str,
     *,
     download: bool,
+    skip_existing: bool,
 ) -> dict[str, ep.Variable]:
-    data_path_stem = f"{download_data_dir}arase/YYYY/MM/"
+    data_path_stem = f"{download_data_dir}/ARASE/YYYY/MM/"
     file_name_stem = "erg_orb_pre_l2_YYYYMMDD_v01.txt"
     url = "https://ergsc.isee.nagoya-u.ac.jp/data/ergsc/satellite/erg/swx/orb/"
 
@@ -291,7 +301,7 @@ def _get_orb_variables(
             download_url=url,
             authentification_info=(erg_user, erg_password),
             file_name_stem=file_name_stem,
-            skip_existing=False,
+            skip_existing=skip_existing,
         )
 
     extraction_infos = [
@@ -336,7 +346,7 @@ def _get_orb_variables(
 
 
 def _get_mean_energy(e_min: NDArray[np.float64], e_max: NDArray[np.float64]) -> NDArray[np.float64]:
-    b = 7.068e-3  # Bernhard: copied from Ingo's scripts. Don't know where this comes from
+    b = 7.068e-3
 
     weighted_max = (1 / b) * np.exp(-b * e_max)
     weighted_min = (1 / b) * np.exp(-b * e_min)
