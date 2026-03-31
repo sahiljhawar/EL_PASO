@@ -154,10 +154,9 @@ def timed_function(func_name: str | None = None) -> Callable[[Callable[P, R]], C
             tic = timeit.default_timer()
             result = f(*args, **kwargs)
             toc = timeit.default_timer()
-            if func_name:
-                logger.info(f"\t\t{func_name} finished in {toc - tic:0.3f} seconds")
-            else:
-                logger.info(f"\t\tFinished in {toc - tic:0.3f} seconds")
+            name = func_name or f"{f.__name__}"
+            log = logging.getLogger(f.__module__)
+            log.info(f"{name} finished in {toc - tic:0.3f} seconds", stacklevel=2)
 
             return result
 
