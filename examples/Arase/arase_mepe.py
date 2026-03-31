@@ -272,7 +272,7 @@ if __name__ == "__main__":
         process_mepe_level_3(
             start_time,
             end_time,
-            "../../IRBEM/libirbem.so",
+            "../../libirbem.so",
             "T89",
             raw_data_path=tmp_dir,
             processed_data_path=".",

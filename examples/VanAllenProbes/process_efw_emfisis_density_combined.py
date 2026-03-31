@@ -347,7 +347,7 @@ if __name__ == "__main__":
         type=str,
         nargs="?",
         help="Path towards the compiled IRBEM library..",
-        default="../../IRBEM/libirbem.so",
+        default="../../libirbem.so",
     )
 
     args = parser.parse_args()

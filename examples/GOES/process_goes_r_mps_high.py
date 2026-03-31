@@ -344,7 +344,7 @@ if __name__ == "__main__":
             sat_str=sat,
             raw_data_path="goes/raw/",
             processed_data_path="goes/processed/",
-            irbem_lib_path="../../IRBEM/libirbem.so",
+            irbem_lib_path="../../libirbem.so",
             start_time=start_time,
             end_time=end_time,
             num_cores=64,

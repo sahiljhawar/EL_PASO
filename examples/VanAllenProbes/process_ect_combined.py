@@ -234,7 +234,7 @@ if __name__ == "__main__":
         start_time,
         end_time,
         "a",
-        "../../IRBEM/libirbem.so",
+        "../../libirbem.so",
         "T89",
         raw_data_path=".",
         processed_data_path=".",
