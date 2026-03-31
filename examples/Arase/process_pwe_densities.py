@@ -163,7 +163,7 @@ if __name__ == "__main__":
         process_pwe_density(
             start_time,
             end_time,
-            "../../IRBEM/libirbem.so",
+            "../../libirbem.so",
             "T89",
             raw_data_path=".",
             processed_data_path=".",

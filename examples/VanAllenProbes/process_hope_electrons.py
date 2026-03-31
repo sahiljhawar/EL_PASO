@@ -225,7 +225,7 @@ if __name__ == "__main__":
         "--irbem_lib_path",
         type=str,
         help="Path towards the compiled IRBEM library..",
-        default="../../IRBEM/libirbem.so",
+        default="../../libirbem.so",
         required=False,
     )
 

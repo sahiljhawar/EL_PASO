@@ -20,7 +20,7 @@ def test_goes_realtime_snapshot(
     start_time = datetime(2025, 12, 17, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=0.1)
 
-    irbem_lib_path = Path(__file__).parent / "../../IRBEM/libirbem.so"
+    irbem_lib_path = Path(__file__).parent / "../../libirbem.so"
 
     processed_data_path = Path(tmpdir)
 

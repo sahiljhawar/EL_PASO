@@ -26,7 +26,7 @@ def test_arase_mepe_snapshot(
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(hours=4, seconds=-1)
 
-    irbem_lib_path = Path(__file__).parent / "../../IRBEM/libirbem.so"
+    irbem_lib_path = Path(__file__).parent / "../../libirbem.so"
     processed_data_path = tmpdir / "ARASE" / "arase"
 
     process_mepe_level_3(
