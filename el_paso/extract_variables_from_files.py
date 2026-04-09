@@ -200,7 +200,7 @@ def _extract_data_from_files(  # noqa: C901, PLR0912
                 logger.debug(f"Concatenating data for {key} ...")
                 variable_data[key] = np.concatenate((variable_data[key], new_data[key]), axis=0)
 
-            elif np.any(np.isnan(variable_data[key])):
+            elif np.any(pd.isna(variable_data[key])):
                 logger.debug(f"Found NaNs in non-time-dependent variable {key}. Trying to fill with next file ...")
                 nan_idx = np.isnan(variable_data[key])
                 variable_data[key] = new_data[key][nan_idx]
