@@ -42,20 +42,23 @@ def process_ngrm_electron_fluxes(
     num_cores: int = 32,
     bin_cadence: timedelta = timedelta(seconds=10),
     skip_existing: bool = True,  # noqa: FBT001, FBT002,
+    client_id: str | None = None,
+    client_secret: str | None = None,
 ) -> None:
     data_path_stem = f"{raw_data_path}/{satellite}/YYYY/MM/"
     file_name_stem = f"{satellite}_ngrm_YYYYMMDD_L1d.csv"
 
-    # loaded environment variables from .env file
-    client_id = os.environ.get("CLIENT_ID")
-    client_secret = os.environ.get("CLIENT_SECRET")
+    if client_id is None:
+        client_id = os.environ.get("CLIENT_ID")
+    if client_secret is None:
+        client_secret = os.environ.get("CLIENT_SECRET")
 
     if client_id is None:
-        msg = "Client ID not found!"
+        msg = "Client ID not found! Either load it from environment variables or pass it as an argument."
         raise ValueError(msg)
 
     if client_secret is None:
-        msg = "Client secret not found!"
+        msg = "Client secret not found! Either load it from environment variables or pass it as an argument."
         raise ValueError(msg)
 
     ep.download(
