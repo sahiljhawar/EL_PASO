@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import sys
 import typing
 from datetime import datetime, timedelta
@@ -31,8 +32,8 @@ def process_arase_xep_real_time(
     irbem_lib_path: str | Path,
     start_time: datetime,
     end_time: datetime,
-    erg_user: str,
-    erg_password: str,
+    erg_user: str | None = None,
+    erg_password: str | None = None,
     num_cores: int = 32,
     save_strategy: Literal["dataorg", "netcdf"] = "netcdf",
     *,
@@ -40,6 +41,19 @@ def process_arase_xep_real_time(
     skip_existing: bool = True,
 ) -> None:
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
+    if erg_user is None:
+        erg_user = os.environ.get("ERG_USER")
+    if erg_password is None:
+        erg_password = os.environ.get("ERG_PASSWORD")
+
+    if erg_user is None:
+        msg = "ERG_USER not found! Either load it from environment variables or pass it as an argument."
+        raise ValueError(msg)
+
+    if erg_password is None:
+        msg = "ERG_PASSWORD not found! Either load it from environment variables or pass it as an argument."
+        raise ValueError(msg)
 
     xep_variables = _get_xep_variables(
         download_data_dir, start_time, end_time, erg_user, erg_password, download=download, skip_existing=skip_existing
