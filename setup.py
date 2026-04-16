@@ -50,8 +50,9 @@ class CustomBuild(build_py):
         return None
 
     def _clone_and_build(self):
-        target = os.environ.get("IRBEM_OUTPUT_DIR", os.getcwd())
-        dest_so = os.path.join(target, "libirbem.so")
+        dest_dir = os.path.join(self.build_lib, "el_paso")
+        os.makedirs(dest_dir, exist_ok=True)
+        dest_so = os.path.join(dest_dir, "libirbem.so")
 
         tmp_dir = tempfile.mkdtemp(prefix="irbem_build_")
 
@@ -86,6 +87,7 @@ class CustomBuild(build_py):
 setup(
     name="el_paso",
     packages=find_packages(),
+    package_data={"el_paso": ["libirbem.so"]},
     include_package_data=True,
     python_requires=">=3.11",
     cmdclass={"build_py": CustomBuild},
