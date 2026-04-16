@@ -11,7 +11,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "el_paso"
-version = "1.0.2rc1"
+version = "1.0.2"
 description = "EL-PASO is a Python framework designed to streamline the download, processing, and saving of satellite particle observation data."
 authors = [{name="Bernhard Haas", email="bhaas@gfz.de"}]
 readme = "README.md"
@@ -60,7 +60,7 @@ Tracker = "https://github.com/GFZ/EL_PASO/issues"
 Documentation = "https://el-paso.readthedocs.io/en/latest/"
 
 [tool.bumpver]
-current_version = "1.0.2rc1"
+current_version = "1.0.2"
 version_pattern = "MAJOR.MINOR.PATCH[PYTAGNUM]"
 commit_message = "bump version {old_version} -> {new_version}"
 commit = true
