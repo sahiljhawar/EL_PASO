@@ -50,8 +50,8 @@ class CustomBuild(build_py):
         return None
 
     def _clone_and_build(self):
-        cwd = os.getcwd()
-        dest_so = os.path.join(cwd, "libirbem.so")
+        target = os.environ.get("IRBEM_OUTPUT_DIR", os.getcwd())
+        dest_so = os.path.join(target, "libirbem.so")
 
         tmp_dir = tempfile.mkdtemp(prefix="irbem_build_")
 
