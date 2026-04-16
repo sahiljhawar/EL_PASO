@@ -42,13 +42,14 @@ def compute_magnetic_field_variables(
     time_var: Variable,
     xgeo_var: Variable,
     variables_to_compute: VariableRequest,
-    irbem_lib_path: str,
     irbem_options: list[int],
     num_cores: int,
     indices_solar_wind: dict[str, Variable] | None = None,
     pa_local_var: Variable | None = None,
     energy_var: Variable | None = None,
     particle_species: Literal["electron", "proton"] | None = None,
+    *,
+    irbem_lib_path: str | Path = Path(ep.__file__).parent / "libirbem.so",
 ) -> dict[str, Variable]:
     """Computes various magnetic field-related variables using the IRBEM library.
 
@@ -65,8 +66,6 @@ def compute_magnetic_field_variables(
         variables_to_compute (Sequence[tuple[mag_utils.MagFieldVarTypes, str | mag_utils.MagneticField]]):
             A sequence of tuples, where each tuple specifies a variable to compute. The first element is the
             variable type (e.g., "Lstar"), and the second is the magnetic field model to use (e.g., "IGRF").
-        irbem_lib_path (str): The file path to the compiled IRBEM library object
-            (a `.so` or `.dll` file).
         irbem_options (list[int]): A list of 5 integer options for the IRBEM library
             calls, controlling aspects like model selection, bounce tracing, etc.
         num_cores (int): The number of CPU cores to use for parallel processing
@@ -82,6 +81,8 @@ def compute_magnetic_field_variables(
         particle_species (Literal["electron", "proton"] | None): Optional. The
             species of particle (e.g., "electron", "proton"). Required if "invMu"
             is requested. Defaults to None.
+        irbem_lib_path (str | Path): Optional. The file path to the IRBEM library (e.g., "libirbem.so"). Defaults to a
+        path relative to the el_paso package.
 
     Returns:
         dict[str, Variable]: A dictionary where keys are the computed variable
@@ -107,6 +108,11 @@ def compute_magnetic_field_variables(
     """
     if not Path(irbem_lib_path).is_file():
         msg = f"No library object found under the provided irbem_lib_path: {irbem_lib_path}"
+        logger.warning(
+            "Ideally this should not happen if the default path is used. If you installed "
+            "the package in editable mode, 'libirbem.so' can be found in the ./build/lib/ directory. "
+            "Check if the file exists at the provided path."
+        )
         raise FileNotFoundError(msg)
 
     if len(irbem_options) != 5:  # noqa: PLR2004
@@ -154,7 +160,13 @@ def compute_magnetic_field_variables(
 
         maginput = mag_utils.construct_maginput(time_var, mag_field, indices_solar_wind_hashable)
 
-        irbem_input = mag_utils.IrbemInput(irbem_lib_path, mag_field, maginput, irbem_options, num_cores)  # type: ignore[bad-argument-type]
+        irbem_input = mag_utils.IrbemInput(
+            magnetic_field=mag_field,
+            maginput=maginput,
+            irbem_options=irbem_options,
+            num_cores=num_cores,
+            irbem_lib_path=irbem_lib_path,
+        )
 
         computed_variables |= _get_result(
             var_type, xgeo_var, time_var, pa_local_var, energy_var, computed_variables, irbem_input, particle_species

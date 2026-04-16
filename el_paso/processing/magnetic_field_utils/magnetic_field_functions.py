@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import partial
 from multiprocessing import Pool
+from pathlib import Path
 from typing import Literal, NamedTuple
 
 import numpy as np
@@ -53,21 +54,22 @@ class IrbemInput:
     """A data class to hold all necessary input parameters for IRBEM calculations.
 
     Attributes:
-        irbem_lib_path (str): The file path to the compiled IRBEM library.
         magnetic_field (MagneticField): The magnetic field model to be used.
         maginput (dict[MagInputKeys, NDArray[np.float64]]): A dictionary of
             magnetic field input parameters required by IRBEM (e.g., Kp, Dst).
         irbem_options (list[int]): A list of integer options to configure the
             IRBEM library's behavior.
         num_cores (int): The number of CPU cores to use for parallel processing.
-                         Defaults to 4.
+            Defaults to 4.
+        irbem_lib_path (str|Path): The file path to the compiled IRBEM library.
+            Defaults to the 'libirbem.so' located in the same directory as the el_paso package.
     """
 
-    irbem_lib_path: str
     magnetic_field: MagneticField
     maginput: dict[MagInputKeys, NDArray[np.float64]]
     irbem_options: list[int]
     num_cores: int = 4
+    irbem_lib_path: str | Path = str(Path(ep.__file__).parent / "libirbem.so")
 
 
 class IrbemOutput(NamedTuple):
@@ -85,7 +87,7 @@ class IrbemOutput(NamedTuple):
 
 
 def _get_magequator_parallel(
-    irbem_args: tuple[str, list[int], int, int],
+    irbem_args: tuple[Path | str, list[int], int, int],
     x_geo: NDArray[np.float64],
     datetimes: list[datetime],
     maginput: dict[MagInputKeys, NDArray[np.float64]],
@@ -207,7 +209,7 @@ def get_magequator(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: Ir
 
 
 def _get_footpoint_atmosphere_parallel(
-    irbem_args: tuple[str, list[int], int, int],
+    irbem_args: tuple[str | Path, list[int], int, int],
     x_geo: NDArray[np.float64],
     datetimes: list[datetime],
     maginput: dict[MagInputKeys, NDArray[np.float64]],
@@ -412,7 +414,7 @@ def get_local_B_field(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input:
 
 
 def _get_mirror_point_parallel(
-    irbem_args: tuple[str, list[int], int, int],
+    irbem_args: tuple[str | Path, list[int], int, int],
     x_geo: NDArray[np.float64],
     datetimes: list[datetime],
     maginput: dict[MagInputKeys, NDArray[np.float64]],
@@ -520,7 +522,7 @@ def get_mirror_point(
 
 
 def _make_lstar_shell_splitting_parallel(
-    irbem_args: tuple[str, list[int], int, int],
+    irbem_args: tuple[str | Path, list[int], int, int],
     x_geo: NDArray[np.float64],
     datetimes: list[datetime],
     maginput: dict[MagInputKeys, NDArray[np.float64]],
