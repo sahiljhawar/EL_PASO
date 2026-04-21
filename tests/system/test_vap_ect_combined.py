@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
-from swvo.io.RBMDataSet import RBMDataSet, RBMNcDataSet
+from swvo.io.RBMDataSet import RBMDataSet
 
 from examples.VanAllenProbes.process_ect_combined import process_ect_combined
 
@@ -102,10 +102,22 @@ def test_rbsp_ect_combined_snapshot(
             preferred_extension="mat",
         )
     elif save_strategy == "netcdf":
-        rbsp_proc = RBMNcDataSet(start_time, end_time, tmpdir, "RBSPA", "ect_combined", mag_field)
+        rbsp_proc = RBMDataSet(
+            start_time=start_time,
+            end_time=end_time,
+            folder_path=tmpdir,
+            satellite="RBSPA",
+            instrument="ect_combined",
+            mfm=mag_field,
+        )
 
-        rbsp_true = RBMNcDataSet(
-            start_time, end_time, Path(__file__).parent / "data" / "processed", "RBSPA", "ect_combined", mag_field
+        rbsp_true = RBMDataSet(
+            start_time=start_time,
+            end_time=end_time,
+            folder_path=Path(__file__).parent / "data" / "processed",
+            satellite="RBSPA",
+            instrument="ect_combined",
+            mfm=mag_field,
         )
     else:
         msg = "Test not implemented for this save strategy."

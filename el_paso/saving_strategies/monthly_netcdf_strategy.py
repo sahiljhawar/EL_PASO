@@ -14,7 +14,7 @@ from typing import Any
 
 import netCDF4 as nC
 import numpy as np
-from swvo.io.RBMDataSet.RBMNcDataSet import _read_all_datasets_netcdf
+from swvo.io.RBMDataSet.utils import read_all_datasets_netcdf
 
 import el_paso as ep
 from el_paso.saving_strategies.monthly_h5_strategy import MonthlyH5Strategy
@@ -187,7 +187,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
     def _load_netcdf_data(self, file_path: Path) -> dict[str, Any]:
         """Load all data from an existing NetCDF file, including metadata.
 
-        Uses _read_all_datasets_netcdf from swvo if available for efficient recursive loading,
+        Uses read_all_datasets_netcdf from swvo if available for efficient recursive loading,
         otherwise falls back to custom implementation.
 
         Parameters:
@@ -198,7 +198,7 @@ class MonthlyNetCDFStrategy(MonthlyH5Strategy):
         """
         loaded_data: dict[str, Any] = {"metadata": {}}
 
-        datasets = _read_all_datasets_netcdf(file_path)
+        datasets = read_all_datasets_netcdf(file_path)
         loaded_data.update(datasets)
 
         # load metadata
