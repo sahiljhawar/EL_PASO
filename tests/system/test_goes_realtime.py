@@ -7,7 +7,7 @@ import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from swvo.io.RBMDataSet import Instrument, RBMNcDataSet, Satellite
+from swvo.io.RBMDataSet import Instrument, RBMDataSet, Satellite
 
 from examples.GOES.process_goes_realtime import process_goes_real_time
 
@@ -41,17 +41,22 @@ def test_goes_realtime_snapshot(
     if renew_solution:
         shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "GOES" / "primary")
 
-    goes_proc = RBMNcDataSet(
-        start_time, end_time, processed_data_path, Satellite("goes_primary", "GOES"), Instrument("mps_high"), "T89"
+    goes_proc = RBMDataSet(
+        start_time=start_time,
+        end_time=end_time,
+        folder_path=processed_data_path,
+        satellite=Satellite("goes_primary", "GOES"),
+        instrument=Instrument("mps_high"),
+        mfm="T89",
     )
 
-    goes_true = RBMNcDataSet(
-        start_time,
-        end_time,
-        Path(__file__).parent / "data" / "processed",
-        Satellite("goes_primary", "GOES"),
-        Instrument("mps_high"),
-        "T89",
+    goes_true = RBMDataSet(
+        start_time=start_time,
+        end_time=end_time,
+        folder_path=Path(__file__).parent / "data" / "processed",
+        satellite=Satellite("goes_primary", "GOES"),
+        instrument=Instrument("mps_high"),
+        mfm="T89",
     )
 
     assert goes_proc == goes_true, f"Different variables: {goes_proc.get_different_variables(goes_true)}"
