@@ -60,3 +60,27 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     assert min_value == true_data[mag_field][0]
     assert mean_value == true_data[mag_field][1]
     assert max_value == true_data[mag_field][2]
+
+
+def test_mlt_mlt_eq_equal():
+
+    start_time = datetime(2024, 5, 10, 16, tzinfo=timezone.utc)
+    time_var = ep.Variable(data=np.asarray([start_time.timestamp()]), original_unit=ep.units.posixtime)
+
+    xgeo_data = np.array([[0, 6.6, 0]])
+    xgeo_var = ep.Variable(data=xgeo_data, original_unit=ep.units.RE)
+
+    variables_to_compute: ep.processing.VariableRequest = [
+        ("MLT", "OP77"),
+        ("MLT_eq", "OP77"),
+    ]
+
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+        time_var=time_var,
+        xgeo_var=xgeo_var,
+        variables_to_compute=variables_to_compute,
+        irbem_options=[1, 1, 4, 4, 0],
+        num_cores=12,
+    )
+
+    assert np.round(magnetic_field_variables["MLT_OP77"].get_data()) == np.round(magnetic_field_variables["MLT_eq_OP77"].get_data())

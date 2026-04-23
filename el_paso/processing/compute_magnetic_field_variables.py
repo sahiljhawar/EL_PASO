@@ -49,7 +49,7 @@ def compute_magnetic_field_variables(
     energy_var: Variable | None = None,
     particle_species: Literal["electron", "proton"] | None = None,
     *,
-    irbem_lib_path: str | Path = Path(ep.__file__).parent / "libirbem.so",
+    irbem_lib_path: str | Path = Path(ep.__file__).parent / ".." / "libirbem.so",
 ) -> dict[str, Variable]:
     """Computes various magnetic field-related variables using the IRBEM library.
 
@@ -221,7 +221,7 @@ def _get_result(
         case "MLT":
             result_dict = mag_utils.get_MLT(xgeo_var, time_var, irbem_input)
 
-        case "R_eq" | "B_eq" | "xGEO_eq":
+        case "R_eq" | "B_eq" | "xGEO_eq" | "MLT_eq":
             result_dict = mag_utils.get_magequator(xgeo_var, time_var, irbem_input)
 
         case "Lstar" | "Lm" | "XJ":

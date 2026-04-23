@@ -28,7 +28,20 @@ logger = logging.getLogger(__name__)
 FORTRAN_BAD_VALUE = np.float64(-1.0e31)
 
 MagFieldVarTypes = Literal[
-    "B_local", "B_fofl", "B_eq", "B_mirr", "xGEO_eq", "MLT", "R_eq", "Lstar", "Lm", "PA_eq", "invMu", "invK", "XJ"
+    "B_local",
+    "B_fofl",
+    "B_eq",
+    "B_mirr",
+    "xGEO_eq",
+    "MLT",
+    "R_eq",
+    "MLT_eq",
+    "Lstar",
+    "Lm",
+    "PA_eq",
+    "invMu",
+    "invK",
+    "XJ",
 ]
 
 
@@ -185,25 +198,38 @@ def get_magequator(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: Ir
     )
 
     # add radial distance field in SM coordinates
-    x_sm = Coords(lib_path=irbem_input.irbem_lib_path).transform(
+    x_gsm = Coords(lib_path=irbem_input.irbem_lib_path).transform(
         datetimes,
         x_geo_min,
         ep.IRBEM_SYSAXIS_GEO,
-        ep.IRBEM_SYSAXIS_SM,
+        ep.IRBEM_SYSAXIS_GSM,
     )
 
     R_eq_var = ep.Variable(
-        data=np.linalg.norm(x_sm, ord=2, axis=1).astype(np.float64),
+        data=np.linalg.norm(x_gsm, ord=2, axis=1).astype(np.float64),
         original_unit=ep.units.RE,
     )
     R_eq_var.metadata.add_processing_note(
-        f"Calculated radial distance at the equator in SM coordinates using IRBEM model {irbem_input.magnetic_field} "
+        f"Calculated radial distance at the equator in GSM coordinates using IRBEM model {irbem_input.magnetic_field} "
         f"with options {irbem_input.irbem_options}."
+    )
+
+    p_gsm = np.arctan2(x_gsm[:, 1], x_gsm[:, 0])
+    mlt_gsm = ((p_gsm * 12 / np.pi) + 12) % 24
+
+    mlt_eq_var = ep.Variable(
+        data=mlt_gsm.astype(np.float64),
+        original_unit=u.hour,
+    )
+    mlt_eq_var.metadata.add_processing_note(
+        "Calculated magnetic local time at the equator in GSM coordinates using "
+        f"IRBEM model {irbem_input.magnetic_field} with options {irbem_input.irbem_options}."
     )
 
     return {
         create_var_name("B_eq", irbem_input.magnetic_field): B_eq_var,
         create_var_name("R_eq", irbem_input.magnetic_field): R_eq_var,
+        create_var_name("MLT_eq", irbem_input.magnetic_field): mlt_eq_var,
         create_var_name("xGEO_eq", irbem_input.magnetic_field): x_geo_var,
     }
 
@@ -536,7 +562,7 @@ def _make_lstar_shell_splitting_parallel(
         sysaxes=irbem_args[3],
     )
 
-    x_dict_single: dict[Literal["x1", "x2", "x3"], np.floating] = {
+    x_dict_single: dict[Literal["x1", "x2", "x3"], np.float64] = {
         "x1": x_geo[it, 0],
         "x2": x_geo[it, 1],
         "x3": x_geo[it, 2],
