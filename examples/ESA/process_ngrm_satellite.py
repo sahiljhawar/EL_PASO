@@ -192,7 +192,7 @@ def process_ngrm_electron_fluxes(
     variables_to_compute: ep.processing.VariableRequest = [
         ("B_local", "T89"),
         ("B_eq", "T89"),
-        ("MLT", "T89"),
+        ("MLT_eq", "T89"),
         ("B_eq", "T89"),
         ("R_eq", "T89"),
         ("PA_eq", "T89"),
@@ -229,7 +229,7 @@ def process_ngrm_electron_fluxes(
         "flux/alpha_local": variables["PA_local_FEDU"],
         "flux/alpha_eq": magnetic_field_variables["PA_eq_T89"],
         "position/T89/R0": magnetic_field_variables["R_eq_T89"],
-        "position/T89/MLT": magnetic_field_variables["MLT_T89"],
+        "position/T89/MLT": magnetic_field_variables["MLT_eq_T89"],
         "position/T89/Lm": magnetic_field_variables["Lm_T89"],
         "position/T89/Lstar": magnetic_field_variables["Lstar_T89"],
         "mag_field/T89/B_local": magnetic_field_variables["B_local_T89"],
