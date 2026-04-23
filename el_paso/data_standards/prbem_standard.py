@@ -71,7 +71,7 @@ class PRBEMStandard(DataStandard):
                 variable.metadata.description = "Processed omnidirectional differential electron flux"
 
         elif "alpha" in standard_name:
-            variable.convert_to_unit(u.deg)  # type: ignore[reportUnknownArgumentType]
+            variable.convert_to_unit(u.radian)  # type: ignore[reportUnknownArgumentType]
 
             assert_n_dim(variable, 2, standard_name)
             shape = variable.get_data().shape
