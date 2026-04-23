@@ -626,7 +626,7 @@ class MagFields:
         c_lm, c_blocal, c_bmin, c_xj = [ctypes.c_double(-9999) for _ in range(4)]
         c_blocal = (ctypes.c_double * 3000)()
 
-        self._irbem_obj.trace_field_line1_(
+        self._irbem_obj.trace_field_line2_1_(
             ctypes.byref(self.kext),
             ctypes.byref(self.options),
             ctypes.byref(self.sysaxes),
@@ -648,7 +648,7 @@ class MagFields:
 
         return TraceFieldLineOutput(
             posit=np.array(c_posit[: c_n_posit.value]),
-            n_posit=c_posit.value,
+            n_posit=c_n_posit.value,
             lm=c_lm.value,
             blocal=np.array(c_blocal[: c_n_posit.value]),
             bmin=c_bmin.value,
