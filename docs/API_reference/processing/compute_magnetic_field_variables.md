@@ -16,12 +16,17 @@ and invariant K) based on provided time and geocentric coordinates. It leverages
 
 - B_local
 - B_fofl
+- B_mirr
 - MLT
 - R_eq
+- MLT_eq
+- xGEO_eq
+- B_eq
 - Lstar
 - PA_eq
 - invMu
 - invK
+- XJ
 
 **Supported magnetic field strings**:
 
