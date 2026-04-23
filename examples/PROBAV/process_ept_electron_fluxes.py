@@ -124,6 +124,9 @@ def process_ept_electron_fluxes(
 
     # expand PA variable
     variables["PA_local"].set_data(variables["PA_local"].get_data()[:, np.newaxis], unit="same")
+    pa_arr = variables["PA_local"].get_data(u.deg)
+    pa_arr = np.where(pa_arr > 90, 180 - pa_arr, pa_arr)
+    variables["PA_local"].set_data(pa_arr, unit=u.deg)
 
     # create Epoch variable
     epoch_datetime = [
