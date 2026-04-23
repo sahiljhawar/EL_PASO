@@ -31,6 +31,25 @@ Its primary purpose is to prepare and standardize particle data for use in radia
 
 Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest/).
 
+## Available processing scripts
+
+- **Arase**
+    - XEP real-time
+    - PWE density
+- **GOES-R**
+    - MPS-High real-time
+    - MPS-High
+- **ESA**
+    - NGRM satellites
+- **POES**
+    - MEPED (electrons)
+    - TED (electrons)
+- **PROBA-V**
+    - EPT
+- **Van Allen Probes**
+    - HOPE (electrons) and ECT-combined
+    - EMFISIS and EFW density
+
 ## Installation Guide
 
 ### Step 1: Clone the Repository
