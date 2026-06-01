@@ -15,7 +15,7 @@ import typing
 from collections.abc import Mapping, Sequence
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import Literal, NamedTuple, Optional
 
 import dateutil.parser
 import numpy as np
@@ -73,6 +73,8 @@ EXT_MODELS = [
     "T07",
     "MT",
 ]
+
+DEFAULT_LIBIRBEM_PATH = Path(ep.__file__).parent / "libirbem.so"
 
 logger = logging.getLogger(__name__)
 
@@ -232,7 +234,7 @@ class MagFields:
     def __init__(
         self,
         *,
-        lib_path: str | Path | None = None,
+        lib_path: Optional[str | Path] = DEFAULT_LIBIRBEM_PATH,
         kext: int | str = 5,
         sysaxes: int = 0,
         options: Sequence[int] | None = None,
@@ -240,8 +242,8 @@ class MagFields:
         """Initializes the MagFields object and loads the IRBEM shared library.
 
         Args:
-            lib_path (str | Path | None, optional): The path to the IRBEM shared library file.
-                                                    If None, the library is searched for in standard locations.
+            lib_path (str | Path, optional): The path to the IRBEM shared library file.
+                                                Defaults to DEFAULT_LIBIRBEM_PATH.
             kext (int | str, optional): The code for the external magnetic field model. Can be an integer
                                         (e.g., 5 for OPQ77) or a string (e.g., 'T96'). Defaults to 5 (OPQ77).
             sysaxes (int, optional): The coordinate system for input positions.
@@ -938,13 +940,12 @@ class Coords:
     Fortran routines of the IRBEM-LIB.
     """
 
-    def __init__(self, *, lib_path: str | Path = Path(ep.__file__).parent / "libirbem.so") -> None:
+    def __init__(self, *, lib_path: Optional[str | Path] = DEFAULT_LIBIRBEM_PATH) -> None:
         """Initializes the Coords object and loads the IRBEM shared library.
 
         Args:
-            lib_path (str | Path | None, optional): The path to the IRBEM shared library file.
-                                                    If None, the library is searched for in standard locations.
-                                                    Defaults to None.
+            lib_path (Optional[str | Path]): The path to the IRBEM shared library file.
+                                                    Defaults to DEFAULT_LIBIRBEM_PATH.
         """
         if isinstance(lib_path, str):
             lib_path = Path(lib_path)
