@@ -39,7 +39,11 @@ jobs:
         run: bash download_data_for_tests.sh
 
       - name: Run tests
+        env:
+          ESA_CLIENT_ID: ${{ secrets.ESA_CLIENT_ID }}
+          ESA_CLIENT_SECRET: ${{ secrets.ESA_CLIENT_SECRET }}
         run: python -m coverage run --source el_paso -m pytest -rf tests -m basic
+
       - name: Run Coveralls
         if: ${{ success() && matrix.python-version == '3.11' }}
         run: |
