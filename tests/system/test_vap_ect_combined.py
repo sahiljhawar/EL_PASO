@@ -10,23 +10,24 @@ from typing import Literal
 
 import pytest
 
-from el_paso import RBMDataSet
-from examples.VanAllenProbes.process_ect_combined import process_ect_combined
+import el_paso as ep
+from el_paso.dataset import GFZDataSet
+from el_paso.recipes.rbsp import process_rbsp_ect_combined
 
 
 @pytest.mark.parametrize(
     ("mag_field", "save_strategy"),
     [
-        pytest.param("T89", "dataorg", marks=pytest.mark.basic),
-        ("OP77", "dataorg"),
-        ("T96", "dataorg"),
-        ("TS04", "dataorg"),
+        pytest.param("T89", "gfz", marks=pytest.mark.basic),
+        ("OP77", "gfz"),
+        ("T96", "gfz"),
+        ("TS04", "gfz"),
         pytest.param("T89", "netcdf", marks=pytest.mark.basic),
     ],
 )
 def test_rbsp_ect_combined_snapshot(
     mag_field: Literal["T89", "TS04", "OP77", "T96"],
-    save_strategy: Literal["dataorg", "h5", "netcdf"],
+    save_strategy: Literal["gfz", "netcdf"],
     tmpdir: Path,
     *,
     renew_solution: bool,
@@ -34,15 +35,12 @@ def test_rbsp_ect_combined_snapshot(
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=0.4, seconds=-1)
 
-    irbem_lib_path = Path(__file__).parent / "../../libirbem.so"
+    processed_data_path = tmpdir
 
-    processed_data_path = tmpdir / "RBSP" / "rbspa" if save_strategy != "dataorg" else tmpdir
-
-    process_ect_combined(
+    process_rbsp_ect_combined(
         start_time=start_time,
         end_time=end_time,
         sat_str="a",
-        irbem_lib_path=irbem_lib_path,
         mag_field=mag_field,
         raw_data_path=Path(__file__).parent / "data" / "raw",
         processed_data_path=processed_data_path,
@@ -55,7 +53,7 @@ def test_rbsp_ect_combined_snapshot(
     end_date = end_time.replace(day=30)
 
     match save_strategy:
-        case "dataorg":
+        case "gfz":
             out_path = (
                 processed_data_path
                 / "RBSP"
@@ -68,59 +66,60 @@ def test_rbsp_ect_combined_snapshot(
             if renew_solution:
                 shutil.copytree(processed_data_path, Path(__file__).parent / "data" / "processed", dirs_exist_ok=True)
 
-        case "h5":
-            out_path = processed_data_path / f"rbspa_ect_combined_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.h5"
-            assert out_path.exists()
+            rbsp_proc = GFZDataSet(
+                saving_strategy=ep.saving_strategies.GFZStrategy(
+                    str(tmpdir), "RBSP", "rbspa", "ect_combined", mag_field
+                ),
+                start_time=start_time,
+                end_time=end_time,
+            )
 
-            if renew_solution:
-                shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "RBSP" / "rbspa")
+            rbsp_true = GFZDataSet(
+                saving_strategy=ep.saving_strategies.GFZStrategy(
+                    Path(__file__).parent / "data" / "processed", "RBSP", "rbspa", "ect_combined", mag_field
+                ),
+                start_time=start_time,
+                end_time=end_time,
+            )
 
         case "netcdf":
-            out_path = processed_data_path / f"rbspa_ect_combined_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.nc"
+            out_path = (
+                processed_data_path
+                / "RBSP"
+                / "rbspa"
+                / f"rbspa_ect_combined_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.nc"
+            )
             assert out_path.exists()
 
             if renew_solution:
                 shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "RBSP" / "rbspa")
 
-    if save_strategy == "dataorg":
-        rbsp_proc = RBMDataSet(
-            start_time=start_time,
-            end_time=end_time,
-            folder_path=tmpdir,
-            satellite="RBSPA",
-            instrument="ect_combined",
-            mfm=mag_field,
-        )
+            rbsp_proc = GFZDataSet(
+                start_time=start_time,
+                end_time=end_time,
+                saving_strategy=ep.saving_strategies.MonthlyRBStrategy(
+                    tmpdir,
+                    "RBSP",
+                    "rbspa",
+                    "ect_combined",
+                    mag_field,
+                    data_standard=ep.data_standards.GFZStandard(),
+                    file_format="nc",
+                ),
+            )
 
-        rbsp_true = RBMDataSet(
-            start_time=start_time,
-            end_time=end_time,
-            folder_path=Path(__file__).parent / "data" / "processed",
-            satellite="RBSPA",
-            instrument="ect_combined",
-            mfm=mag_field,
-            preferred_extension="mat",
-        )
-    elif save_strategy == "netcdf":
-        rbsp_proc = RBMDataSet(
-            start_time=start_time,
-            end_time=end_time,
-            folder_path=tmpdir,
-            satellite="RBSPA",
-            instrument="ect_combined",
-            mfm=mag_field,
-        )
+            rbsp_true = GFZDataSet(
+                start_time=start_time,
+                end_time=end_time,
+                saving_strategy=ep.saving_strategies.MonthlyRBStrategy(
+                    Path(__file__).parent / "data" / "processed",
+                    "RBSP",
+                    "rbspa",
+                    "ect_combined",
+                    mag_field,
+                    data_standard=ep.data_standards.GFZStandard(),
+                    file_format="nc",
+                ),
+            )
 
-        rbsp_true = RBMDataSet(
-            start_time=start_time,
-            end_time=end_time,
-            folder_path=Path(__file__).parent / "data" / "processed",
-            satellite="RBSPA",
-            instrument="ect_combined",
-            mfm=mag_field,
-        )
-    else:
-        msg = "Test not implemented for this save strategy."
-        raise NotImplementedError(msg)
-
-    assert rbsp_proc == rbsp_true, f"Different variables: {rbsp_proc.get_different_variables(rbsp_true)}"
+    rbsp_proc.assert_equal(rbsp_true)

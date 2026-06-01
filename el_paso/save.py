@@ -6,32 +6,32 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, get_args
 
 import numpy as np
 
+from el_paso.typing import InternalName, Variable
 from el_paso.utils import enforce_utc_timezone, timed_function
 
 if TYPE_CHECKING:
     from datetime import datetime
 
-    from numpy.typing import NDArray
-
-    from el_paso import Variable
     from el_paso.saving_strategy import SavingStrategy
+    from el_paso.typing import SavedDataDict
 
 logger = logging.getLogger(__name__)
 
 
 @timed_function()
 def save(
-    variables_dict: dict[str, Variable],
+    variables_dict: dict[InternalName, Variable],
     saving_strategy: SavingStrategy,
     start_time: datetime,
     end_time: datetime,
     time_var: Variable | None = None,
     *,
     append: bool = False,
+    ignore_validation: bool = False,
 ) -> None:
     """Saves variables to files based on the specified saving strategy and time intervals.
 
@@ -51,11 +51,18 @@ def save(
             the saving strategy must handle time internally. Defaults to None.
         append (bool, optional): If `True`, data will be appended to existing files
             rather than overwriting them. Defaults to `False`.
+        ignore_validation (bool, optional): If `True`, validation of the input against the `ep.typing.InternalName`
+            variables will be skipped. Defaults to `False`.
 
     Raises:
+        TypeError: If `variables_dict` is not a dictionary of `Variable` objects.
+        KeyError: If `variables_dict` contains invalid internal variable names.
         UserWarning: If the saving process is attempted for an output file but one
             or more of its required variables are missing from `variables_dict`.
     """
+    if not ignore_validation:
+        _validate_variables_dict(variables_dict)
+
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
 
@@ -70,7 +77,7 @@ def save(
             )
 
             if target_variables is None:
-                logger.info(
+                logger.warning(
                     f"Saving attempted, but product is missing some required variables for output {output_file.name}!",
                     stacklevel=2,
                 )
@@ -79,7 +86,37 @@ def save(
                 saving_strategy.save_single_file(file_path, data_dict, append=append)
 
 
-def _get_data_dict_to_save(target_variables: dict[str, Variable]) -> dict[str, Any]:
+def _validate_variables_dict(variables_dict: dict[InternalName, Variable]) -> None:
+    """Validates runtime types for data passed to ``save``.
+
+    This guard complements static type checking by rejecting invalid keys and
+    values even when annotations are ignored.
+    """
+    valid_internal_names = {
+        arg
+        for names in get_args(InternalName)
+        for arg in get_args(names)
+    }
+
+    invalid_keys = [key for key in variables_dict if not isinstance(key, str) or key not in valid_internal_names]
+    if invalid_keys:
+        msg = (
+            "variables_dict contains invalid internal name keys: "
+            f"{invalid_keys}. Allowed keys are: {valid_internal_names}"
+        )
+        raise KeyError(msg)
+
+    invalid_values = {
+        key: type(value).__name__ for key, value in variables_dict.items() if not isinstance(value, Variable)
+    }
+    if invalid_values:
+        msg = f"variables_dict must map each internal name to an ep.Variable. Invalid entries: {invalid_values}"
+        raise TypeError(msg)
+
+
+def _get_data_dict_to_save(
+    target_variables: dict[InternalName, Variable],
+) -> SavedDataDict:
     """Generates a dictionary of data and metadata for saving.
 
     This internal function iterates through a dictionary of variables, extracts their
@@ -94,7 +131,7 @@ def _get_data_dict_to_save(target_variables: dict[str, Variable]) -> dict[str, A
         dict[str, Any]: The formatted dictionary containing all variable data and
             associated metadata.
     """
-    data_dict: dict[str, NDArray[np.generic] | dict[str, Any]] = {}
+    data_dict: SavedDataDict = {}
     metadata_dict: dict[Any, Any] = {}
 
     for save_name, variable in target_variables.items():
@@ -116,6 +153,7 @@ def _get_data_dict_to_save(target_variables: dict[str, Variable]) -> dict[str, A
             "source_files": variable.metadata.source_files,
             "description": variable.metadata.description,
             "processing_notes": variable.metadata.processing_notes,
+            "standard_name": variable.metadata.standard_name or save_name,
         }
 
     # Add metadata to the dictionary
@@ -144,7 +182,7 @@ def _sanitize_metadata_dict(metadata_dict: dict[Any, Any]) -> dict[Any, Any]:
     for key, value in metadata_dict.items():
         if isinstance(value, dict):
             # Recursively sanitize nested dictionaries
-            sanitized_dict[key] = _sanitize_metadata_dict(value)  # type: ignore[reportUnknownArgumentType]
+            sanitized_dict[key] = _sanitize_metadata_dict(value)
         elif value is None:
             # Replace None with an empty numpy array
             sanitized_dict[key] = np.array([])

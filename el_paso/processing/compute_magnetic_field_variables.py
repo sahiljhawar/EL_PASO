@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# ruff: noqa: N806
 
 from __future__ import annotations
 
@@ -14,27 +13,30 @@ from pathlib import Path
 from typing import Literal, NamedTuple
 
 import numpy as np
-from astropy import units as u  # type: ignore[reportMissingTypeStubs]
+from astropy import units as u
 
 import el_paso as ep
 import el_paso.processing.magnetic_field_utils as mag_utils
 from el_paso import Variable
+from el_paso.typing import MagFieldVarTypes, MagneticFieldLiteral
 from el_paso.utils import make_dict_hashable, timed_function
 
 logger = logging.getLogger(__name__)
 
-VariableRequest = Sequence[tuple[mag_utils.MagFieldVarTypes, mag_utils.MagneticFieldLiteral | mag_utils.MagneticField]]
+VariableRequest = Sequence[tuple[MagFieldVarTypes, MagneticFieldLiteral | mag_utils.MagneticField]]
+"""Type alias for a request to compute magnetic field variables, consisting of a sequence of tuples where each tuple
+    specifies the variable type and the magnetic field model to use for its computation."""
 
 
 class MagFieldVar(NamedTuple):
     """A named tuple to represent a request for a magnetic field variable.
 
     Attributes:
-        type (mag_utils.MagFieldVarTypes): The type of magnetic field variable to compute (e.g., "B_local", "Lstar").
+        type (MagFieldVarTypes): The type of magnetic field variable to compute (e.g., "B_local", "Lstar").
         mag_field (str | mag_utils.MagneticField): The magnetic field model to use for the computation .
     """
 
-    type: mag_utils.MagFieldVarTypes
+    type: MagFieldVarTypes
     mag_field: str | mag_utils.MagneticField
 
 
@@ -63,7 +65,7 @@ def compute_magnetic_field_variables(
         xgeo_var (Variable): A Variable object containing geocentric (XGEO)
             coordinates. Expected to be a 2D array (time, 3) where the last
             dimension represents X, Y, Z coordinates.
-        variables_to_compute (Sequence[tuple[mag_utils.MagFieldVarTypes, str | mag_utils.MagneticField]]):
+        variables_to_compute (Sequence[tuple[MagFieldVarTypes, str | mag_utils.MagneticField]]):
             A sequence of tuples, where each tuple specifies a variable to compute. The first element is the
             variable type (e.g., "Lstar"), and the second is the magnetic field model to use (e.g., "IGRF").
         irbem_options (list[int]): A list of 5 integer options for the IRBEM library
@@ -82,7 +84,7 @@ def compute_magnetic_field_variables(
             species of particle (e.g., "electron", "proton"). Required if "invMu"
             is requested. Defaults to None.
         irbem_lib_path (str | Path): Optional. The file path to the IRBEM library (e.g., "libirbem.so"). Defaults to a
-        path relative to the el_paso package.
+            path relative to the el_paso package.
 
     Returns:
         dict[str, Variable]: A dictionary where keys are the computed variable
@@ -115,7 +117,7 @@ def compute_magnetic_field_variables(
         )
         raise FileNotFoundError(msg)
 
-    if len(irbem_options) != 5:  # noqa: PLR2004
+    if len(irbem_options) != 5:
         msg = f"irbem_options must be a list with exactly 5 entries! Got: {irbem_options}"
         raise ValueError(msg)
 
@@ -181,7 +183,7 @@ def compute_magnetic_field_variables(
 
 
 def _get_result(
-    var_type: mag_utils.MagFieldVarTypes,
+    var_type: MagFieldVarTypes,
     xgeo_var: Variable,
     time_var: Variable,
     pa_local_var: Variable,
@@ -193,7 +195,7 @@ def _get_result(
     """Helper function to get the result for a specific magnetic field variable.
 
     Args:
-        var_type (mag_utils.MagFieldVarTypes): The type of magnetic field variable to compute.
+        var_type (MagFieldVarTypes): The type of magnetic field variable to compute.
         xgeo_var (Variable): Variable containing geocentric (XGEO) coordinates.
         time_var (Variable): Variable containing time data.
         pa_local_var (Variable): Variable containing local pitch angles.
@@ -209,7 +211,7 @@ def _get_result(
         NotImplementedError: If the requested variable type is not supported.
     """
     match var_type:
-        case "B_local":
+        case "B_Calc":
             result_dict = mag_utils.get_local_B_field(xgeo_var, time_var, irbem_input)
 
         case "B_fofl":
@@ -221,13 +223,13 @@ def _get_result(
         case "MLT":
             result_dict = mag_utils.get_MLT(xgeo_var, time_var, irbem_input)
 
-        case "R_eq" | "B_eq" | "xGEO_eq" | "MLT_eq":
+        case "R_Eq" | "B_Eq" | "xGEO_Eq" | "MLT_Eq":
             result_dict = mag_utils.get_magequator(xgeo_var, time_var, irbem_input)
 
-        case "Lstar" | "Lm" | "XJ":
+        case "L_star" | "L_m" | "I":
             result_dict = mag_utils.get_Lstar(xgeo_var, time_var, pa_local_var, irbem_input)
 
-        case "PA_eq":
+        case "Alpha_Eq":
             result_dict = _get_pa_eq(
                 xgeo_var,
                 time_var,
@@ -236,7 +238,7 @@ def _get_result(
                 irbem_input,
             )
 
-        case "invMu":
+        case "InvMu":
             result_dict = _get_invariant_mu(
                 xgeo_var,
                 time_var,
@@ -247,11 +249,27 @@ def _get_result(
                 particle_species,
             )
 
-        case "invK":
+        case "InvK":
             result_dict = _get_invariant_K(
                 xgeo_var,
                 time_var,
                 pa_local_var,
+                computed_vars,
+                irbem_input,
+            )
+
+        case "Alpha_LC_Eq":
+            result_dict = _get_eq_loss_cone_angle(
+                xgeo_var,
+                time_var,
+                computed_vars,
+                irbem_input,
+            )
+
+        case "Alpha_LC":
+            result_dict = _get_local_loss_cone_angle(
+                xgeo_var,
+                time_var,
                 computed_vars,
                 irbem_input,
             )
@@ -329,8 +347,8 @@ def _get_pa_eq(
 
     pa_local = pa_local_var.get_data(u.radian)
 
-    B_eq_name = mag_utils.create_var_name("B_eq", irbem_input.magnetic_field)
-    B_local_name = mag_utils.create_var_name("B_local", irbem_input.magnetic_field)
+    B_eq_name = mag_utils.create_var_name("B_Eq", irbem_input.magnetic_field)
+    B_local_name = mag_utils.create_var_name("B_Calc", irbem_input.magnetic_field)
 
     if B_eq_name not in computed_vars:
         computed_vars |= mag_utils.get_magequator(xgeo_var, time_var, irbem_input)
@@ -348,7 +366,7 @@ def _get_pa_eq(
         f"using {irbem_input.magnetic_field} and options: {irbem_input.irbem_options}."
     )
 
-    computed_vars[mag_utils.create_var_name("PA_eq", irbem_input.magnetic_field)] = pa_var
+    computed_vars[mag_utils.create_var_name("Alpha_Eq", irbem_input.magnetic_field)] = pa_var
 
     return computed_vars
 
@@ -379,7 +397,7 @@ def _get_invariant_mu(
     """
     logger.info("\tCalculating invariant mu ...")
 
-    B_local_name = mag_utils.create_var_name("B_local", irbem_input.magnetic_field)
+    B_local_name = mag_utils.create_var_name("B_Calc", irbem_input.magnetic_field)
 
     if B_local_name not in computed_vars:
         computed_vars |= mag_utils.get_local_B_field(xgeo_var, time_var, irbem_input)
@@ -389,13 +407,13 @@ def _get_invariant_mu(
 
     mu_var = ep.processing.compute_invariant_mu(energy_var, pa_local_var, B_local, particle_species)
 
-    computed_vars[mag_utils.create_var_name("invMu", irbem_input.magnetic_field)] = mu_var
+    computed_vars[mag_utils.create_var_name("InvMu", irbem_input.magnetic_field)] = mu_var
 
     return computed_vars
 
 
 @timed_function("Invariant K calculation")
-def _get_invariant_K(  # noqa: N802
+def _get_invariant_K(
     xgeo_var: Variable,
     time_var: Variable,
     pa_local_var: Variable,
@@ -416,7 +434,7 @@ def _get_invariant_K(  # noqa: N802
     """
     logger.info("\tCalculating invariant K ...")
 
-    xj_name = mag_utils.create_var_name("XJ", irbem_input.magnetic_field)
+    xj_name = mag_utils.create_var_name("I", irbem_input.magnetic_field)
     B_mirr_name = mag_utils.create_var_name("B_mirr", irbem_input.magnetic_field)
 
     if xj_name not in computed_vars:
@@ -428,7 +446,65 @@ def _get_invariant_K(  # noqa: N802
     B_mirr = computed_vars[B_mirr_name]
     xj = computed_vars[xj_name]
 
-    inv_k_name = mag_utils.create_var_name("invK", irbem_input.magnetic_field)
+    inv_k_name = mag_utils.create_var_name("InvK", irbem_input.magnetic_field)
     computed_vars[inv_k_name] = ep.processing.compute_invariant_K(B_mirr, xj)
+
+    return computed_vars
+
+@timed_function("Equatorial loss cone angle calculation")
+def _get_eq_loss_cone_angle(
+    xgeo_var: Variable,
+    time_var: Variable,
+    computed_vars: dict[str, Variable],
+    irbem_input: mag_utils.IrbemInput,
+) -> dict[str, Variable]:
+
+    logger.info("\tCalculating eq loss cone angle ...")
+
+    B_fofl_name = mag_utils.create_var_name("B_fofl", irbem_input.magnetic_field)
+    B_eq_name = mag_utils.create_var_name("B_Eq", irbem_input.magnetic_field)
+
+    if B_fofl_name not in computed_vars:
+        computed_vars |= mag_utils.get_footpoint_atmosphere(xgeo_var, time_var, irbem_input)
+    if B_eq_name not in computed_vars:
+        computed_vars |= mag_utils.get_magequator(xgeo_var, time_var, irbem_input)
+
+    # load needed data and convert to correct units
+    B_fofl = computed_vars[B_fofl_name].get_data(u.nT).astype(np.float64)
+    B_eq = computed_vars[B_eq_name].get_data(u.nT).astype(np.float64)
+
+    pa_lc_eq = np.asin(np.sqrt(B_eq / B_fofl))
+
+    pa_lc_eq_name = mag_utils.create_var_name("Alpha_LC_Eq", irbem_input.magnetic_field)
+    computed_vars[pa_lc_eq_name] = ep.Variable(data=pa_lc_eq, original_unit=u.rad)
+
+    return computed_vars
+
+@timed_function("Local loss cone angle calculation")
+def _get_local_loss_cone_angle(
+    xgeo_var: Variable,
+    time_var: Variable,
+    computed_vars: dict[str, Variable],
+    irbem_input: mag_utils.IrbemInput,
+) -> dict[str, Variable]:
+
+    logger.info("\tCalculating local loss cone angle ...")
+
+    B_fofl_name = mag_utils.create_var_name("B_fofl", irbem_input.magnetic_field)
+    B_local_name = mag_utils.create_var_name("B_Calc", irbem_input.magnetic_field)
+
+    if B_fofl_name not in computed_vars:
+        computed_vars |= mag_utils.get_footpoint_atmosphere(xgeo_var, time_var, irbem_input)
+    if B_local_name not in computed_vars:
+        computed_vars |= mag_utils.get_magequator(xgeo_var, time_var, irbem_input)
+
+    # load needed data and convert to correct units
+    B_fofl = computed_vars[B_fofl_name].get_data(u.nT).astype(np.float64)
+    B_local = computed_vars[B_local_name].get_data(u.nT).astype(np.float64)
+
+    pa_lc_local = np.asin(np.sqrt(B_local / B_fofl))
+
+    pa_lc_local_name = mag_utils.create_var_name("Alpha_LC", irbem_input.magnetic_field)
+    computed_vars[pa_lc_local_name] = ep.Variable(data=pa_lc_local, original_unit=u.rad)
 
     return computed_vars

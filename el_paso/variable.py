@@ -11,13 +11,15 @@ from datetime import datetime
 from typing import Literal, overload
 
 import numpy as np
-from astropy import units as u  # type: ignore[reportMissingTypeStubs]
+from astropy import units as u
 
 import el_paso as ep
 from el_paso.utils import enforce_utc_timezone
 
 if typing.TYPE_CHECKING:
     from numpy.typing import NDArray
+
+    from el_paso.typing import StandardName
 
 
 @dataclass
@@ -91,6 +93,7 @@ class Variable:
         data: NDArray[np.generic] | None = None,
         description: str = "",
         processing_notes: str = "",
+        standard_name: StandardName = "",  # ty:ignore[invalid-parameter-default]
     ) -> None:
         """Initializes a Variable instance.
 
@@ -100,6 +103,7 @@ class Variable:
                 numpy array if None.
             description (str): A description of the variable. Defaults to "".
             processing_notes (str): Notes on how the data was processed. Defaults to "".
+            standard_name (StandardName): The standard name of the variable. Defaults to "".
         """
         self._data = np.array([]) if data is None else data
 
@@ -107,6 +111,7 @@ class Variable:
             unit=original_unit,
             description=description,
             processing_notes=processing_notes,
+            standard_name=standard_name,
         )
 
     def __repr__(self) -> str:
@@ -124,7 +129,7 @@ class Variable:
 
         if self.metadata.unit != target_unit:
             data_with_unit = u.Quantity(self._data, self.metadata.unit)
-            self._data = typing.cast("NDArray[np.generic]", data_with_unit.to_value(target_unit))  # type: ignore[reportUnknownMemberType]
+            self._data = typing.cast("NDArray[np.generic]", data_with_unit.to_value(target_unit))
 
             self.metadata.unit = target_unit
 
@@ -158,7 +163,7 @@ class Variable:
             msg = f"Unit conversion is only supported for numeric types! Encountered for variable {self}."
             raise TypeError(msg)
 
-        return typing.cast("NDArray[np.generic]", u.Quantity(self._data, self.metadata.unit).to_value(target_unit))  # type: ignore[reportUnknownMemberType]
+        return typing.cast("NDArray[np.generic]", u.Quantity(self._data, self.metadata.unit).to_value(target_unit))
 
     def set_data(self, data: NDArray[np.generic], unit: Literal["same"] | str | u.UnitBase) -> None:  # noqa: PYI051
         """Sets the data and optionally updates the unit of the variable.
@@ -177,7 +182,7 @@ class Variable:
         if isinstance(unit, str):
             if unit != "same":
                 self.metadata.unit = u.Unit(unit)
-        elif isinstance(unit, u.UnitBase):  # type: ignore[reportUnknownMemberType]
+        elif isinstance(unit, u.UnitBase):
             self.metadata.unit = unit
         else:
             msg = "unit must be either a str or a astropy unit!"

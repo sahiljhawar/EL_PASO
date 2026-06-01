@@ -55,7 +55,7 @@ class CustomBuild(build_py):
         dest_so = os.path.join(dest_dir, "libirbem.so")
 
         cwd = os.getcwd()
-        dest_so_local = os.path.join(cwd, "libirbem.so")
+        dest_so_el_paso_dir = os.path.join(cwd, "el_paso")
 
         tmp_dir = tempfile.mkdtemp(prefix="irbem_build_")
 
@@ -72,7 +72,7 @@ class CustomBuild(build_py):
                 )
 
             shutil.copy2(so_path, dest_so)
-            shutil.copy2(so_path, dest_so_local)
+            shutil.copy2(so_path, dest_so_el_paso_dir)
 
         finally:
             shutil.rmtree(tmp_dir, ignore_errors=True)

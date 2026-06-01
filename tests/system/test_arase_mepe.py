@@ -10,15 +10,15 @@ from typing import Literal
 
 import pytest
 
-from el_paso import RBMDataSet
-from examples.Arase.arase_mepe import process_mepe_level_3
+import el_paso as ep
+from el_paso.dataset import GFZDataSet
+from el_paso.recipes.arase import process_arase_mepe
 
 
 @pytest.mark.parametrize("mag_field", ["T89", "TS04"])
-@pytest.mark.parametrize("save_strategy", ["netcdf"])
+@pytest.mark.basic
 def test_arase_mepe_snapshot(
-    mag_field: Literal["T89", "TS04", "OP77Q"],
-    save_strategy: Literal["DataOrg", "h5", "netcdf"],
+    mag_field: Literal["T89", "TS04"],
     tmpdir: Path,
     *,
     renew_solution: bool,
@@ -26,64 +26,50 @@ def test_arase_mepe_snapshot(
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(hours=4, seconds=-1)
 
-    irbem_lib_path = Path(__file__).parent / "../../libirbem.so"
-    processed_data_path = tmpdir / "ARASE" / "arase"
+    processed_data_path = tmpdir
 
-    process_mepe_level_3(
+    process_arase_mepe(
         start_time,
         end_time,
-        irbem_lib_path,
         mag_field,
         raw_data_path=Path(__file__).parent / "data" / "raw",
         processed_data_path=processed_data_path,
         num_cores=32,
         cadence=timedelta(hours=1),
-        save_strategy=save_strategy,
+        save_strategy="netcdf",
         use_level_3_orbit_data=False,
     )
 
     start_date = start_time.replace(day=1)
     end_date = end_time.replace(day=30)
 
-    match save_strategy:
-        case "DataOrg":
-            out_path = (
-                processed_data_path / "arase_mepe" / "level_3" / f"{start_date:%Y%m%d}to{end_date:%Y%m%d}" / mag_field
-            )
-            assert out_path.exists()
+    out_path = (
+        processed_data_path / "ARASE" / "arase" / f"arase_mepe_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.nc"
+    )
+    assert out_path.exists(), "File did not get written!"
 
-            if renew_solution:
-                shutil.copytree(processed_data_path, Path(__file__).parent / "data" / "processed", dirs_exist_ok=True)
+    if renew_solution:
+        shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "ARASE" / "arase")
 
-        case "h5":
-            out_path = processed_data_path / f"arase_mepe-l3_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.h5"
-            assert out_path.exists()
-
-            if renew_solution:
-                shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "ARASE" / "arase")
-
-        case "netcdf":
-            out_path = processed_data_path / f"arase_mepe-l3_{start_date:%Y%m%d}to{end_date:%Y%m%d}_{mag_field}.nc"
-            assert out_path.exists()
-
-            if renew_solution:
-                shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "ARASE" / "arase")
-
-    arase_proc = RBMDataSet(
+    arase_proc = GFZDataSet(
+        ep.saving_strategies.MonthlyRBStrategy(
+            tmpdir, "ARASE", "arase", "mepe", mag_field, data_standard=ep.data_standards.GFZStandard(), file_format="nc"
+        ),
         start_time=start_time,
         end_time=end_time,
-        folder_path=tmpdir,
-        satellite="ARASE",
-        instrument="mepe",
-        mfm=mag_field,
     )
-    arase_true = RBMDataSet(
+    arase_true = GFZDataSet(
+        ep.saving_strategies.MonthlyRBStrategy(
+            Path(__file__).parent / "data" / "processed",
+            "Arase",
+            "arase",
+            "mepe",
+            mag_field,
+            ep.data_standards.GFZStandard(),
+            "nc",
+        ),
         start_time=start_time,
         end_time=end_time,
-        folder_path=Path(__file__).parent / "data" / "processed",
-        satellite="ARASE",
-        instrument="mepe",
-        mfm=mag_field,
     )
 
-    assert arase_proc == arase_true, f"Different variables: {arase_proc.get_different_variables(arase_true)}"
+    arase_true.assert_equal(arase_proc)

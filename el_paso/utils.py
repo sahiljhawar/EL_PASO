@@ -5,25 +5,33 @@
 
 from __future__ import annotations
 
+import calendar
 import logging
 import re
 import time
 import timeit
-import typing
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
-from typing import Any, ParamSpec, TypeVar
+from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
+import cdflib
+import h5py
+import netCDF4 as nC
+import numpy as np
 import pandas as pd
 import tqdm
 from packaging import version as version_pkg
+from scipy.io.matlab import loadmat, savemat
 
-if typing.TYPE_CHECKING:
+if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
     from multiprocessing.pool import MapResult
 
     import el_paso as ep
+    from el_paso.typing import DataStandard, SavedDataDict, StandardName, TimeInterval
+
+    DataDict = SavedDataDict
 
 logger = logging.getLogger(__name__)
 
@@ -154,7 +162,7 @@ def timed_function(func_name: str | None = None) -> Callable[[Callable[P, R]], C
             tic = timeit.default_timer()
             result = f(*args, **kwargs)
             toc = timeit.default_timer()
-            name = func_name or f"{f.__name__}"
+            name = func_name or f"{f.__name__}"  # ty:ignore[unresolved-attribute]
             log = logging.getLogger(f.__module__)
             log.info(f"{name} finished in {toc - tic:0.3f} seconds", stacklevel=2)
 
@@ -252,12 +260,12 @@ def show_process_bar_for_map_async(map_result: MapResult[Any], chunksize: int) -
         map_result (MapResult): The result object from `Pool.map_async()`.
         chunksize (int): The chunk size used in the `map_async` call.
     """
-    init = typing.cast("int", map_result._number_left) * chunksize  # type: ignore[reportUnknownMemberType] # noqa: SLF001
+    init = cast("int", map_result._number_left) * chunksize  # ty:ignore[unresolved-attribute]
     with tqdm.tqdm(total=init) as t:
         while True:
             if map_result.ready():
                 break
-            t.n = init - map_result._number_left * chunksize  # type: ignore[reportUnknownMemberType] # noqa: SLF001
+            t.n = init - map_result._number_left * chunksize  # ty:ignore[unresolved-attribute]
             t.refresh()
             time.sleep(1)
 
@@ -269,7 +277,7 @@ class Hashabledict(dict[Any, Any]):
     by providing a custom hash implementation based on its contents.
     """
 
-    def __hash__(self) -> int:  # type: ignore[reportIncompatibleVariableOverride]
+    def __hash__(self) -> int:
         """Computes a hash value for the dictionary.
 
         The hash is computed based on the frozensets of the dictionary's keys
@@ -280,7 +288,7 @@ class Hashabledict(dict[Any, Any]):
         Returns:
             int: The hash value of the dictionary.
         """
-        return hash((frozenset(self), frozenset(self.itervalues())))  # type: ignore[reportAttributeAccessIssue]
+        return hash((frozenset(self), frozenset(self.itervalues())))  # ty:ignore[unresolved-attribute]
 
 
 def make_dict_hashable(dict_input: dict[Any, Any] | None) -> Hashabledict | None:
@@ -299,3 +307,447 @@ def make_dict_hashable(dict_input: dict[Any, Any] | None) -> Hashabledict | None
         return dict_input
 
     return Hashabledict(dict_input)
+
+
+def load_h5_data(file_path: Path) -> dict[StandardName, Any]:
+    """Load all datasets and dataset attributes from an HDF5 file."""
+    loaded_data: dict[StandardName, Any] = {"metadata": {}}
+
+    def _recursively_load_datasets(group: h5py.Group | h5py.File, prefix: str = "") -> None:
+        for key, item in group.items():
+            full_path = f"{prefix}{key}" if prefix else key
+            if isinstance(item, h5py.Dataset):
+                loaded_data[full_path] = np.array(item)  # ty:ignore[invalid-assignment]
+                loaded_data["metadata"][full_path] = dict(item.attrs.items())
+            elif isinstance(item, h5py.Group):
+                _recursively_load_datasets(item, f"{full_path}/")
+
+    with h5py.File(file_path, "r") as file:
+        _recursively_load_datasets(file)
+
+    return loaded_data
+
+
+def load_netcdf_data(file_path: Path) -> dict[StandardName, Any]:
+    """Load all variables and variable metadata from a NetCDF file."""
+    loaded_data: dict[StandardName, Any] = {"metadata": {}}
+
+    def _recursively_load(group: nC.Group | nC.Dataset, prefix: str = "") -> None:
+        for var_name, variable in group.variables.items():
+            full_path = f"{prefix}{var_name}" if prefix else var_name
+            loaded_data[full_path] = np.array(variable[:])  # ty:ignore[invalid-assignment]
+            loaded_data["metadata"][full_path] = {
+                "unit": getattr(variable, "units", "unknown"),
+                "source_files": getattr(variable, "source", "unknown"),
+                "processing_notes": getattr(variable, "history", "unknown"),
+                "description": getattr(variable, "description", "unknown"),
+                "original_cadence_seconds": getattr(variable, "original_cadence_seconds", "unknown"),
+                "standard_name": getattr(variable, "standard_name", "unknown"),
+            }
+
+        for group_name, subgroup in group.groups.items():
+            _recursively_load(subgroup, f"{prefix}{group_name}/")
+
+    if not file_path.exists():
+        logger.error(f"File not found: {file_path}")
+        return {}
+
+    with nC.Dataset(file_path, "r", format="NETCDF4") as file:
+        _recursively_load(file)
+
+    return loaded_data
+
+
+def load_cdf_data(file_path: Path) -> dict[StandardName, Any]:
+    """Load all zVariables from an existing CDF file."""
+    loaded_data: dict[StandardName, Any] = {"metadata": {}}
+    cdf_file = cdflib.CDF(str(file_path))
+    try:
+        info = cdf_file.cdf_info()
+        z_variables = getattr(info, "zVariables", None)
+        if z_variables is None and isinstance(info, dict):
+            z_variables = info.get("zVariables", [])  # ty:ignore[no-matching-overload]
+
+        for variable_name in z_variables or []:
+            try:
+                loaded_data[variable_name] = np.asarray(cdf_file.varget(variable_name))
+            except ValueError as exc:
+                if "No records found" not in str(exc):
+                    raise
+                logger.warning(f"Skipping empty CDF variable {variable_name} in {file_path.name}")
+                continue
+
+            try:
+                loaded_data["metadata"][variable_name] = cdf_file.varattsget(variable_name)
+            except Exception:  # noqa: BLE001
+                loaded_data["metadata"][variable_name] = {}
+    finally:
+        close = getattr(cdf_file, "close", None)
+        if close is not None:
+            close()
+
+    return loaded_data
+
+
+def load_mat_data(file_path: Path) -> dict[StandardName, Any]:
+    """Load an existing MATLAB file."""
+    loaded = loadmat(str(file_path), simplify_cells=True)
+    data: dict[StandardName, Any] = {key: value for key, value in loaded.items() if not key.startswith("__")}
+
+    if "metadata" in data and isinstance(data["metadata"], dict):
+        for var_key, attrs in data["metadata"].items():
+            if not isinstance(attrs, dict):
+                continue
+            data["metadata"][var_key] = {
+                k: v.item()
+                if isinstance(v, np.ndarray) and v.ndim == 0
+                else v.tolist()
+                if isinstance(v, np.ndarray) and v.size != 0
+                else ""
+                if isinstance(v, np.ndarray) and v.size == 0
+                else v
+                for k, v in attrs.items()
+            }
+
+    return data
+
+
+def normalize_file_format(file_format: str) -> str:
+    """Return a normalized file extension for the requested monthly format."""
+    normalized = file_format.lower()
+    if not normalized.startswith("."):
+        normalized = f".{normalized}"
+
+    if normalized not in {".nc", ".cdf", ".h5", ".mat"}:
+        msg = "MonthlyRBStrategy supports only 'nc', 'cdf', 'h5', and 'mat' formats."
+        raise ValueError(msg)
+
+    return normalized
+
+
+def write_mat_file(file_path: Path, data_dict: DataDict, data_standard: DataStandard) -> None:
+    """Write a MATLAB file, resolving standard variable paths and flattening hierarchy.
+
+    Data variables are stored under their flattened canonical names (``/`` → ``__``).
+    Per-variable metadata is stored in a parallel ``metadata`` struct whose field
+    names mirror the data variable names, matching how HDF5 stores attrs per dataset.
+    """
+    mat_dict: dict[str, Any] = {}
+    mat_metadata: dict[str, Any] = {}
+
+    for internal_name, value in data_dict.items():
+        if internal_name == "metadata":
+            continue
+
+        path = data_standard.get_standard_name(internal_name)
+        mat_var_name = path.replace("/", "__")
+
+        value_to_write = value
+        if isinstance(value, np.ndarray) and value.ndim == 2 and value.shape[1] == 1:
+            value_to_write = value.reshape(-1)
+
+        mat_dict[mat_var_name] = value_to_write
+
+        # Attach per-variable metadata under a matching key in the metadata struct,
+        # mirroring how _write_h5_file stores attrs on each dataset.
+        variable_meta = data_dict.get("metadata", {}).get(internal_name, {})
+        if isinstance(variable_meta, dict) and variable_meta:
+            mat_metadata[mat_var_name] = {
+                "unit": variable_meta.get("unit", "unknown"),
+                "source_files": variable_meta.get("source_files", "unknown"),
+                "processing_notes": variable_meta.get("processing_notes", "unknown"),
+                "description": variable_meta.get("description", "unknown"),
+                "original_cadence_seconds": variable_meta.get("original_cadence_seconds", "unknown"),
+                "standard_name": variable_meta.get("standard_name", "unknown"),
+            }
+
+    if mat_metadata:
+        mat_dict["metadata"] = mat_metadata
+
+    savemat(str(file_path), mat_dict)
+
+
+def write_h5_file(file_path: Path, data_dict: SavedDataDict, data_standard: DataStandard) -> None:
+    """Write an HDF5 file with hierarchical groups from slash-delimited paths."""
+    with h5py.File(file_path, "w") as file:
+        for internal_name, value in data_dict.items():
+            if internal_name == "metadata":
+                continue
+            path = data_standard.get_standard_name(internal_name)
+
+            path_parts = path.split("/")
+            groups = path_parts[:-1]
+            dataset_name = path_parts[-1]
+
+            curr_hierarchy = file
+            for group in groups:
+                if group not in curr_hierarchy:
+                    curr_hierarchy = curr_hierarchy.create_group(group)
+                else:
+                    curr_hierarchy = cast("h5py.Group", curr_hierarchy[group])
+
+            # Normalize 2D arrays with shape (n, 1) back to 1D for consistency with other formats
+            value_to_write = value
+            if isinstance(value, np.ndarray) and value.ndim == 2 and value.shape[1] == 1:
+                value_to_write = value.reshape(-1)
+
+            data_set = curr_hierarchy.create_dataset(
+                dataset_name, data=value_to_write, compression="gzip", shuffle=True
+            )
+
+            metadata_dict = data_dict.get("metadata", {}).get(internal_name, {})
+            if not isinstance(metadata_dict, dict):
+                continue
+
+            for key, metadata in metadata_dict.items():
+                if getattr(metadata, "size", None) == 0:
+                    continue
+                data_set.attrs[key] = metadata
+
+
+def _write_data_to_netcdf_file(file: nC.Dataset | nC.Group, data_dict: DataDict, data_standard: DataStandard) -> None:
+    """Write variables to a NetCDF file or group."""
+    for internal_name, value in data_dict.items():
+        if internal_name == "metadata":
+            continue
+
+        value_array = np.asarray(value)
+        if value_array.size == 0:
+            continue
+
+        standard_name = data_standard.get_standard_name(internal_name)
+
+        path_parts = standard_name.split("/")
+        groups = path_parts[:-1]
+        dataset_name = path_parts[-1]
+
+        curr_hierarchy: nC.Group | nC.Dataset = file
+        for group in groups:
+            if group not in curr_hierarchy.groups:
+                curr_hierarchy = curr_hierarchy.createGroup(group)
+            else:
+                curr_hierarchy = curr_hierarchy.groups[group]
+
+        dimensions = data_standard.get_dependencies(internal_name)
+        data_set = cast(
+            "nC.Variable[Any]",
+            curr_hierarchy.createVariable(
+                dataset_name,
+                "float64",
+                dimensions,
+                zlib=True,
+                complevel=5,
+                shuffle=True,
+            ),
+        )
+
+        value_to_write = value_array
+        if len(dimensions) == 1 and value_array.ndim == 2 and value_array.shape[1] == 1:
+            value_to_write = value_array.reshape(-1)
+
+        if len(dimensions) == 0:
+            data_set[...] = value_to_write
+        else:
+            data_set[:, ...] = value_to_write
+
+        metadata_dict = data_dict.get("metadata", {})
+        metadata = {}
+        if isinstance(metadata_dict, dict):
+            metadata = metadata_dict.get(internal_name, metadata_dict.get(internal_name, {}))
+
+        if not isinstance(metadata, dict):
+            continue
+
+        data_set.units = metadata.get("unit", "unknown")
+        data_set.source = metadata.get("source_files", "unknown")
+        data_set.history = metadata.get("processing_notes", "unknown")
+        data_set.description = metadata.get("description", "unknown")
+        data_set.original_cadence_seconds = metadata.get("original_cadence_seconds", "unknown")
+        data_set.standard_name = metadata.get("standard_name", "unknown")
+
+
+def write_netcdf_file(file_path: Path, data_dict: DataDict, data_standard: DataStandard) -> None:
+    """Create and write a NetCDF file from a data dictionary."""
+    with nC.Dataset(file_path, "w", format="NETCDF4") as file:
+        size_time = np.asarray(data_dict["Epoch"]).shape[0]
+        if size_time == 0:
+            logger.info(f"Skipping write for {file_path.name} (time has length 0).")
+            return
+
+        dimensions = _calculate_dimensions(data_dict)
+        for dim_name, dim_size in dimensions.items():
+            if dim_name == "Epoch":
+                # we create the time dimension as unilimited to allow for append later on
+                file.createDimension(dim_name, size=None)
+            else:
+                file.createDimension(dim_name, dim_size)
+
+        _write_data_to_netcdf_file(file, data_dict, data_standard)
+
+
+def _calculate_dimensions(data_dict: DataDict) -> dict[str, int]:
+    """Calculate NetCDF dimension sizes from the data dictionary."""
+    dimensions = {
+        "Epoch": np.asarray(data_dict["Epoch"]).shape[0],
+        "Alpha": 0,
+        "Energy_FEDU": 0,
+    }
+
+    if "Alpha_Eq" in data_dict and np.asarray(data_dict["Alpha_Eq"]).size > 0:
+        dimensions["Alpha"] = np.asarray(data_dict["Alpha_Eq"]).shape[1]
+    elif "Alpha" in data_dict and np.asarray(data_dict["Alpha"]).size > 0:
+        dimensions["Alpha"] = np.asarray(data_dict["Alpha"]).shape[1]
+
+    if "Energy_FEDU" in data_dict and np.asarray(data_dict["Energy_FEDU"]).size > 0:
+        dimensions["Energy_FEDU"] = np.asarray(data_dict["Energy_FEDU"]).shape[1]
+
+    if "Position" in data_dict and np.asarray(data_dict["Position"]).size > 0:
+        dimensions["Position_components"] = 3
+
+    dimensions["min_max"] = 2
+
+    return dimensions
+
+
+def _get_cdf_variable_attrs(var_name: str, data_dict: DataDict) -> DataDict:
+    """Return non-empty CDF variable attributes for a saved variable."""
+    metadata = data_dict.get("metadata", {}).get(var_name, {})
+    var_attrs: SavedDataDict = {}
+
+    if isinstance(metadata, dict):
+        for attr_name, attr_value in metadata.items():
+            if _is_empty_cdf_attribute(attr_value):
+                logger.debug(f"Skipping empty CDF attribute {var_name}:{attr_name}")
+                continue
+
+            var_attrs[str(attr_name)] = attr_value  # ty:ignore[invalid-assignment]
+
+    var_attrs["Compress"] = 6  # ty:ignore[invalid-assignment]
+    return var_attrs
+
+
+def _is_empty_cdf_attribute(value: Any) -> bool:  # noqa: ANN401
+    """Return True if cdflib cannot infer a datatype from the attribute value."""
+    if value is None:
+        return True
+
+    if isinstance(value, (list, tuple, dict, str, bytes)):
+        return len(value) == 0
+
+    return getattr(value, "size", None) == 0
+
+
+def write_cdf_file(file_path: Path, data_dict: DataDict, data_standard: DataStandard) -> None:
+    """Write a CDF file, resolving standard variable paths and embedding metadata."""
+    try:
+        cdf_file = cdflib.cdfwrite.CDF(str(file_path), delete=True)
+        try:
+            for internal_name, var_data in data_dict.items():
+                if internal_name == "metadata":
+                    continue
+
+                if getattr(var_data, "size", 0) == 0:
+                    logger.warning(f"Skipping empty variable {internal_name}")
+                    continue
+
+                # Resolve the canonical name via the data standard, matching H5/NC behaviour.
+                # CDF does not support '/' in variable names, so we replace path separators
+                # with '__' to preserve hierarchy information without violating the spec.
+                path = data_standard.get_standard_name(internal_name)
+                cdf_var_name = path
+                value_to_write = var_data
+                if isinstance(var_data, np.ndarray) and var_data.ndim == 2 and var_data.shape[1] == 1:
+                    value_to_write = var_data.reshape(-1)
+
+                var_data_array = np.asarray(value_to_write)
+                if np.issubdtype(var_data_array.dtype, np.integer):
+                    if var_data_array.dtype == np.int8:
+                        cdf_dtype = cdflib.cdfwrite.CDF.CDF_INT1
+                    elif var_data_array.dtype == np.int16:
+                        cdf_dtype = cdflib.cdfwrite.CDF.CDF_INT2
+                    elif var_data_array.dtype == np.int32:
+                        cdf_dtype = cdflib.cdfwrite.CDF.CDF_INT4
+                    else:
+                        cdf_dtype = cdflib.cdfwrite.CDF.CDF_INT8
+                elif np.issubdtype(var_data_array.dtype, np.floating):
+                    cdf_dtype = (
+                        cdflib.cdfwrite.CDF.CDF_FLOAT
+                        if var_data_array.dtype == np.float32
+                        else cdflib.cdfwrite.CDF.CDF_DOUBLE
+                    )
+                else:
+                    var_data_array = var_data_array.astype(np.float64)
+                    cdf_dtype = cdflib.cdfwrite.CDF.CDF_DOUBLE
+
+                var_spec: dict[str, Any] = {
+                    "Variable": cdf_var_name,
+                    "Data_Type": cdf_dtype,
+                    "Num_Elements": 1,
+                    "Rec_Vary": True,
+                    "Dim_Sizes": (list(var_data_array.shape[1:]) if var_data_array.ndim > 1 else []),
+                }
+
+                metadata_dict = data_dict.get("metadata", {})
+                metadata: dict[str, Any] = {}
+                if isinstance(metadata_dict, dict):
+                    metadata = metadata_dict.get(path, metadata_dict.get(internal_name, {}))
+
+                var_attrs = {}
+                if isinstance(metadata, dict):
+                    for attr_name, attr_value in metadata.items():
+                        if _is_empty_cdf_attribute(attr_value):
+                            logger.debug(f"Skipping empty CDF attribute {cdf_var_name}:{attr_name}")
+                            continue
+                        var_attrs[str(attr_name)] = attr_value
+                if isinstance(metadata, dict):
+                    for field, nc_key in {
+                        "unit": "unit",
+                        "source_files": "source_files",
+                        "processing_notes": "processing_notes",
+                        "description": "description",
+                        "original_cadence_seconds": "original_cadence_seconds",
+                        "standard_name": "standard_name",
+                    }.items():
+                        value = metadata.get(nc_key)
+                        if value is None or _is_empty_cdf_attribute(value):
+                            var_attrs.setdefault(nc_key, "empty")
+                            continue
+                        if value and not _is_empty_cdf_attribute(value):
+                            var_attrs.setdefault(field, value)
+
+                var_attrs["Compress"] = 6
+
+                cdf_file.write_var(var_spec, var_attrs=var_attrs, var_data=var_data_array)
+        finally:
+            cdf_file.close()
+    except Exception as e:
+        msg = f"Failed to write CDF file {file_path}: {e}"
+        logger.exception(msg)
+        raise RuntimeError(msg) from e
+
+
+def get_monthly_datetime_intervals(  # noqa: D103
+    start_time: datetime | None, end_time: datetime | None
+) -> list[TimeInterval]:
+    time_intervals: list[TimeInterval] = []
+
+    if start_time is None or end_time is None:
+        msg = "start_time and end_time must be provided!"
+        logger.error(msg)
+        raise ValueError(msg)
+
+    current_time = start_time.replace(day=1)
+    while current_time <= end_time:
+        year = current_time.year
+        month = current_time.month
+        eom_day = calendar.monthrange(year, month)[1]
+
+        month_start = datetime(year, month, 1, 0, 0, 0, tzinfo=timezone.utc)
+        month_end = datetime(year, month, eom_day, 23, 59, 59, tzinfo=timezone.utc)
+        time_intervals.append((month_start, month_end))
+        current_time = (
+            datetime(year + 1, 1, 1, tzinfo=timezone.utc)
+            if month == 12
+            else datetime(year, month + 1, 1, tzinfo=timezone.utc)
+        )
+    return time_intervals

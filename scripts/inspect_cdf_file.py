@@ -38,7 +38,7 @@ def inspect_cdf_file(file_path: str) -> None:
         vdr_info = cdf_file.varinq(var)
         var_data = cdf_file.varget(var)
 
-        var_shape = var_data.shape  # type: ignore[reportAttributeAccessIssue]
+        var_shape = var_data.shape
 
         units = var_attrs_full.get("UNITS", "")
 
@@ -49,6 +49,18 @@ def inspect_cdf_file(file_path: str) -> None:
         data_type = vdr_info.Data_Type_Description
 
         var_attrs_to_print.append([var, data_type, units, var_shape, fillvall, desc])
+
+    flux = cdf_file.varget("FPDU")
+    energy = cdf_file.varget("HOPE_ENERGY_Ion")[0,:]
+    
+    from matplotlib import pyplot as plt
+    import numpy as np
+    print(flux.shape)
+    plt.pcolormesh(range(flux.shape[0]), np.log10(energy), np.log10(flux[1:,5,1:]).T, cmap="jet")
+    plt.colorbar()
+    plt.ylim(0, np.log10(50))
+    plt.show() 
+
 
     print(  # noqa: T201
         tabulate(

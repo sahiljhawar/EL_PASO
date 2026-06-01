@@ -10,13 +10,17 @@ SPDX-License-Identifier: Apache-2.0
 This section provides a detailed reference for all modules, classes, and functions in `el_paso`.
 
 ## Core classes
+
 [DataStandard](data_standard.md)
 
 [SavingStrategy](saving_strategy.md)
 
 [Variable](variable.md)
 
+[DataSet](dataset/dataset.md)
+
 ## Core functions
+
 [download](download.md)
 
 [extract_variables_from_files](extract_variables_from_files.md)
@@ -59,19 +63,30 @@ This section provides a detailed reference for all modules, classes, and functio
 
 [convert_string_to_datetime](processing/convert_string_to_datetime.md)
 
-
 ## Saving standards
 
-[DataOrgStrategy](saving_strategies/data_org.md)
+[GFZStrategy](saving_strategies/gfz.md)
 
-[MonthlyH5Strategy](saving_strategies/monthly_h5.md)
-
-[MonthlyNetCDFStrategy](saving_strategies/monthly_netcdf.md)
+[MonthlyRBStrategy](saving_strategies/monthly.md)
 
 [SingleFileStrategy](saving_strategies/single_file.md)
 
 ## Data Standards
 
-[DataOrgStandard](data_standards/data_org.md)
+[GFZStandard](data_standards/gfz.md)
 
 [PRBEMStandard](data_standards/prbem.md)
+
+## Datasets
+
+[GFZDataSet](dataset/dataset_implementations.md#el_paso.dataset.GFZDataSet)
+
+[PRBEMDataSet](dataset/dataset_implementations.md#el_paso.dataset.PRBEMDataSet)
+
+## Metadata
+
+[Metadata](metadata.md)
+
+## Typing
+
+[Typing](typing.md)

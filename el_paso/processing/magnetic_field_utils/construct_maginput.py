@@ -6,13 +6,13 @@
 import logging
 from datetime import datetime, timezone
 from functools import cache
-from typing import Literal
 
 import numpy as np
 from numpy.typing import NDArray
 
 import el_paso as ep
 from el_paso.load_indices_solar_wind_parameters import SW_Index
+from el_paso.typing import MagInputKeys
 
 from .mag_field_enum import MagneticField, kext
 
@@ -64,14 +64,10 @@ MAGINPUT_TO_INDEX: dict[SW_Index, int | list[int]] = {
     "W_params": list(range(10, 16)),
 }
 
-MagInputKeys = Literal[
-    "Kp", "Dst", "dens", "velo", "Pdyn", "ByIMF", "BzIMF", "G1", "G2", "G3", "W1", "W2", "W3", "W4", "W5", "W6", "AL"
-]
-
 
 @cache
 def construct_maginput(
-    time_var: ep.Variable, magnetic_field: MagneticField, indices_solar_wind: dict[str, ep.Variable] | None = None
+    time_var: ep.Variable, magnetic_field: MagneticField, indices_solar_wind: dict[SW_Index, ep.Variable] | None = None
 ) -> dict[MagInputKeys, NDArray[np.float64]]:
     """Construct the basic magnetospheric input parameters array.
 

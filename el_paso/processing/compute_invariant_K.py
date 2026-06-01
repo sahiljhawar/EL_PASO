@@ -3,15 +3,14 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# ruff: noqa: N999
 
 import numpy as np
-from astropy import units as u  # type: ignore[reportMissingTypeStubs]
+from astropy import units as u
 
 import el_paso as ep
 
 
-def compute_invariant_K(  # noqa: N802
+def compute_invariant_K(
     bmirr: ep.Variable,
     xj: ep.Variable,
 ) -> ep.Variable:
@@ -34,9 +33,9 @@ def compute_invariant_K(  # noqa: N802
 
     xj_data = xj.get_data(ep.units.RE).astype(np.float64)
 
-    inv_K_var = ep.Variable(  # noqa: N806
+    inv_K_var = ep.Variable(
         data=np.sqrt(bmirr_data) * xj_data,
-        original_unit=ep.units.RE * u.G**0.5,  # type: ignore[reportUnknownArgumentType]
+        original_unit=ep.units.RE * u.G**0.5,
     )
 
     inv_K_var.metadata.add_processing_note("Created with compute_invariant_K from B_mirr and XJ.")

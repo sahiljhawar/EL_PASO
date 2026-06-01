@@ -3,23 +3,33 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from __future__ import annotations
+
+import inspect
 import logging
-import pickle
-import typing
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from datetime import datetime
-from pathlib import Path
-from typing import Any, NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
-import h5py  # type: ignore[reportMissingTypeStubs]
 import numpy as np
-from astropy import units as u  # type: ignore[reportMissingTypeStubs]
-from scipy.io import savemat  # type: ignore[reportMissingTypeStubs]
+from astropy import units as u
 
 from el_paso import Variable
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from datetime import datetime
+    from pathlib import Path
+
+    from el_paso.typing import (
+        DataStandard,
+        InternalName,
+        MagneticFieldLiteral,
+        SavedDataDict,
+        StandardName,
+        TimeInterval,
+    )
 
 
 class OutputFile(NamedTuple):
@@ -32,7 +42,7 @@ class OutputFile(NamedTuple):
     """
 
     name: str
-    names_to_save: list[str]
+    names_to_save: list[InternalName]
     save_incomplete: bool = False
 
 
@@ -41,35 +51,65 @@ class SavingStrategy(ABC):
 
     Attributes:
         output_files (list[OutputFile]): List of output files to be managed by the saving strategy.
+        data_standard (DataStandard[StandardName]): The data standard that defines the variable naming convention.
+        base_data_path (Path): The base path where output files will be saved.
+        satellite (str): The name of the satellite for which data is being saved.
+        mission (str): The name of the mission for which data is being saved.
+        instrument (str): The name of the instrument for which data is being saved.
+        mag_field (MagneticFieldLiteral): The magnetic field model used for saving data, if applicable.
 
     Methods:
-        get_time_intervals_to_save(start_time: datetime | None, end_time: datetime | None)
-            -> list[tuple[datetime, datetime]]:
+        get_time_intervals_to_save:
             Abstract method to determine the time intervals for saving data between start_time and end_time.
 
-        get_file_path(interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:
+        get_file_path:
             Abstract method to generate the file path for a given time interval and output file.
 
-        standardize_variable(variable: Variable, name_in_file: str) -> Variable:
+        standardize_variable:
             Abstract method to standardize a variable before saving, possibly renaming or formatting it.
 
-        get_target_variables(output_file: OutputFile, variables_dict: dict[str, Variable], time_var: Variable | None,
-                             start_time: datetime | None, end_time: datetime | None) -> dict[str, Variable] | None:
+        get_target_variables:
             Selects and prepares variables to be saved in the output file, optionally truncating them to a time range.
 
-        save_single_file(file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False):
-            Saves the provided dictionary to a file in the specified format (.mat, .pickle, .h5),
+        save_single_file:
+            Saves the provided dictionary to a file in the specified format (.mat, .h5, .nc, .cdf),
             optionally appending data.
 
-        append_data(file_path: Path, dict_to_save: dict[str, Any]) -> dict[str, Any]:
+        append_data:
             Abstract method to append data to an existing file; must be implemented by subclasses.
+            All subclasses may not need it, so it is not defined in the base class.
     """
 
     output_files: list[OutputFile]
-    dependency_dict: dict[str, list[str]]
+    data_standard: DataStandard[StandardName]
+    base_data_path: Path
+    satellite: str
+    mission: str
+    instrument: str
+    mag_field: MagneticFieldLiteral
+
+    def __repr__(self) -> str:
+        cls = type(self)
+
+        constructor_params = inspect.signature(cls.__init__).parameters
+
+        args = []
+
+        for name in constructor_params:
+            if name == "self":
+                continue
+
+            if hasattr(self, name):
+                value = getattr(self, name)
+                args.append(f"{name}={value!r}")
+
+        return f"{cls.__name__}({', '.join(args)})"
+
+    def __str__(self) -> str:
+        return self.__repr__()
 
     @abstractmethod
-    def get_time_intervals_to_save(self, start_time: datetime, end_time: datetime) -> list[tuple[datetime, datetime]]:
+    def get_time_intervals_to_save(self, start_time: datetime, end_time: datetime) -> list[TimeInterval]:
         """Generates a list of time intervals to save between the specified start and end times.
 
         Args:
@@ -79,7 +119,7 @@ class SavingStrategy(ABC):
                                         If None, intervals may end at the latest available time.
 
         Returns:
-            list[tuple[datetime, datetime]]: A list of tuples, each representing a time interval (start, end)
+            list[TimeInterval]: A list of tuples, each representing a time interval (start, end)
                                              to be saved.
         """
 
@@ -98,28 +138,49 @@ class SavingStrategy(ABC):
         """
 
     @abstractmethod
-    def standardize_variable(self, variable: Variable, name_in_file: str, *, first_call_of_interval: bool) -> Variable:
+    def standardize_variable(
+        self, variable: Variable, internal_name: InternalName, *, first_call_of_interval: bool
+    ) -> Variable:
         """Standardizes the given variable according to the specified name in the file.
 
         Standardization may include checking of units, dimensions, and size consistency.
 
         Args:
             variable (Variable): The variable instance to be standardized.
-            name_in_file (str): The name of the variable as it appears in the file.
+            internal_name (str): The internal name of the variable, used for standardization rules.
             first_call_of_interval (bool): Flag to indicate if it is the first call of a time interval
 
         Returns:
             Variable: The standardized variable instance.
         """
 
+    @abstractmethod
+    def save_single_file(self, file_path: Path, dict_to_save: SavedDataDict, *, append: bool = False) -> None:
+        """Saves the provided dictionary to a single file in one of the supported formats (.mat, .h5, .nc).
+
+        Parameters:
+            file_path (Path): The path where the file should be saved.
+            dict_to_save (dict[str, Any]): The dictionary containing variable data and metadata to be saved.
+            append (bool, optional): If True, data will be appended to existing files rather than overwriting them.
+                    Defaults to False.
+        """
+
+    @abstractmethod
+    def get_file_path_stem(self) -> Path:
+        pass
+
+    @abstractmethod
+    def get_file_name_stem(self) -> str:
+        pass
+
     def get_target_variables(
         self,
         output_file: OutputFile,
-        variables_dict: dict[str, Variable],
+        variables_dict: dict[InternalName, Variable],
         time_var: Variable | None,
         start_time: datetime | None,
         end_time: datetime | None,
-    ) -> dict[str, Variable] | None:
+    ) -> dict[InternalName, Variable] | None:
         """Retrieves and processes target variables for saving based on the specified output file.
 
         Parameters:
@@ -140,7 +201,7 @@ class SavingStrategy(ABC):
             - Each variable is standardized using the `standardize_variable` method.
             - If a requested variable name is not found, a warning is issued and None is returned.
         """
-        target_variables: dict[str, Variable] = {}
+        target_variables: dict[InternalName, Variable] = {}
         first_call_of_interval = True
 
         # if no variables have been specified, we save all of them
@@ -172,7 +233,7 @@ class SavingStrategy(ABC):
                 target_variables[name_to_save] = var_to_save
             else:
                 msg = f"Could not find target variable {name_to_save}!"
-                logger.info(msg, stacklevel=2)
+                logger.warning(msg, stacklevel=2)
                 if output_file.save_incomplete:
                     target_variables[name_to_save] = Variable(original_unit=u.dimensionless_unscaled, data=np.array([]))
                 else:
@@ -180,86 +241,30 @@ class SavingStrategy(ABC):
 
         return target_variables
 
-    def save_single_file(self, file_path: Path, dict_to_save: dict[str, Any], *, append: bool = False) -> None:  # noqa: C901, PLR0912
-        """Saves variable data to a single file in one of the supported formats (.mat, .pickle, .h5).
+    def get_output_file(
+        self, *, standard_name: StandardName | None = None, internal_name: InternalName | None = None
+    ) -> OutputFile | None:
+        if internal_name is None:
+            if standard_name is None:
+                msg = "Either standard_name or internal_name must be provided!"
+                raise ValueError(msg)
+            internal_name = self.data_standard.get_internal_name(standard_name)
 
-        Parameters:
-            file_path (Path): The path to the file where the dictionary will be saved.
-                              The file extension determines the format.
-            dict_to_save (dict[str, Any]): The dictionary containing variable data to save.
-            append (bool, optional): If True and the file exists, appends data to the existing file (if supported).
-                                     Defaults to False.
+        if internal_name is None:
+            return None
 
-        Raises:
-            NotImplementedError: If the file format specified by the file extension is not supported.
+        for output_file in self.output_files:
+            if internal_name in output_file.names_to_save:
+                return output_file
 
-        Supported formats:
-            - .mat: Saves using scipy.io.savemat.
-            - .pickle: Saves using pickle.dump.
-            - .h5: Saves using h5py, with each key as a dataset (excluding "metadata").
-        """
-        logger.info(f"Saving file {file_path.name}...")
+        return None
 
-        file_path.parent.mkdir(parents=True, exist_ok=True)
-        format_name = file_path.suffix.lower()
+    def get_all_standard_names(self) -> list[StandardName]:
+        all_standard_names: list[StandardName] = []
 
-        if file_path.exists() and append:
-            dict_to_save = self.append_data(file_path, dict_to_save)
-
-        if format_name == ".mat":
-            # Save the dictionary into a .mat file
-            savemat(str(file_path), dict_to_save)
-
-        elif format_name == ".pickle":
-            with file_path.open("wb") as file:
-                pickle.dump(dict_to_save, file)
-
-        elif format_name == ".h5":
-            with h5py.File(file_path, "w") as file:
-                for path, value in dict_to_save.items():
-                    if path == "metadata":
-                        continue
-
-                    path_parts = path.split("/")
-                    groups = path_parts[:-1]
-                    dataset_name = path_parts[-1]
-
-                    curr_hierachy = file
-                    for group in groups:
-                        if group not in curr_hierachy:
-                            curr_hierachy = curr_hierachy.create_group(group)  # type: ignore[reportUnknownVariableType]
-                        else:
-                            curr_hierachy = typing.cast("h5py.Group", curr_hierachy[group])
-
-                    data_set = curr_hierachy.create_dataset(dataset_name, data=value, compression="gzip", shuffle=True)  # type: ignore[reportUnknownMemberType]
-
-                    if path in dict_to_save["metadata"]:
-                        for key, metadata in dict_to_save["metadata"][path].items():
-                            data_set.attrs[key] = metadata
-
-        elif format_name == ".nc":
-            msg = (
-                "Encountered format netCDF (.nc). This format has to be implemented by "
-                "each subclass as no general writer exists for it!"
+        for output_file in self.output_files:
+            all_standard_names.extend(
+                [self.data_standard.get_standard_name(internal_name) for internal_name in output_file.names_to_save]
             )
-            raise NotImplementedError(msg)
 
-        else:
-            msg = f"The '{format_name}' format is not implemented."
-            raise NotImplementedError(msg)
-
-    def append_data(self, file_path: Path, data_dict_to_save: dict[str, Any]) -> dict[str, Any]:
-        """Appends variable data from the specified file to the provided dictionary.
-
-        Args:
-            file_path (Path): The path to the file where data should be appended.
-            data_dict_to_save (dict[str, Any]): The dictionary containing data to append.
-
-        Returns:
-            dict[str, Any]: The updated dictionary after appending data.
-
-        Raises:
-            NotImplementedError: This method must be implemented by subclasses.
-        """
-        msg = "This has to be overwritten for each Strategy!"
-        raise NotImplementedError(msg)
+        return list(set(all_standard_names))

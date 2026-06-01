@@ -3,7 +3,6 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-# ruff: noqa: N802, N806
 
 import logging
 from dataclasses import dataclass
@@ -14,35 +13,19 @@ from pathlib import Path
 from typing import Literal, NamedTuple
 
 import numpy as np
-from astropy import units as u  # type: ignore[reportMissingTypeStubs]
+from astropy import units as u
 from numpy.typing import NDArray
 
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils.construct_maginput import MagInputKeys
 from el_paso.processing.magnetic_field_utils.irbem import Coords, MagFields
 from el_paso.processing.magnetic_field_utils.mag_field_enum import MagneticField
+from el_paso.typing import MagFieldVarTypes
 from el_paso.utils import show_process_bar_for_map_async, timed_function
 
 logger = logging.getLogger(__name__)
 
 FORTRAN_BAD_VALUE = np.float64(-1.0e31)
-
-MagFieldVarTypes = Literal[
-    "B_local",
-    "B_fofl",
-    "B_eq",
-    "B_mirr",
-    "xGEO_eq",
-    "MLT",
-    "R_eq",
-    "MLT_eq",
-    "Lstar",
-    "Lm",
-    "PA_eq",
-    "invMu",
-    "invK",
-    "XJ",
-]
 
 
 def create_var_name(var_type: MagFieldVarTypes, mag_field: MagneticField) -> str:
@@ -185,7 +168,7 @@ def get_magequator(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: Ir
     B_eq[B_eq == FORTRAN_BAD_VALUE] = np.nan
     x_geo_min[x_geo_min == FORTRAN_BAD_VALUE] = np.nan
 
-    B_eq_var = ep.Variable(data=B_eq.astype(np.float64), original_unit=u.nT)  # type:ignore [reportAttributeAccessIssue]
+    B_eq_var = ep.Variable(data=B_eq.astype(np.float64), original_unit=u.nT)
     B_eq_var.metadata.add_processing_note(
         f"Calculated magnetic field at the equator using IRBEM model {irbem_input.magnetic_field} "
         f"with options {irbem_input.irbem_options}."
@@ -227,10 +210,10 @@ def get_magequator(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: Ir
     )
 
     return {
-        create_var_name("B_eq", irbem_input.magnetic_field): B_eq_var,
-        create_var_name("R_eq", irbem_input.magnetic_field): R_eq_var,
-        create_var_name("MLT_eq", irbem_input.magnetic_field): mlt_eq_var,
-        create_var_name("xGEO_eq", irbem_input.magnetic_field): x_geo_var,
+        create_var_name("B_Eq", irbem_input.magnetic_field): B_eq_var,
+        create_var_name("R_Eq", irbem_input.magnetic_field): R_eq_var,
+        create_var_name("MLT_Eq", irbem_input.magnetic_field): mlt_eq_var,
+        create_var_name("xGEO_Eq", irbem_input.magnetic_field): x_geo_var,
     }
 
 
@@ -309,11 +292,11 @@ def get_footpoint_atmosphere(
     results = rs.get()
 
     for i in range(len(datetimes)):
-        B_foot[i] = results[i][0]
+        B_foot[i] = results[i]
 
     B_foot[B_foot == FORTRAN_BAD_VALUE] = np.nan
 
-    var = ep.Variable(data=B_foot.astype(np.float64), original_unit=u.nT)  # type:ignore [reportAttributeAccessIssue]
+    var = ep.Variable(data=B_foot.astype(np.float64), original_unit=u.nT)
     var.metadata.add_processing_note(
         f"Calculated foot point at the atmosphere using IRBEM model {irbem_input.magnetic_field} "
         f"with options {irbem_input.irbem_options}."
@@ -370,7 +353,7 @@ def get_MLT(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: IrbemInpu
 
     mlt_output = mlt_output.astype(np.float64)
 
-    var = ep.Variable(data=mlt_output, original_unit=u.hour)  # type:ignore [reportAttributeAccessIssue]
+    var = ep.Variable(data=mlt_output, original_unit=u.hour)
     var.metadata.add_processing_note(
         f"Calculated MLT using IRBEM model {irbem_input.magnetic_field} with options {irbem_input.irbem_options}."
     )
@@ -435,8 +418,8 @@ def get_local_B_field(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input:
     field_multi_output.bgeo[field_multi_output.bgeo == fortran_bad_value] = np.nan
     field_multi_output.blocal[field_multi_output.blocal == fortran_bad_value] = np.nan
 
-    b_local_var = ep.Variable(data=field_multi_output.blocal, original_unit=u.nT)  # type:ignore [reportAttributeAccessIssue]
-    return {create_var_name("B_local", irbem_input.magnetic_field): b_local_var}
+    b_local_var = ep.Variable(data=field_multi_output.blocal, original_unit=u.nT)
+    return {create_var_name("B_Calc", irbem_input.magnetic_field): b_local_var}
 
 
 def _get_mirror_point_parallel(
@@ -491,7 +474,7 @@ def get_mirror_point(
 
     timestamps = time_var.get_data(ep.units.posixtime)
     x_geo = xgeo_var.get_data(ep.units.RE)
-    pa_local = pa_local_var.get_data(u.deg)  # type:ignore [reportAttributeAccessIssue]
+    pa_local = pa_local_var.get_data(u.deg)
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = ep.IRBEM_SYSAXIS_GEO
@@ -538,7 +521,7 @@ def get_mirror_point(
     # replace bad values with nan
     mirror_point_output[mirror_point_output < 0] = np.nan
 
-    var = ep.Variable(data=mirror_point_output.astype(np.float64), original_unit=u.nT)  # type:ignore [reportAttributeAccessIssue]
+    var = ep.Variable(data=mirror_point_output.astype(np.float64), original_unit=u.nT)
     var.metadata.add_processing_note(
         f"Calculated mirror points using IRBEM model {irbem_input.magnetic_field} "
         f"with options {irbem_input.irbem_options}."
@@ -606,7 +589,7 @@ def get_Lstar(
 
     timestamps = time_var.get_data(ep.units.posixtime)
     x_geo = xgeo_var.get_data(ep.units.RE)
-    pa_local = pa_local_var.get_data(u.deg)  # type:ignore [reportAttributeAccessIssue]
+    pa_local = pa_local_var.get_data(u.deg)
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in timestamps]
     sysaxes = ep.IRBEM_SYSAXIS_GEO
@@ -691,7 +674,7 @@ def get_Lstar(
     )
 
     return {
-        create_var_name("Lm", irbem_input.magnetic_field): Lm_var,
-        create_var_name("Lstar", irbem_input.magnetic_field): Lstar_var,
-        create_var_name("XJ", irbem_input.magnetic_field): XJ_var,
+        create_var_name("L_m", irbem_input.magnetic_field): Lm_var,
+        create_var_name("L_star", irbem_input.magnetic_field): Lstar_var,
+        create_var_name("I", irbem_input.magnetic_field): XJ_var,
     }
