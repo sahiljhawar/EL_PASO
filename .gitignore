@@ -10,6 +10,7 @@ venv
 *.env
 *.png
 *.cdf
+tests/system/data
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,7 +1,12 @@
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache-2.0
+
 #!/bin/bash
 set -e
 
-RECORD_ID="20486612"
+RECORD_ID="20486833"
 OUTPUT_DIR="./tests/system/"
 API_URL="https://zenodo.org/api/records/${RECORD_ID}"
 

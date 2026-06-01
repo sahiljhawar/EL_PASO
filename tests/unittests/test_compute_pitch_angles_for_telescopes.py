@@ -11,6 +11,7 @@ import el_paso as ep
 from el_paso.processing import compute_pitch_angles_for_telescopes
 
 
+@pytest.mark.basic
 def test_goes_pitch_angles_basic() -> None:
 
     b_brf = np.array([[15.788571, -89.67072 , 13.318663 ],

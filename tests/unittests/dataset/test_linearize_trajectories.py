@@ -17,7 +17,7 @@ from el_paso.dataset.linearize_trajectories import _linearize_trajectories
 def test_linearize_trajectories_monotonicity():
     """Verify that the resulting x-axis is strictly increasing even with inbound segments."""
     distance = np.array([0.0, 5.0, 10.0, 7.0, 3.0, 0.0])
-    time = np.asarray([datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=i) for i in range(len(distance))])
+    time = [datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(minutes=i) for i in range(len(distance))]
 
     trajectories = _identify_orbits(time, distance, 1, apply_smoothing=False)
 
@@ -33,7 +33,7 @@ def test_linearize_trajectories_abs_sin():
     """Test with a more complex rectified sine wave."""
     x = np.arange(0, 3 * np.pi, 3 * np.pi / 100)
     distance = np.abs(np.sin(x))
-    time = np.asarray([datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=i) for i in range(len(distance))])
+    time = [datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=i) for i in range(len(distance))]
 
     trajectories = _identify_orbits(time, distance, 1, apply_smoothing=False)
 
@@ -48,7 +48,7 @@ def test_linearize_trajectories_abs_sin():
 def test_linearize_trajectories_with_nans():
     """Ensure the interpolation logic handles NaNs in the input distance."""
     distance = np.array([1.0, np.nan, 3.0, 4.0])
-    time = np.asarray([datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=i) for i in range(4)])
+    time = [datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=i) for i in range(4)]
 
     trajectories = [Trajectory(0, 3, "outbound")]
 
@@ -62,7 +62,7 @@ def test_linearize_trajectories_with_nans():
 def test_linearize_trajectories_single_point():
     """Edge case: ensure it handles very short trajectories without crashing."""
     distance = np.array([1.0])
-    time = np.asarray([datetime(2026, 1, 1, tzinfo=timezone.utc)])
+    time = [datetime(2026, 1, 1, tzinfo=timezone.utc)]
     trajectories = [Trajectory(0, 0, "outbound")]
 
     lin_x, _ = _linearize_trajectories(time, distance, trajectories)
@@ -75,7 +75,7 @@ def test_linearize_trajectories_single_point():
 def test_linearize_trajectories_visual() -> None:
     x = np.arange(0, 3 * np.pi, 3 * np.pi / 200)
     distance = np.abs(np.sin(x))
-    time = np.asarray([datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=i) for i in range(len(distance))])
+    time = [datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=i) for i in range(len(distance))]
 
     trajectories = _identify_orbits(time, distance, 1, apply_smoothing=False)
 
@@ -93,7 +93,7 @@ def test_linearize_trajectories_visual() -> None:
 def test_linearize_trajectories_visual_with_noise() -> None:
     x = np.arange(0, 3 * np.pi, 3 * np.pi / 100)
     distance = np.abs(np.sin(x)) + np.random.Generator(np.random.MT19937(42)).normal(0, 0.01, 100)
-    time = np.asarray([datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=i) for i in range(len(distance))])
+    time = [datetime(2026, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=i) for i in range(len(distance))]
 
     trajectories = _identify_orbits(time, distance, 20, apply_smoothing=False)
 

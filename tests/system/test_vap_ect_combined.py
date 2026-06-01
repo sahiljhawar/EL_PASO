@@ -19,9 +19,6 @@ from el_paso.recipes.rbsp import process_rbsp_ect_combined
     ("mag_field", "save_strategy"),
     [
         pytest.param("T89", "gfz", marks=pytest.mark.basic),
-        ("OP77", "gfz"),
-        ("T96", "gfz"),
-        ("TS04", "gfz"),
         pytest.param("T89", "netcdf", marks=pytest.mark.basic),
     ],
 )

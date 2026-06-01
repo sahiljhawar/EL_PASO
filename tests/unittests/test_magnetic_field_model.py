@@ -16,6 +16,7 @@ mag_field_list = ["OP77", "T89", "T01s", "TS04"]
 
 
 @pytest.mark.parametrize("mag_field", mag_field_list)
+@pytest.mark.basic
 def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     true_data = {
         "OP77": (92.3, 97.27, 106.77),
@@ -40,19 +41,18 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     xgeo_var = ep.Variable(data=xgeo_data, original_unit=ep.units.RE)
 
     variables_to_compute: ep.processing.VariableRequest = [
-        ("B_local", mag_field),
+        ("B_Calc", mag_field),
     ]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=time_var,
         xgeo_var=xgeo_var,
         variables_to_compute=variables_to_compute,
-        irbem_lib_path=str(Path(__file__).parent.parent.parent / "IRBEM" / "libirbem.so"),
         irbem_options=[1, 1, 4, 4, 0],
         num_cores=12,
     )
 
-    mag_field_data = magnetic_field_variables["B_local_" + mag_field].get_data("nT")
+    mag_field_data = magnetic_field_variables["B_Calc_" + mag_field].get_data("nT")
     min_value = np.round(mag_field_data.min(), 2)
     mean_value = np.round(mag_field_data.mean(), 2)
     max_value = np.round(mag_field_data.max(), 2)
@@ -61,7 +61,7 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     assert mean_value == true_data[mag_field][1]
     assert max_value == true_data[mag_field][2]
 
-
+@pytest.mark.basic
 def test_mlt_mlt_eq_equal():
 
     start_time = datetime(2024, 5, 10, 16, tzinfo=timezone.utc)
@@ -72,7 +72,7 @@ def test_mlt_mlt_eq_equal():
 
     variables_to_compute: ep.processing.VariableRequest = [
         ("MLT", "OP77"),
-        ("MLT_eq", "OP77"),
+        ("MLT_Eq", "OP77"),
     ]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
@@ -83,4 +83,4 @@ def test_mlt_mlt_eq_equal():
         num_cores=12,
     )
 
-    assert np.round(magnetic_field_variables["MLT_OP77"].get_data()) == np.round(magnetic_field_variables["MLT_eq_OP77"].get_data())
+    assert np.round(magnetic_field_variables["MLT_OP77"].get_data()) == np.round(magnetic_field_variables["MLT_Eq_OP77"].get_data())
