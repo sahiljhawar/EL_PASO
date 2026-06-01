@@ -16,6 +16,7 @@ mag_field_list = ["OP77", "T89", "T01s", "TS04"]
 
 
 @pytest.mark.parametrize("mag_field", mag_field_list)
+@pytest.mark.basic
 def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     true_data = {
         "OP77": (92.3, 97.27, 106.77),
@@ -40,7 +41,7 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     xgeo_var = ep.Variable(data=xgeo_data, original_unit=ep.units.RE)
 
     variables_to_compute: ep.processing.VariableRequest = [
-        ("B_local", mag_field),
+        ("B_Calc", mag_field),
     ]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
@@ -72,7 +73,7 @@ def test_mlt_mlt_eq_equal():
 
     variables_to_compute: ep.processing.VariableRequest = [
         ("MLT", "OP77"),
-        ("MLT_eq", "OP77"),
+        ("MLT_Eq", "OP77"),
     ]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
