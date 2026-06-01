@@ -48,12 +48,11 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
         time_var=time_var,
         xgeo_var=xgeo_var,
         variables_to_compute=variables_to_compute,
-        irbem_lib_path=str(Path(__file__).parent.parent.parent / "IRBEM" / "libirbem.so"),
         irbem_options=[1, 1, 4, 4, 0],
         num_cores=12,
     )
 
-    mag_field_data = magnetic_field_variables["B_local_" + mag_field].get_data("nT")
+    mag_field_data = magnetic_field_variables["B_Calc_" + mag_field].get_data("nT")
     min_value = np.round(mag_field_data.min(), 2)
     mean_value = np.round(mag_field_data.mean(), 2)
     max_value = np.round(mag_field_data.max(), 2)
@@ -62,7 +61,7 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
     assert mean_value == true_data[mag_field][1]
     assert max_value == true_data[mag_field][2]
 
-
+@pytest.mark.basic
 def test_mlt_mlt_eq_equal():
 
     start_time = datetime(2024, 5, 10, 16, tzinfo=timezone.utc)
@@ -84,4 +83,4 @@ def test_mlt_mlt_eq_equal():
         num_cores=12,
     )
 
-    assert np.round(magnetic_field_variables["MLT_OP77"].get_data()) == np.round(magnetic_field_variables["MLT_eq_OP77"].get_data())
+    assert np.round(magnetic_field_variables["MLT_OP77"].get_data()) == np.round(magnetic_field_variables["MLT_Eq_OP77"].get_data())
