@@ -51,10 +51,6 @@ along with IRBEM-LIB.  If not, see <http://www.gnu.org/licenses/>.
 ***************************************************************************
 """
 
-# Physical constants
-Re = 6371  # km
-c = 3.0e8  # m/s
-
 # External magnetic field model look up table.
 EXT_MODELS = [
     "None",

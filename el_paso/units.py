@@ -11,7 +11,6 @@ from typing import TYPE_CHECKING
 import cdflib
 import numpy as np
 from astropy import units as u
-from astropy.constants import R_earth  # ty:ignore[unresolved-import]
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -31,7 +30,7 @@ datetime = u.def_unit("datetime")
 J2000_EPOCH = dt.datetime(2000, 1, 1, 12, 0, 0, tzinfo=dt.timezone.utc)
 
 # Position units
-RE = u.def_unit("RE", R_earth)
+RE = u.def_unit("RE", 6371.2 * u.km)
 
 # -----------------------------------------------------------------------------
 # 2. Time Conversion Functions
