@@ -29,13 +29,13 @@ class GFZStandard(DataStandard[GFZVarNames]):
             ),
             "Position_geo_alt": VariableInfo[GFZVarNames](
                 "geo_alt", "Altitude in geographic cartesian coordinates.", u.km, ["Epoch"]
-            ), 
+            ),
             "Position_geo_lat": VariableInfo[GFZVarNames](
                 "geo_lat", "Latitude in geographic cartesian coordinates.", u.deg, ["Epoch"]
-            ), 
+            ),
             "Position_geo_lon": VariableInfo[GFZVarNames](
                 "geo_lon", "Longitude in geographic cartesian coordinates.", u.deg, ["Epoch"]
-            ), 
+            ),
             "Energy_FEDU": VariableInfo[GFZVarNames](
                 "energy_channels", "Central energy of measured flux.", u.MeV, ["Epoch", "Energy_FEDU"]
             ),

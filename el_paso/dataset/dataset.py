@@ -153,7 +153,7 @@ class DataSet:
         if levenstein_info["min_distance"] <= 2:
             msg = f"Cannot set attribute '{name}'. Maybe you meant '{levenstein_info['var_name']}'?"
         else:
-            msg = f"Cannot set attribute '{name}'. It is not part of {self.saving_strategy.data_standard}."
+            msg = f"Cannot set attribute '{name}'. It is not part of the saving strategy: {self.saving_strategy}."
 
         raise AttributeError(msg)
 

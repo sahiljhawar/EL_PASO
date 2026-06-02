@@ -241,8 +241,8 @@ def process_ept_electron_fluxes(  # noqa: D103
         strategy = ep.saving_strategies.MonthlyRBStrategy(
             base_data_path=Path(processed_data_path),
             mission="PROBAV",
-            satellite="probav_EPT",
-            instrument="PROBAV",
+            satellite="probav",
+            instrument="ept",
             mag_field="T89",
             file_format=".nc",
             data_standard=ep.data_standards.GFZStandard(),
