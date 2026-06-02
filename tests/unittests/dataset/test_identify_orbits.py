@@ -16,7 +16,7 @@ def test_identify_orbits_clean_abs_sin():
     distance = np.abs(np.sin(x))
     time = [datetime(2026, 1, 1) + timedelta(seconds=i) for i in range(len(x))]  # noqa: DTZ001
 
-    orbits = _identify_orbits(time, distance, minimal_distance=3, apply_smoothing=False)  # ty:ignore[invalid-argument-type]
+    orbits = _identify_orbits(time, distance, minimal_distance=3, apply_smoothing=False)
 
     assert len(orbits) == 6
 
@@ -51,6 +51,6 @@ def test_identify_orbits_noisy_all_extrema() -> None:
     distance = np.abs(np.sin(x)) + np.random.normal(0, 0.01, 100)  # noqa: NPY002
     time = [datetime(2026, 1, 1) + timedelta(seconds=i) for i in range(100)]  # noqa: DTZ001
 
-    orbits = _identify_orbits(time, distance, 20, apply_smoothing=True)  # ty:ignore[invalid-argument-type]
+    orbits = _identify_orbits(time, distance, 20, apply_smoothing=True)
 
     assert len(orbits) == 6
