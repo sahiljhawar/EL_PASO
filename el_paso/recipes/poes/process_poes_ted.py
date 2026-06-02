@@ -29,7 +29,7 @@ def process_poes_ted_electron(
     *,
     calculate_Lm_Lstar: bool = False,
 ) -> None:
-    data_path_stem = f"{raw_data_path}/YYYY/MM/{satellite_str}/"
+    data_path_stem = f"{raw_data_path}/POES/{satellite_str}/YYYY/MM/"
     url = f"https://spdf.gsfc.nasa.gov/pub/data/noaa/{satellite_str}/sem2_fluxes-2sec/YYYY/"
     file_name_stem = satellite_str + "_poes-sem2_fluxes-2sec_YYYYMMDD_.{3}.cdf"
 

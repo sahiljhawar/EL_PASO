@@ -195,7 +195,6 @@ def process_ept_electron_fluxes(  # noqa: D103
         ("MLT_Eq", "T89"),
         ("R_Eq", "T89"),
         ("Alpha_Eq", "T89"),
-        ("L_star", "T89"),
         ("L_m", "T89"),
     ]
 
@@ -206,7 +205,7 @@ def process_ept_electron_fluxes(  # noqa: D103
         pa_local_var=variables["PA_local"],
         particle_species="electron",
         variables_to_compute=variables_to_compute,
-        irbem_options=[1, 1, 4, 4, 0],
+        irbem_options=[0, 1, 4, 4, 0],
         num_cores=num_cores,
     )
 
@@ -221,7 +220,6 @@ def process_ept_electron_fluxes(  # noqa: D103
         "R_Eq": magnetic_field_variables["R_Eq_T89"],
         "MLT": magnetic_field_variables["MLT_Eq_T89"],
         "L_m": magnetic_field_variables["L_m_T89"],
-        "L_star": magnetic_field_variables["L_star_T89"],
         "B_Calc": magnetic_field_variables["B_Calc_T89"],
         "B_Eq": magnetic_field_variables["B_Eq_T89"],
         "Position": variables["xGEO"],
@@ -231,8 +229,8 @@ def process_ept_electron_fluxes(  # noqa: D103
         strategy = ep.saving_strategies.GFZStrategy(
             processed_data_path,
             mission="PROBAV",
-            satellite="probav_EPT",
-            instrument="PROBAV",
+            satellite="probav",
+            instrument="ept",
             mag_field="T89",
             data_standard=ep.data_standards.GFZStandard(),
         )

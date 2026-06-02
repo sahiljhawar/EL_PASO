@@ -647,7 +647,7 @@ def get_Lstar(
     # replace bad values with nan
     for arr in [Lm, Lstar, xj]:
         arr[arr < 0] = np.nan
-        if not np.any(np.isfinite(arr)):
+        if not np.any(np.isfinite(arr)) and irbem_input.irbem_options[0] != 0:
             msg = (
                 "Lstar calculation failed! All points are NaNs! Hints for debugging:\n"
                 "1) The calculation can fail for very low pitch-angles, where particles"

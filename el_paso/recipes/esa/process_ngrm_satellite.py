@@ -47,7 +47,7 @@ def process_ngrm_electron_fluxes(  # noqa: D103
     client_secret: str | None = None,
     save_strategy: Literal["gfz", "netcdf", "both"] = "netcdf",
 ) -> None:
-    data_path_stem = f"{raw_data_path}/{satellite}/YYYY/MM/"
+    data_path_stem = f"{raw_data_path}/NGRM/{satellite}/YYYY/MM/"
     file_name_stem = f"{satellite}_ngrm_YYYYMMDD_L1d.csv"
 
     if client_id is None:
@@ -245,9 +245,9 @@ def process_ngrm_electron_fluxes(  # noqa: D103
     if save_strategy in ("gfz", "both"):
         strategy = ep.saving_strategies.GFZStrategy(
             processed_data_path,
-            mission="NGRM",
+            mission="ESA",
             satellite=f"{satellite.lower()}_NGRM",
-            instrument="NGRM",
+            instrument="ngrm",
             mag_field="T89",
             data_standard=ep.data_standards.GFZStandard(),
         )
@@ -255,9 +255,9 @@ def process_ngrm_electron_fluxes(  # noqa: D103
     if save_strategy in ("netcdf", "both"):
         strategy = ep.saving_strategies.MonthlyRBStrategy(
             base_data_path=Path(processed_data_path),
-            mission="NGRM",
-            satellite=f"{satellite.lower()}_NGRM",
-            instrument="NGRM",
+            mission="ESA",
+            satellite=f"{satellite.lower()}",
+            instrument="ngrm",
             mag_field="T89",
             file_format=".nc",
             data_standard=ep.data_standards.GFZStandard(),

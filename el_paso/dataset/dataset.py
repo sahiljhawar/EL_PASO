@@ -253,21 +253,7 @@ class DataSet:
         return self.saving_strategy.satellite + " " + self.saving_strategy.instrument
 
     def _load_variable(self, requested_name: str) -> None:
-        """Load variable from .mat, or .nc files."""
-        # Re-entrancy guard: if this variable is already being loaded further up
-        # the call stack, return immediately to break the cycle.
-        currently_loading: set[str] = self.__dict__.setdefault("_currently_loading", set())
-        if requested_name in currently_loading:
-            return
-        currently_loading.add(requested_name)
 
-        try:
-            self._load_variable_impl(requested_name)
-        finally:
-            currently_loading.discard(requested_name)
-
-    def _load_variable_impl(self, requested_name: str) -> None:
-        """Internal implementation of variable loading (called by _load_variable)."""
         loaded_var_arrs: dict[str, NDArray[np.number]] = {}
         var_names_stored: list[str] = []
         original_requested_name = requested_name
@@ -318,7 +304,7 @@ class DataSet:
 
             time_key = self.saving_strategy.data_standard.get_standard_name("Epoch")
 
-            # 4. Process Datetimes
+            # 3. Process Datetimes
             raw_times = file_content[time_key]
 
             time_unit = self.saving_strategy.data_standard.variable_infos["Epoch"].unit
@@ -330,7 +316,7 @@ class DataSet:
             file_content["datetime"] = datetimes  # ty:ignore[invalid-assignment]
             correct_time_idx = (datetimes >= self._start_time) & (datetimes <= self._end_time)
 
-            # 5. Filter and Join Arrays
+            # 4. Filter and Join Arrays
             for key, var_arr in file_content.items():
                 # Skip non-numeric metadata (excluding our new datetime)
                 if key == "metadata":
@@ -364,7 +350,7 @@ class DataSet:
                 if key not in var_names_stored:
                     var_names_stored.append(key)
 
-        # 6. Final Assignment to Self
+        # 5. Final Assignment to Self
         if requested_name not in var_names_stored:
             setattr(self, requested_name, np.asarray([]))
 
@@ -375,6 +361,12 @@ class DataSet:
             # Assign the data array onto the dataset
             val = list(loaded_var_arrs[var_name]) if var_name == "datetime" else loaded_var_arrs[var_name]
             setattr(self, var_name, val)
+
+        # assign all vars, which are not present in the saved file, as empty
+        for internal_name in output_file.names_to_save:
+            standard_name = self.saving_strategy.data_standard.get_standard_name(internal_name)
+            if standard_name not in var_names_stored:
+                setattr(self, standard_name, np.asarray([]))
 
     def get_loaded_variables(self) -> list[str]:
         """Get a list of currently loaded variable names."""

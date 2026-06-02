@@ -33,7 +33,7 @@ def process_dmsp_ssj_electrons(
 ) -> None:
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
-    data_path_stem = f"{raw_data_path}/YYYY/MM/{sat_str}/"
+    data_path_stem = f"{raw_data_path}/DMSP/{sat_str}/YYYY/MM/"
 
     ssm_vars = _get_ssm_variables(sat_str, data_path_stem, start_time, end_time)
     ssj_vars = _get_ssj_variables(sat_str, data_path_stem, start_time, end_time)

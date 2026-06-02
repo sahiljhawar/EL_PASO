@@ -15,6 +15,7 @@ from astropy import units as u
 
 import el_paso as ep
 
+
 def process_rbsp_hope_electrons(  # noqa: D103
     start_time: datetime,
     end_time: datetime,
