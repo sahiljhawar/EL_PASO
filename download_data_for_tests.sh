@@ -6,7 +6,7 @@
 #!/bin/bash
 set -e
 
-RECORD_ID="20486833"
+RECORD_ID="20506338"
 OUTPUT_DIR="./tests/system/"
 API_URL="https://zenodo.org/api/records/${RECORD_ID}"
 

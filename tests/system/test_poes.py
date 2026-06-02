@@ -1,0 +1,145 @@
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache-2.0
+
+import shutil
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Literal
+
+import pytest
+
+import el_paso as ep
+from el_paso.dataset import DataSet
+from el_paso.recipes.poes import process_poes_meped_electron, process_poes_ted_electron
+
+
+@pytest.mark.basic
+def test_poes_ted_electron(
+    tmpdir: Path,
+    *,
+    renew_solution: bool,
+) -> None:
+    start_time = datetime(2013, 9, 8, tzinfo=timezone.utc)
+    end_time = start_time + timedelta(hours=4)
+
+    processed_data_path = tmpdir
+
+    process_poes_ted_electron(
+        start_time=start_time,
+        end_time=end_time,
+        satellite_str="metop1",
+        raw_data_path=Path(__file__).parent / "data" / "raw",
+        processed_data_path=processed_data_path,
+        num_cores=32,
+        calculate_Lm_Lstar=True,
+    )
+
+    start_date = start_time.replace(day=1)
+    end_date = end_time.replace(day=30)
+
+    out_path = (
+        processed_data_path
+        / "POES"
+        / "metop1"
+        / f"metop1_ted_{start_date:%Y%m%d}to{end_date:%Y%m%d}_T89.nc"
+    )
+    assert out_path.exists()
+
+    if renew_solution:
+        shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "POES" / "metop1")
+
+    poes_proc = DataSet(
+        start_time=start_time,
+        end_time=end_time,
+        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+            tmpdir,
+            "POES",
+            "metop1",
+            "ted",
+            "T89",
+            data_standard=ep.data_standards.GFZStandard(),
+            file_format="nc",
+        ),
+    )
+
+    poes_true = DataSet(
+        start_time=start_time,
+        end_time=end_time,
+        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+            Path(__file__).parent / "data" / "processed",
+            "POES",
+            "metop1",
+            "ted",
+            "T89",
+            data_standard=ep.data_standards.GFZStandard(),
+            file_format="nc",
+        ),
+    )
+
+    poes_proc.assert_equal(poes_true)
+
+@pytest.mark.basic
+def test_poes_meped_electron(
+    tmpdir: Path,
+    *,
+    renew_solution: bool,
+) -> None:
+    start_time = datetime(2013, 9, 8, tzinfo=timezone.utc)
+    end_time = start_time + timedelta(hours=4)
+
+    processed_data_path = tmpdir
+
+    process_poes_meped_electron(
+        start_time=start_time,
+        end_time=end_time,
+        satellite_str="noaa18",
+        raw_data_path=Path(__file__).parent / "data" / "raw",
+        processed_data_path=processed_data_path,
+        num_cores=32,
+    )
+
+    start_date = start_time.replace(day=1)
+    end_date = end_time.replace(day=30)
+
+    out_path = (
+        processed_data_path
+        / "POES"
+        / "noaa18"
+        / f"noaa18_meped_{start_date:%Y%m%d}to{end_date:%Y%m%d}_T89.nc"
+    )
+    assert out_path.exists()
+
+    if renew_solution:
+        shutil.copy(out_path, Path(__file__).parent / "data" / "processed" / "POES" / "noaa18")
+
+    poes_proc = DataSet(
+        start_time=start_time,
+        end_time=end_time,
+        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+            tmpdir,
+            "POES",
+            "noaa18",
+            "meped",
+            "T89",
+            data_standard=ep.data_standards.GFZStandard(),
+            file_format="nc",
+        ),
+    )
+
+    poes_true = DataSet(
+        start_time=start_time,
+        end_time=end_time,
+        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+            Path(__file__).parent / "data" / "processed",
+            "POES",
+            "noaa18",
+            "meped",
+            "T89",
+            data_standard=ep.data_standards.GFZStandard(),
+            file_format="nc",
+        ),
+    )
+
+    poes_proc.assert_equal(poes_true)

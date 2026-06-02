@@ -1,3 +1,8 @@
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache-2.0
+
 import logging
 from pathlib import Path
 
