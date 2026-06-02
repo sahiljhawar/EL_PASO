@@ -41,6 +41,7 @@ def test_esa_ngrm(
         save_strategy="netcdf",
         client_id=client_id,
         client_secret=client_secret,
+        bin_cadence=timedelta(minutes=5),
     )
 
     start_date = start_time.replace(day=1)
