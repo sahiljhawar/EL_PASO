@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import os
 import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -22,6 +23,9 @@ def test_probav_ept(
     renew_solution: bool,
 ) -> None:
 
+    client_id = os.environ.get("ESA_CLIENT_ID")
+    client_secret = os.environ.get("ESA_CLIENT_SECRET")
+
     start_time = datetime(2017, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(hours=4)
 
@@ -33,7 +37,9 @@ def test_probav_ept(
         raw_data_path=Path(__file__).parent / "data" / "raw",
         processed_data_path=processed_data_path,
         num_cores=32,
-        save_strategy="netcdf"
+        save_strategy="netcdf",
+        client_id=client_id,
+        client_secret=client_secret,
     )
 
     start_date = start_time.replace(day=1)
