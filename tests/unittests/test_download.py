@@ -13,7 +13,6 @@ from astropy import units as u
 import el_paso as ep
 
 
-@pytest.mark.basic
 def test_esa_api(tmp_path: Path):
 
     client_id = os.environ.get("ESA_CLIENT_ID")
