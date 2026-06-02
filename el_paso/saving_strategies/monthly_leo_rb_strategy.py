@@ -11,10 +11,12 @@ class MonthlyLEORBStrategy(ep.typing.MonthlyRBStrategy):
         """Return the standard variable list plus user-defined custom variables."""
         return [
             "FEDU",
+            "FEIU",
             "Epoch",
             "Alpha_Eq",
             "Alpha_Eq_range",
             "Energy_FEDU",
+            "Energy_FEIU",
             "Alpha",
             "Alpha_range",
             "B_Calc",

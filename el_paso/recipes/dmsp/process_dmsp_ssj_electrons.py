@@ -29,7 +29,6 @@ def process_dmsp_ssj_electrons(
     raw_data_path: str | Path,
     start_time: datetime,
     end_time: datetime,
-    save_strategy: Literal["dataorg", "netcdf"] = "netcdf",
     num_cores: int = 32,
 ) -> None:
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
@@ -253,7 +252,7 @@ if __name__ == "__main__":
 
     for sat in satellites:
         process_dmsp_ssj_electrons(
-            sat_str=sat,
+            sat_str=sat,  # ty:ignore[invalid-argument-type]
             raw_data_path="dmsp/raw/",
             processed_data_path="dmsp/processed/",
             start_time=start_time,

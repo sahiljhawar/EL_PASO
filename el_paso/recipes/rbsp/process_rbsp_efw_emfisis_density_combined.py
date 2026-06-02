@@ -94,8 +94,8 @@ def process_efw_emfisis_density_combined(
 
     variables_to_compute: ep.processing.VariableRequest = [
         ("MLT", mag_field),
-        ("R_eq", mag_field),
-        ("xGEO_eq", mag_field),
+        ("R_Eq", mag_field),
+        ("xGEO_Eq", mag_field),
     ]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
@@ -149,6 +149,8 @@ def process_efw_emfisis_density_combined(
             "density_hiss_derived_local": hiss_derived_densities_vars["Density"],
             "density_hiss_derived_eq": hiss_derived_densities_vars["Density_mapped"],
         }
+
+    raise NotImplementedError
 
     saving_strategy = ep.saving_strategies.DensityNetCDFStrategy(
         base_data_path=processed_data_path,
@@ -360,7 +362,7 @@ if __name__ == "__main__":
         process_efw_emfisis_density_combined(
             dt_start,
             dt_end,
-            sat_str,
+            sat_str,  # ty:ignore[invalid-argument-type]
             args.irbem_lib_path,
             "T89",
             raw_data_path=".",

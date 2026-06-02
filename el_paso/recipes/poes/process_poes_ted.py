@@ -15,24 +15,7 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
-
-poes_satellite_literal = Literal[
-    "metop1",
-    "metop2",
-    "metop3",
-    "noaa05",
-    "noaa06",
-    "noaa07",
-    "noaa08",
-    "noaa10",
-    "noaa12",
-    "noaa14",
-    "noaa15",
-    "noaa16",
-    "noaa17",
-    "noaa18",
-    "noaa19",
-]
+from el_paso.recipes.poes import poes_satellite_literal
 
 
 def process_poes_ted_electron(
@@ -45,7 +28,6 @@ def process_poes_ted_electron(
     bin_cadence: timedelta = timedelta(minutes=5),
     *,
     calculate_Lm_Lstar: bool = False,
-    save_strategy: Literal["gfz", "netcdf", "both"] = "netcdf",
 ) -> None:
     data_path_stem = f"{raw_data_path}/YYYY/MM/{satellite_str}/"
     url = f"https://spdf.gsfc.nasa.gov/pub/data/noaa/{satellite_str}/sem2_fluxes-2sec/YYYY/"
@@ -168,7 +150,7 @@ def process_poes_ted_electron(
     ]
 
     if calculate_Lm_Lstar:
-        variables_to_compute.extend([("L_star", "T89"), ("L_m", "T89")])  # pyright: ignore[reportArgumentType]
+        variables_to_compute.extend([("L_star", "T89"), ("L_m", "T89")])  # ty:ignore[invalid-argument-type]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
@@ -202,19 +184,19 @@ def process_poes_ted_electron(
     }
 
     if calculate_Lm_Lstar:
-        variables_to_save |= {"position/T89/Lm": magnetic_field_variables["L_m_T89"],
-                              "position/T89/Lstar": magnetic_field_variables["L_star_T89"]}
+        variables_to_save |= {"L_m": magnetic_field_variables["L_m_T89"],
+                              "L_star": magnetic_field_variables["L_star_T89"]}
 
     saving_strategy = ep.saving_strategies.MonthlyLEORBStrategy(
         base_data_path=Path(processed_data_path),
         mission="POES",
-        satellite=sat_str,
+        satellite=satellite_str,
         instrument="TED",
         mag_field="T89",
         data_standard=ep.data_standards.GFZStandard(),
     )
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)  # ty:ignore[invalid-argument-type]
 
 
 if __name__ == "__main__":
@@ -241,19 +223,13 @@ if __name__ == "__main__":
     dt_start = dateutil.parser.parse(args.start_time)
     dt_end = dateutil.parser.parse(args.end_time)
 
-    #    with tempfile.TemporaryDirectory() as tmpdir:
-    # for sat_str in get_args(poes_satellite_literal):
     for sat_str in ["noaa15"]:
-        print(f"Processing {sat_str}!")
-        # try:
         process_poes_ted_electron(
             start_time=dt_start,
             end_time=dt_end,
-            satellite_str=sat_str,
+            satellite_str=sat_str,  # ty:ignore[invalid-argument-type]
             raw_data_path=".",
             processed_data_path=".",
             num_cores=64,
             bin_cadence=timedelta(seconds=10),
         )
-        # except:
-        #     continue

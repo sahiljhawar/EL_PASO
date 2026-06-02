@@ -56,6 +56,7 @@ InternalName: TypeAlias = Literal[
     "FEDO",
     "FEIU",
     "Energy_FEDU",
+    "Energy_FEIU",
     "Epoch",
     "Alpha",
     "Alpha_range",

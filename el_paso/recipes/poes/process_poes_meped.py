@@ -15,24 +15,7 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
-
-poes_satellite_literal = Literal[
-    "metop1",
-    "metop2",
-    "metop3",
-    "noaa05",
-    "noaa06",
-    "noaa07",
-    "noaa08",
-    "noaa10",
-    "noaa12",
-    "noaa14",
-    "noaa15",
-    "noaa16",
-    "noaa17",
-    "noaa18",
-    "noaa19",
-]
+from el_paso.recipes.poes import poes_satellite_literal
 
 
 def process_poes_meped_electron(  # noqa: D103
@@ -43,7 +26,6 @@ def process_poes_meped_electron(  # noqa: D103
     end_time: datetime,
     num_cores: int = 32,
     bin_cadence: timedelta = timedelta(minutes=5),
-    save_strategy: Literal["gfz", "netcdf", "both"] = "netcdf",
 ) -> None:
     data_path_stem = f"{raw_data_path}/YYYY/MM/{satellite_str}/"
     url = f"https://spdf.gsfc.nasa.gov/pub/data/noaa/{satellite_str}/sem2_fluxes-2sec/YYYY/"
@@ -179,8 +161,8 @@ def process_poes_meped_electron(  # noqa: D103
 
     variables_to_save = {
         "Epoch": binned_time_var,
-        "FEDU": variables["FEDU"],
-        "Energy_FEDU": variables["Energy"],
+        "FEIU": variables["FEIU"],
+        "Energy_FEIU": variables["Energy"],
         "Alpha": variables["PA_local"],
         "Alpha_Eq": magnetic_field_variables["Alpha_Eq_T89"],
         "R_Eq": magnetic_field_variables["R_Eq_T89"],
@@ -193,13 +175,13 @@ def process_poes_meped_electron(  # noqa: D103
     saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
         base_data_path=Path(processed_data_path),
         mission="POES",
-        satellite=sat_str,
+        satellite=satellite_str,
         instrument="MEPED",
         mag_field="T89",
         data_standard=ep.data_standards.GFZStandard(),
     )
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)  # ty:ignore[invalid-argument-type]
 
 
 if __name__ == "__main__":
@@ -227,19 +209,13 @@ if __name__ == "__main__":
     dt_start = dateutil.parser.parse(args.start_time)
     dt_end = dateutil.parser.parse(args.end_time)
 
-    #    with tempfile.TemporaryDirectory() as tmpdir:
-    # for sat_str in get_args(poes_satellite_literal):
     for sat_str in ("noaa15"):
-        print(f"Processing {sat_str}!")
-        # try:
         process_poes_meped_electron(
             start_time=dt_start,
             end_time=dt_end,
-            satellite_str=sat_str,
+            satellite_str=sat_str,  # ty:ignore[invalid-argument-type]
             raw_data_path=".",
             processed_data_path=".",
             num_cores=64,
             bin_cadence=timedelta(seconds=10),
         )
-        # except:
-        #     continue

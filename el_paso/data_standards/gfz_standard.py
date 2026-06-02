@@ -37,12 +37,21 @@ class GFZStandard(DataStandard[GFZVarNames]):
                 "geo_lon", "Longitude in geographic cartesian coordinates.", u.deg, ["Epoch"]
             ),
             "Energy_FEDU": VariableInfo[GFZVarNames](
-                "energy_channels", "Central energy of measured flux.", u.MeV, ["Epoch", "Energy_FEDU"]
+                "energy_channels", "Central energy of measured differential flux.", u.MeV, ["Epoch", "Energy_FEDU"]
+            ),
+            "Energy_FEIU": VariableInfo[GFZVarNames](
+                "energy_channels", "Central energy of measured integral flux.", u.MeV, ["Epoch", "Energy_FEDU"]
             ),
             "FEDU": VariableInfo[GFZVarNames](
                 "Flux",
-                "Flux of particles. Can be uni/omni-directional and differential/integral.",
+                "Electron differential unidirectional flux.",
                 (u.cm**2 * u.s * u.sr * u.keV) ** (-1),
+                ["Epoch", "Energy_FEDU", "Alpha"],
+            ),
+            "FEIU": VariableInfo[GFZVarNames](
+                "Flux",
+                "Electron integral unidirectional flux.",
+                (u.cm**2 * u.s * u.sr) ** (-1),
                 ["Epoch", "Energy_FEDU", "Alpha"],
             ),
             "Alpha": VariableInfo[GFZVarNames](
