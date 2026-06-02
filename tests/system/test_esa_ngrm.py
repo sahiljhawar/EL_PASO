@@ -38,7 +38,7 @@ def test_esa_ngrm(
         raw_data_path=Path(__file__).parent / "data" / "raw",
         processed_data_path=processed_data_path,
         num_cores=32,
-        save_strategy="netcdf"
+        save_strategy="netcdf",
         client_id=client_id,
         client_secret=client_secret,
     )
