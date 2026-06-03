@@ -60,4 +60,4 @@ __all__ = [
     "utils",
 ]
 
-__version__ = "1.0.3rc0"
+__version__ = "2.0.0"
