@@ -114,6 +114,10 @@ plugins:
 
   - search
   - mkdocs-jupyter:
+      include:
+        - "tutorials/*.ipynb"
+      ignore:
+        - "**/*.md"
       execute: true # run the notebook on build
       include_source: false # optionally include source or not
       allow_errors: true # fail build if execution errors
