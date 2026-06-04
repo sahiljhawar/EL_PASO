@@ -13,6 +13,7 @@ import os
 import re
 import shutil
 import typing
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from functools import cache
 from pathlib import Path
@@ -25,6 +26,50 @@ from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get
 
 ERROR_NOT_FOUND = 404
 logger = logging.getLogger(__name__)
+
+
+def _download_single_step(
+    curr_time: datetime,
+    next_time: datetime,
+    save_path: Path,
+    method: str,
+    download_url: str,
+    file_name_stem: str,
+    download_arguments_prefixes: str,
+    download_arguments_suffixes: str,
+    authentication_info: tuple[str, str],
+    rename_file_name_stem: str | None,
+    *,
+    skip_existing: bool,
+    sort_raw_files_by_time: bool,
+) -> None:
+    """Worker function to handle a single time chunk download."""
+    match method:
+        case "request":
+            _requests_download(
+                curr_time,
+                save_path,
+                download_url,
+                file_name_stem,
+                authentication_info,
+                rename_file_name_stem,
+                skip_existing=skip_existing,
+                sort_raw_files_by_time=sort_raw_files_by_time,
+            )
+        case "wget":
+            _wget_download(
+                curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes
+            )
+        case "esa_swe":
+            _esa_swe_download(
+                authentication_info,
+                download_url,
+                start_time=curr_time,
+                end_time=next_time,
+                save_path=save_path,
+                rename_file_name_stem=rename_file_name_stem,
+                skip_existing=skip_existing,
+            )
 
 
 @timed_function()
@@ -43,6 +88,7 @@ def download(
     *,
     sort_raw_files_by_time: bool = False,
     skip_existing: bool = True,
+    max_threads: int = 4,
 ) -> None:
     """Download satellite data files within a specified time range and cadence.
 
@@ -72,6 +118,7 @@ def download(
         sort_raw_files_by_time (bool, optional):
                 If True, creates subdirectories for each year and month (e.g., 'YYYY/MM/').
                 This helps organize a large number of downloaded files. Defaults to False.
+        max_threads (int, optional): Maximum number of threads used for downloading. Defaults to 4.
 
     Raises:
         NotImplementedError: If "monthly" cadence or an unsupported cadence is specified.
@@ -86,40 +133,44 @@ def download(
     save_path = Path(save_path)
 
     curr_time = start_time
+    tasks = []
 
     while curr_time < end_time:
-        next_time = _get_next_time(curr_time, file_cadence)
-        next_time = end_time if next_time is None else min(next_time, end_time)
+            next_time = _get_next_time(curr_time, file_cadence)
+            next_time = end_time if next_time is None else min(next_time, end_time)
 
-        match method:
-            case "request":
-                _requests_download(
-                    curr_time,
-                    save_path,
-                    download_url,
-                    file_name_stem,
-                    authentication_info,
-                    rename_file_name_stem,
-                    skip_existing=skip_existing,
-                    sort_raw_files_by_time=sort_raw_files_by_time,
-                )
-            case "wget":
-                _wget_download(
-                    curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes
-                )
-            case "esa_swe":
-                _esa_swe_download(
-                    authentication_info,
-                    download_url,
-                    start_time=curr_time,
-                    end_time=next_time,
-                    save_path=save_path,
-                    rename_file_name_stem=rename_file_name_stem,
-                    skip_existing=skip_existing,
-                )
+            tasks.append((curr_time, next_time))
+            curr_time = next_time
 
-        curr_time = next_time
+    if len(tasks) > 1:
+        logger.info(f"Starting parallel download with {max_threads} threads for {len(tasks)} files...")
 
+    with ThreadPoolExecutor(max_workers=max_threads) as executor:
+        future_to_time = {
+            executor.submit(
+                _download_single_step,
+                curr_time=t_start,
+                next_time=t_end,
+                save_path=save_path,
+                method=method,
+                download_url=download_url,
+                file_name_stem=file_name_stem,
+                download_arguments_prefixes=download_arguments_prefixes,
+                download_arguments_suffixes=download_arguments_suffixes,
+                authentication_info=authentication_info,
+                rename_file_name_stem=rename_file_name_stem,
+                skip_existing=skip_existing,
+                sort_raw_files_by_time=sort_raw_files_by_time,
+            ): t_start
+            for t_start, t_end in tasks
+        }
+
+        for future in as_completed(future_to_time):
+            t_start = future_to_time[future]
+            try:
+                future.result()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning(f"Download for date {t_start} generated an exception: {exc}")
 
 def _get_next_time(curr_time: datetime, file_cadence: Literal["daily", "monthly", "single_file"]) -> datetime | None:
     match file_cadence:
