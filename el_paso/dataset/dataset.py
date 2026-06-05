@@ -322,13 +322,9 @@ class DataSet:
                 if key == "metadata":
                     if isinstance(var_arr, dict):
                         for metadata_key, metadata_value in var_arr.items():
-                            try:
-                                metadata_key_to_set = self.saving_strategy.data_standard.get_standard_name(metadata_key)
-                            except KeyError:
-                                metadata_key_to_set = metadata_key
                             setattr(
                                 self.metadata,
-                                metadata_key_to_set,
+                                metadata_key,
                                 metadata_value,
                             )
                     continue
