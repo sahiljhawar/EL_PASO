@@ -57,9 +57,7 @@ def _download_single_step(
                 sort_raw_files_by_time=sort_raw_files_by_time,
             )
         case "wget":
-            _wget_download(
-                curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes
-            )
+            _wget_download(curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes)
         case "esa_swe":
             _esa_swe_download(
                 authentication_info,
@@ -136,11 +134,11 @@ def download(
     tasks = []
 
     while curr_time < end_time:
-            next_time = _get_next_time(curr_time, file_cadence)
-            next_time = end_time if next_time is None else min(next_time, end_time)
+        next_time = _get_next_time(curr_time, file_cadence)
+        next_time = end_time if next_time is None else min(next_time, end_time)
 
-            tasks.append((curr_time, next_time))
-            curr_time = next_time
+        tasks.append((curr_time, next_time))
+        curr_time = next_time
 
     if len(tasks) > 1:
         logger.info(f"Starting parallel download with {max_threads} threads for {len(tasks)} files...")
@@ -171,6 +169,7 @@ def download(
                 future.result()
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"Download for date {t_start} generated an exception: {exc}")
+
 
 def _get_next_time(curr_time: datetime, file_cadence: Literal["daily", "monthly", "single_file"]) -> datetime | None:
     match file_cadence:

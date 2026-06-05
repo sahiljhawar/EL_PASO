@@ -18,7 +18,7 @@ import el_paso as ep
 from el_paso.recipes.poes import poes_satellite_literal
 
 
-def process_poes_ted_electron(
+def process_poes_ted_electron(  # noqa: D103
     satellite_str: poes_satellite_literal,
     raw_data_path: str | Path,
     processed_data_path: str | Path,
@@ -135,9 +135,9 @@ def process_poes_ted_electron(
     variables["xGEO"] = ep.Variable(data=xgeo_arr, original_unit=ep.units.RE)
 
     geo_sph_arr = model_coord.transform(time_var_datetime, xGDZ_arr, ep.IRBEM_SYSAXIS_GDZ, ep.IRBEM_SYSAXIS_SPH)
-    variables["geo_alt"] = ep.Variable(data=geo_sph_arr[:,0], original_unit=ep.units.RE)
-    variables["geo_lat"] = ep.Variable(data=geo_sph_arr[:,1], original_unit=u.deg)
-    variables["geo_lon"] = ep.Variable(data=geo_sph_arr[:,2], original_unit=u.deg)
+    variables["geo_alt"] = ep.Variable(data=geo_sph_arr[:, 0], original_unit=ep.units.RE)
+    variables["geo_lat"] = ep.Variable(data=geo_sph_arr[:, 1], original_unit=u.deg)
+    variables["geo_lon"] = ep.Variable(data=geo_sph_arr[:, 2], original_unit=u.deg)
 
     variables_to_compute: ep.processing.VariableRequest = [
         ("B_Calc", "T89"),
@@ -146,7 +146,7 @@ def process_poes_ted_electron(
         ("R_Eq", "T89"),
         ("Alpha_Eq", "T89"),
         ("Alpha_LC", "T89"),
-        ("Alpha_LC_Eq", "T89")
+        ("Alpha_LC_Eq", "T89"),
     ]
 
     if calculate_Lm_Lstar:
@@ -184,8 +184,10 @@ def process_poes_ted_electron(
     }
 
     if calculate_Lm_Lstar:
-        variables_to_save |= {"L_m": magnetic_field_variables["L_m_T89"],
-                              "L_star": magnetic_field_variables["L_star_T89"]}
+        variables_to_save |= {
+            "L_m": magnetic_field_variables["L_m_T89"],
+            "L_star": magnetic_field_variables["L_star_T89"],
+        }
 
     saving_strategy = ep.saving_strategies.MonthlyLEORBStrategy(
         base_data_path=Path(processed_data_path),

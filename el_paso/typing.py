@@ -25,8 +25,10 @@ if TYPE_CHECKING:
     from el_paso.data_standards import GFZStandard, PRBEMStandard
     from el_paso.dataset.metadata import GFZMetaData, PRBEMMetaData
     from el_paso.processing.compute_magnetic_field_variables import VariableRequest
+    from el_paso.saving_strategies.daily_wave_strategy import DailyWaveStrategy
     from el_paso.saving_strategies.density_netcdf_strategy import DensityNetCDFStrategy
     from el_paso.saving_strategies.gfz_strategy import GFZStrategy
+    from el_paso.saving_strategies.monthly_leo_rb_strategy import MonthlyLEORBStrategy
     from el_paso.saving_strategies.monthly_rb_strategy import MonthlyRBStrategy
     from el_paso.saving_strategies.single_file_strategy import SingleFileStrategy
     from el_paso.saving_strategy import OutputFile, SavingStrategy
@@ -51,32 +53,34 @@ MagFieldVarTypes: TypeAlias = Literal[
     "I",
 ]
 
-InternalName: TypeAlias = Literal[
-    "FEDU",
-    "FEDO",
-    "FEIU",
-    "Energy_FEDU",
-    "Energy_FEIU",
-    "Epoch",
-    "Alpha",
-    "Alpha_range",
-    "Alpha_Eq_range",
-    "Position",
-    "MLat",
-    "PSD",
-    "Position_geo_alt",
-    "Position_geo_lat",
-    "Position_geo_lon",
-    "Number_density",
-    "Wave_normal_angle",
-    "Wave_ellipticity",
-    "Wave_planarity",
-    "Wave_frequency",
-    "Magnetic_Power_Spectral_Density",
-    "Wave_frequency_bandwidth",
-    "B_total_obs",
-
-] | MagFieldVarTypes
+InternalName: TypeAlias = (
+    Literal[
+        "FEDU",
+        "FEDO",
+        "FEIU",
+        "Energy_FEDU",
+        "Energy_FEIU",
+        "Epoch",
+        "Alpha",
+        "Alpha_range",
+        "Alpha_Eq_range",
+        "Position",
+        "MLat",
+        "PSD",
+        "Position_geo_alt",
+        "Position_geo_lat",
+        "Position_geo_lon",
+        "Number_density",
+        "Wave_normal_angle",
+        "Wave_ellipticity",
+        "Wave_planarity",
+        "Wave_frequency",
+        "Magnetic_Power_Spectral_Density",
+        "Wave_frequency_bandwidth",
+        "B_total_obs",
+    ]
+    | MagFieldVarTypes
+)
 
 PRBEMName: TypeAlias = InternalName
 """PRBEM-standard variable names, which match EL-PASO internal names."""
@@ -162,11 +166,13 @@ class FileWriter(Protocol):
 
 _LAZY_EXPORTS: dict[str, tuple[str, str]] = {
     "ConsistencyCheck": ("el_paso.data_standard", "ConsistencyCheck"),
+    "DailyWaveStrategy": ("el_paso.saving_strategies.daily_wave_strategy", "DailyWaveStrategy"),
     "GFZStandard": ("el_paso.data_standards.gfz_standard", "GFZStandard"),
     "GFZStrategy": ("el_paso.saving_strategies.gfz_strategy", "GFZStrategy"),
     "DataStandard": ("el_paso.data_standard", "DataStandard"),
     "DensityNetCDFStrategy": ("el_paso.saving_strategies.density_netcdf_strategy", "DensityNetCDFStrategy"),
     "MonthlyRBStrategy": ("el_paso.saving_strategies.monthly_rb_strategy", "MonthlyRBStrategy"),
+    "MonthlyLEORBStrategy": ("el_paso.saving_strategies.monthly_leo_rb_strategy", "MonthlyLEORBStrategy"),
     "OutputFile": ("el_paso.saving_strategy", "OutputFile"),
     "PRBEMStandard": ("el_paso.data_standards.prbem_standard", "PRBEMStandard"),
     "VariableRequest": ("el_paso.processing.compute_magnetic_field_variables", "VariableRequest"),
@@ -200,6 +206,7 @@ def __dir__() -> list[str]:
 
 __all__ = [
     "ConsistencyCheck",
+    "DailyWaveStrategy",
     "DataStandard",
     "DensityNetCDFStrategy",
     "ExtractionInfo",
@@ -214,6 +221,7 @@ __all__ = [
     "MagFieldVarTypes",
     "MagInputKeys",
     "MagneticFieldLiteral",
+    "MonthlyLEORBStrategy",
     "MonthlyRBStrategy",
     "OutputFile",
     "PRBEMMetaData",

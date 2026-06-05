@@ -209,7 +209,7 @@ if __name__ == "__main__":
     dt_start = dateutil.parser.parse(args.start_time)
     dt_end = dateutil.parser.parse(args.end_time)
 
-    for sat_str in ("noaa15"):
+    for sat_str in "noaa15":
         process_poes_meped_electron(
             start_time=dt_start,
             end_time=dt_end,

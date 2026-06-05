@@ -19,6 +19,7 @@ if typing.TYPE_CHECKING:
 
 InterpolationMethod = Literal["linear", "nearest", "zero", "slinear", "quadratic", "cubic", "previous", "next"]
 
+
 @timed_function()
 def interpolate_in_time(
     time_variable: ep.Variable,
@@ -102,7 +103,9 @@ def interpolate_in_time(
     # Pre-calculate reusable search indices and exact match conditions for gaps
     idx = np.searchsorted(timestamps, target_timestamps)
     in_bounds = (idx > 0) & (idx < len(timestamps))
-    exact_match_right = (idx < len(timestamps)) & (target_timestamps == timestamps[np.minimum(idx, len(timestamps) - 1)])
+    exact_match_right = (idx < len(timestamps)) & (
+        target_timestamps == timestamps[np.minimum(idx, len(timestamps) - 1)]
+    )
     exact_match_left = (idx > 0) & (target_timestamps == timestamps[idx - 1])
 
     # Pre-calculate the max_gap_seconds mask
@@ -140,7 +143,9 @@ def interpolate_in_time(
             right_is_nan = np.zeros_like(target_timestamps, dtype=bool)
 
             left_is_nan[idx > 0] = is_nan_time[idx[idx > 0] - 1]
-            right_is_nan[idx < len(timestamps)] = is_nan_time[np.minimum(idx[idx < len(timestamps)], len(timestamps) - 1)]
+            right_is_nan[idx < len(timestamps)] = is_nan_time[
+                np.minimum(idx[idx < len(timestamps)], len(timestamps) - 1)
+            ]
 
             # Target timestamps are inside a NaN gap if bounded by an original NaN point
             is_nan_gap = in_bounds & (left_is_nan | right_is_nan)

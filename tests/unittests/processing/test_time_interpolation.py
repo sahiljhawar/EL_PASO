@@ -1,13 +1,23 @@
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Bernhard Haas
+#
+# SPDX-License-Identifier: Apache-2.0
+
+
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pytest
 from astropy import units as u
 
 import el_paso as ep
 
+if TYPE_CHECKING:
+    from el_paso.processing.interpolate_in_time import InterpolationMethod
+
 
 @pytest.mark.basic
 def test_interpolate_max_gap_seconds():
-
     orig_times = np.asarray([0.0, 2.0, 10.0, 12.0])
     orig_data = np.asarray([0.0, 2.0, 10.0, 12.0])
 
@@ -18,7 +28,7 @@ def test_interpolate_max_gap_seconds():
     target_times = np.asarray([1.0, 5.0, 11.0])
     target_time_var = ep.Variable(data=target_times, original_unit=ep.units.posixtime)
 
-    interpolation_method_dict = {"var_test": "linear"}
+    interpolation_method_dict: dict[str, InterpolationMethod] = {"var_test": "linear"}
 
     ep.processing.interpolate_in_time(
         time_variable=time_var,
@@ -37,9 +47,9 @@ def test_interpolate_max_gap_seconds():
     # 11.0 falls into a gap of 2.0 seconds (<= 4.0) -> Should interpolate perfectly
     assert np.isclose(result_data[2], 11.0)
 
+
 @pytest.mark.basic
 def test_interpolate_nan_gaps():
-
     orig_times = np.asarray([0.0, 1.0, 2.0, 3.0])
     orig_data = np.asarray([10.0, np.nan, 30.0, 40.0])
 
@@ -50,7 +60,7 @@ def test_interpolate_nan_gaps():
     target_times = np.asarray([0.5, 1.5, 2.5])
     target_time_var = ep.Variable(data=target_times, original_unit=ep.units.posixtime)
 
-    interpolation_method_dict = {"var_test": "linear"}
+    interpolation_method_dict: dict[str, InterpolationMethod] = {"var_test": "linear"}
 
     ep.processing.interpolate_in_time(
         time_variable=time_var,
@@ -68,9 +78,9 @@ def test_interpolate_nan_gaps():
     # 2.5 is bounded entirely by valid data points (2.0 and 3.0) -> Should interpolate to 35.0
     assert np.isclose(result_data[2], 35.0)
 
+
 @pytest.mark.basic
 def test_interpolate_exact_matches_are_protected():
-
     orig_times = np.asarray([0.0, 10.0, 20.0])
     orig_data = np.asarray([0.0, 100.0, np.nan])
 
@@ -81,7 +91,7 @@ def test_interpolate_exact_matches_are_protected():
     target_times = np.asarray([10.0, 15.0, 20.0])
     target_time_var = ep.Variable(data=target_times, original_unit=ep.units.posixtime)
 
-    interpolation_method_dict = {"var_test": "linear"}
+    interpolation_method_dict: dict[str, InterpolationMethod] = {"var_test": "linear"}
 
     ep.processing.interpolate_in_time(
         time_variable=time_var,

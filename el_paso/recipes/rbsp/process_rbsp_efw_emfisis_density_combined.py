@@ -19,7 +19,7 @@ import el_paso as ep
 logger = logging.getLogger(__name__)
 
 
-def process_efw_emfisis_density_combined(
+def process_efw_emfisis_density_combined(  # noqa: D103
     start_time: datetime,
     end_time: datetime,
     sat_str: Literal["a", "b"],

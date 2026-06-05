@@ -6,30 +6,30 @@ import argparse
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
 
 import dateutil
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
 from astropy import units as u
-from astropy.constants import e, m_e
-
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+from astropy.constants import e, m_e  # ty:ignore[unresolved-import]
 
 import el_paso as ep
 from el_paso.units import RE
 from el_paso.variable import Variable
 
+if TYPE_CHECKING:
+    from el_paso.processing.interpolate_in_time import InterpolationMethod
 
-def process_rbsp_emfisis_waves(
+
+def process_rbsp_emfisis_waves(  # noqa: D103
     start_time: datetime,
     end_time: datetime,
     sat_str: Literal["a", "b"],
     raw_data_path: str | Path = ".",
     processed_data_path: str | Path = ".",
 ) -> None:
-
     wfr_vars = _get_wfr_data(start_time, end_time, Path(raw_data_path), sat_str)
 
     target_time_var = wfr_vars["Epoch"]
@@ -56,7 +56,6 @@ def process_rbsp_emfisis_waves(
     )
 
     ep.save(vars_to_save, saving_strat, start_time, end_time)
-    asdf
 
     wfr_vars["BB"] = psd_var
 
@@ -66,11 +65,9 @@ def process_rbsp_emfisis_waves(
     _plot_magnetometer(mag_vars)
     _plot_wfr(wfr_vars)
     _plot_wna(wna_vars)
-    asdf
 
 
 def _calculate_orbital_vars(mag_vars: dict[str, ep.Variable]) -> dict[str, ep.Variable]:
-
     bt = np.asarray(mag_vars["Bt"].get_data(u.T))
     coords = np.asarray(mag_vars["Coordinates"].get_data(u.km))
 
@@ -104,7 +101,6 @@ def _calculate_orbital_vars(mag_vars: dict[str, ep.Variable]) -> dict[str, ep.Va
 def _get_wfr_data(
     start_time: datetime, end_time: datetime, raw_data_path: Path, sat_str: Literal["a", "b"]
 ) -> dict[str, ep.Variable]:
-
     url = f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{sat_str}/l2/emfisis/wfr/spectral-matrix-diagonal/YYYY/"
     file_name_stem = "rbsp-" + sat_str + r"_wfr-spectral-matrix-diagonal_emfisis-l2_YYYYMMDD_.{6}.cdf"
 
@@ -145,10 +141,13 @@ def _get_wfr_data(
 
     return variables
 
-def _get_wna_data(
-    start_time: datetime, end_time: datetime, raw_data_path: Path, sat_str: Literal["a", "b"],
-) -> dict[str, ep.Variable]:
 
+def _get_wna_data(
+    start_time: datetime,
+    end_time: datetime,
+    raw_data_path: Path,
+    sat_str: Literal["a", "b"],
+) -> dict[str, ep.Variable]:
     url = f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{sat_str}/l4/emfisis/wna-survey-sheath-corrected-e/YYYY/"
     file_name_stem = "rbsp-" + sat_str + r"_wna-survey-sheath-corrected-e_emfisis-l4_YYYYMMDD_.{6}.cdf"
 
@@ -183,9 +182,12 @@ def _get_wna_data(
 
 
 def _get_density_data(
-    start_time: datetime, end_time: datetime, raw_data_path: Path, sat_str: Literal["a", "b"], target_time_var: ep.Variable,
+    start_time: datetime,
+    end_time: datetime,
+    raw_data_path: Path,
+    sat_str: Literal["a", "b"],
+    target_time_var: ep.Variable,
 ) -> dict[str, ep.Variable]:
-
     url = f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{sat_str}/l4/emfisis/density/YYYY/"
     file_name_stem = "rbsp-" + sat_str + r"_density_emfisis-l4_YYYYMMDD_.{7}.cdf"
 
@@ -215,7 +217,7 @@ def _get_density_data(
         extraction_infos=extraction_infos,
     )
 
-    interp_methods = {"Density": "linear"}
+    interp_methods: dict[str, InterpolationMethod] = {"Density": "linear"}
 
     _ = ep.processing.interpolate_in_time(
         variables["Epoch"],
@@ -226,10 +228,14 @@ def _get_density_data(
 
     return variables
 
-def _get_magnetometer_data(
-    start_time: datetime, end_time: datetime, raw_data_path: Path, sat_str: Literal["a", "b"], target_time_var: ep.Variable,
-) -> dict[str, ep.Variable]:
 
+def _get_magnetometer_data(
+    start_time: datetime,
+    end_time: datetime,
+    raw_data_path: Path,
+    sat_str: Literal["a", "b"],
+    target_time_var: ep.Variable,
+) -> dict[str, ep.Variable]:
     url = f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{sat_str}/l3/emfisis/magnetometer/4sec/sm/YYYY/"
     file_name_stem = "rbsp-" + sat_str + r"_magnetometer_4sec-sm_emfisis-l3_YYYYMMDD_.{6}.cdf"
 
@@ -261,7 +267,7 @@ def _get_magnetometer_data(
         extraction_infos=extraction_infos,
     )
 
-    interp_methods = {"Bt": "nearest", "Coordinates": "nearest"}
+    interp_methods: dict[str, InterpolationMethod] = {"Bt": "nearest", "Coordinates": "nearest"}
 
     _ = ep.processing.interpolate_in_time(
         variables["Epoch"],

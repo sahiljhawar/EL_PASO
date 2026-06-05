@@ -70,7 +70,10 @@ class GFZStandard(DataStandard[GFZVarNames]):
                 "alpha_lc", "Local loss cone size at the satellite location.", u.radian, ["Epoch"]
             ),
             "Alpha_LC_Eq": VariableInfo[GFZVarNames](
-                "alpha_lc_eq", "Local loss cone size at the satellite location mapped to the equator.", u.radian, ["Epoch"]
+                "alpha_lc_eq",
+                "Local loss cone size at the satellite location mapped to the equator.",
+                u.radian,
+                ["Epoch"],
             ),
             "PSD": VariableInfo[GFZVarNames](
                 "PSD",
@@ -107,10 +110,16 @@ class GFZStandard(DataStandard[GFZVarNames]):
                 "freq", "Frequency of the power spectral density.", u.Hz, ["Wave_frequency"]
             ),
             "Wave_ellipticity": VariableInfo[GFZVarNames](
-                "ellipticity", "Frequency of the power spectral density.", u.dimensionless_unscaled, ["Epoch", "Wave_frequency"]
+                "ellipticity",
+                "Frequency of the power spectral density.",
+                u.dimensionless_unscaled,
+                ["Epoch", "Wave_frequency"],
             ),
             "Wave_planarity": VariableInfo[GFZVarNames](
-                "planarity", "Frequency of the power spectral density.", u.dimensionless_unscaled, ["Epoch", "Wave_frequency"]
+                "planarity",
+                "Frequency of the power spectral density.",
+                u.dimensionless_unscaled,
+                ["Epoch", "Wave_frequency"],
             ),
             "Wave_frequency_bandwidth": VariableInfo[GFZVarNames](
                 "freq_bw", "Frequency of the power spectral density.", u.Hz, ["Wave_frequency"]
@@ -118,9 +127,7 @@ class GFZStandard(DataStandard[GFZVarNames]):
             "Wave_normal_angle": VariableInfo[GFZVarNames](
                 "wave_wna", "Frequency of the power spectral density.", u.degree, ["Epoch", "Wave_frequency"]
             ),
-            "MLat": VariableInfo[GFZVarNames](
-                "MLat", "Frequency of the power spectral density.", u.degree, ["Epoch"]
-            ),
+            "MLat": VariableInfo[GFZVarNames]("MLat", "Frequency of the power spectral density.", u.degree, ["Epoch"]),
             "Magnetic_Power_Spectral_Density": VariableInfo[GFZVarNames](
                 "BB", "Frequency of the power spectral density.", u.dimensionless_unscaled, ["Epoch", "Wave_frequency"]
             ),

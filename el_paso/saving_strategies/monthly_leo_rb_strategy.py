@@ -5,8 +5,8 @@
 
 import el_paso as ep
 
-class MonthlyLEORBStrategy(ep.typing.MonthlyRBStrategy):
 
+class MonthlyLEORBStrategy(ep.typing.MonthlyRBStrategy):  # noqa: D101
     def _get_output_file_entries(self) -> list[ep.typing.InternalName]:
         """Return the standard variable list plus user-defined custom variables."""
         return [

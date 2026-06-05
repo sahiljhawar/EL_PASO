@@ -558,13 +558,11 @@ def _write_data_to_netcdf_file(file: nC.Dataset | nC.Group, data_dict: DataDict,
             continue
 
         valid_internal_names = {
-            arg
-            for names in typing.get_args(ep.typing.InternalName)
-            for arg in typing.get_args(names)
+            arg for names in typing.get_args(ep.typing.InternalName) for arg in typing.get_args(names)
         }
 
         coordinates = [
-            data_standard.get_standard_name(int_name)
+            data_standard.get_standard_name(int_name)  # ty:ignore[invalid-argument-type]
             for int_name in data_standard.get_dependencies(internal_name)
             if int_name in valid_internal_names
         ]

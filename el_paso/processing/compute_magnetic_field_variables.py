@@ -451,6 +451,7 @@ def _get_invariant_K(
 
     return computed_vars
 
+
 @timed_function("Equatorial loss cone angle calculation")
 def _get_eq_loss_cone_angle(
     xgeo_var: Variable,
@@ -458,7 +459,6 @@ def _get_eq_loss_cone_angle(
     computed_vars: dict[str, Variable],
     irbem_input: mag_utils.IrbemInput,
 ) -> dict[str, Variable]:
-
     logger.info("\tCalculating eq loss cone angle ...")
 
     B_fofl_name = mag_utils.create_var_name("B_fofl", irbem_input.magnetic_field)
@@ -480,6 +480,7 @@ def _get_eq_loss_cone_angle(
 
     return computed_vars
 
+
 @timed_function("Local loss cone angle calculation")
 def _get_local_loss_cone_angle(
     xgeo_var: Variable,
@@ -487,7 +488,6 @@ def _get_local_loss_cone_angle(
     computed_vars: dict[str, Variable],
     irbem_input: mag_utils.IrbemInput,
 ) -> dict[str, Variable]:
-
     logger.info("\tCalculating local loss cone angle ...")
 
     B_fofl_name = mag_utils.create_var_name("B_fofl", irbem_input.magnetic_field)

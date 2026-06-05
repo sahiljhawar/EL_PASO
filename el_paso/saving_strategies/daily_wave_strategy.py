@@ -5,7 +5,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
-from el_paso.utils import write_netcdf_file
 
 import logging
 from datetime import datetime, timedelta
@@ -14,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import el_paso as ep
 from el_paso.saving_strategy import OutputFile, SavingStrategy
+from el_paso.utils import write_netcdf_file
 
 if TYPE_CHECKING:
     from el_paso.typing import (
@@ -127,9 +127,7 @@ class DailyWaveStrategy(SavingStrategy):
 
     def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:  # noqa: ARG002
         """Generate the daily file path for the configured format."""
-        file_name = (
-            f"{self.get_file_name_stem()}_{interval_start.strftime('%Y%m%d')}.nc"
-        )
+        file_name = f"{self.get_file_name_stem()}_{interval_start.strftime('%Y%m%d')}.nc"
 
         return self.get_file_path_stem() / file_name
 

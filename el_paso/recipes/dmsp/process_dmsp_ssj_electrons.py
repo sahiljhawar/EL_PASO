@@ -73,23 +73,25 @@ def process_dmsp_ssj_electrons(
     ssj_vars["diff_energy_flux"].apply_thresholds_on_data(lower_threshold=0)
 
     en = ssj_vars["diff_energy"].get_data(u.eV)
-    I = np.argsort(en[0,:])
-    ssj_vars["diff_energy"].set_data(en[:,I], unit=u.eV)
+    I = np.argsort(en[0, :])
+    ssj_vars["diff_energy"].set_data(en[:, I], unit=u.eV)
 
     diff_flux = ssj_vars["diff_energy_flux"].get_data().astype(np.float64)
     diff_flux = diff_flux[:, I]
     diff_flux /= ssj_vars["diff_energy"].get_data(u.eV)
 
-    diff_flux = diff_flux[:,:,np.newaxis] # add pitch angle dimension
+    diff_flux = diff_flux[:, :, np.newaxis]  # add pitch angle dimension
     ssj_vars["diff_flux"] = ep.Variable(data=diff_flux, original_unit=(u.cm**2 * u.s * u.eV * u.sr) ** (-1))
 
     del ssj_vars["diff_energy_flux"]
 
-    geo_spherical = np.vstack((
-        ssj_vars["R_geo"].get_data(ep.units.RE).astype(np.float64),
-        ssj_vars["lat_geo"].get_data(u.deg).astype(np.float64),
-        ssj_vars["lon_geo"].get_data(u.deg).astype(np.float64),
-    )).T
+    geo_spherical = np.vstack(
+        (
+            ssj_vars["R_geo"].get_data(ep.units.RE).astype(np.float64),
+            ssj_vars["lat_geo"].get_data(u.deg).astype(np.float64),
+            ssj_vars["lon_geo"].get_data(u.deg).astype(np.float64),
+        )
+    ).T
 
     # calculate xGEO
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in binned_time_var.get_data(ep.units.posixtime)]
@@ -226,7 +228,9 @@ def _get_ssj_variables(
     extraction_infos = [
         ep.ExtractionInfo(name_or_column="Epoch", unit=ep.units.cdf_epoch, result_key="time"),
         ep.ExtractionInfo(
-            name_or_column="ELE_DIFF_ENERGY_FLUX", unit=u.eV*(u.cm**2 * u.s * u.eV * u.sr) ** (-1), result_key="diff_energy_flux"
+            name_or_column="ELE_DIFF_ENERGY_FLUX",
+            unit=u.eV * (u.cm**2 * u.s * u.eV * u.sr) ** (-1),
+            result_key="diff_energy_flux",
         ),
         ep.ExtractionInfo(name_or_column="CHANNEL_ENERGIES", unit=u.eV, result_key="diff_energy"),
         ep.ExtractionInfo(name_or_column="SC_GEOCENTRIC_R", unit=u.km, result_key="R_geo"),
