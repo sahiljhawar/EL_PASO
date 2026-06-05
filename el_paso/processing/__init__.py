@@ -14,8 +14,10 @@ from el_paso.processing.compute_phase_space_density import compute_phase_space_d
 from el_paso.processing.compute_pitch_angles_for_telescopes import compute_pitch_angles_for_telescopes
 from el_paso.processing.construct_pitch_angle_distribution import construct_pitch_angle_distribution
 from el_paso.processing.convert_string_to_datetime import convert_string_to_datetime
+from el_paso.processing.create_quality_flag_from_magnetometer import create_quality_flag_from_magnetometer
 from el_paso.processing.fold_pitch_angles_and_flux import fold_pitch_angles_and_flux
 from el_paso.processing.get_real_time_tipsod import get_real_time_tipsod
+from el_paso.processing.interpolate_in_time import interpolate_in_time
 
 __all__ = [
     "TimeBinMethod",
@@ -30,7 +32,9 @@ __all__ = [
     "compute_pitch_angles_for_telescopes",
     "construct_pitch_angle_distribution",
     "convert_string_to_datetime",
+    "create_quality_flag_from_magnetometer",
     "fold_pitch_angles_and_flux",
     "get_real_time_tipsod",
+    "interpolate_in_time",
     "magnetic_field_utils",
 ]

@@ -10,6 +10,7 @@ venv
 *.env
 *.png
 *.cdf
+*.nc
 tests/system/data
 
 # Byte-compiled / optimized / DLL files

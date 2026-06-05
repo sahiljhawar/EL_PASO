@@ -62,10 +62,20 @@ InternalName: TypeAlias = Literal[
     "Alpha_range",
     "Alpha_Eq_range",
     "Position",
+    "MLat",
     "PSD",
     "Position_geo_alt",
     "Position_geo_lat",
     "Position_geo_lon",
+    "Number_density",
+    "Wave_normal_angle",
+    "Wave_ellipticity",
+    "Wave_planarity",
+    "Wave_frequency",
+    "Magnetic_Power_Spectral_Density",
+    "Wave_frequency_bandwidth",
+    "B_total_obs",
+
 ] | MagFieldVarTypes
 
 PRBEMName: TypeAlias = InternalName
@@ -80,6 +90,7 @@ GFZVarNames: TypeAlias = Literal[
     "alpha_eq_model",
     "PSD",
     "MLT",
+    "MLat",
     "Lstar",
     "Lm",
     "B_eq",
@@ -95,6 +106,12 @@ GFZVarNames: TypeAlias = Literal[
     "geo_alt",
     "geo_lat",
     "geo_lon",
+    "freq",
+    "ellipticity",
+    "planarity",
+    "freq_bw",
+    "BB",
+    "wave_wna",
 ]
 """Variable names used by the GFZ output standard."""
 

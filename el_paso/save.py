@@ -140,8 +140,6 @@ def _get_data_dict_to_save(
         if data_content.size == 0:
             logger.debug(f"Variable {save_name} does not hold any content! Skipping ...", stacklevel=2)
             continue
-        if data_content.ndim == 1:
-            data_content = data_content.reshape(-1, 1)
 
         # Save the data_content into a field named by save_name
         data_dict[save_name] = data_content

@@ -67,6 +67,11 @@ class DataStandard(ABC, Generic[T_co]):
         return None
 
     def get_standard_name(self, internal_name: InternalName) -> T_co:
+
+        if internal_name not in self.variable_infos:
+            msg = f"Internal name {internal_name} is not part of the {type(self)}!"
+            raise ValueError(msg)
+
         return self.variable_infos[internal_name].standard_name
 
     def get_dependencies(self, internal_name: InternalName) -> list[InternalName | str]:

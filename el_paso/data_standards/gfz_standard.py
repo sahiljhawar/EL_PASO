@@ -7,7 +7,7 @@ from astropy import units as u
 
 import el_paso as ep
 from el_paso.data_standard import ConsistencyCheck, DataStandard, VariableInfo
-from el_paso.typing import GFZVarNames
+from el_paso.typing import GFZVarNames, InternalName
 
 
 class GFZStandard(DataStandard[GFZVarNames]):
@@ -22,7 +22,7 @@ class GFZStandard(DataStandard[GFZVarNames]):
         """Initializes the GFZStandard with a ConsistencyCheck object."""
         self.consistency_check = ConsistencyCheck()
 
-        self.variable_infos = {
+        self.variable_infos: dict[InternalName, VariableInfo] = {
             "Epoch": VariableInfo[GFZVarNames]("time", "Time in MATLAB datenum format.", ep.units.datenum, ["Epoch"]),
             "Position": VariableInfo[GFZVarNames](
                 "xGEO", "Position in geographic cartesian coordinates.", ep.units.RE, ["Epoch", "Position_components"]
@@ -91,6 +91,9 @@ class GFZStandard(DataStandard[GFZVarNames]):
             "B_Calc": VariableInfo[GFZVarNames](
                 "B_total", "Calculated magnetic field at the satellite location.", u.nT, ["Epoch"]
             ),
+            "B_total_obs": VariableInfo[GFZVarNames](
+                "B_sat", "Observered magnetic field at the satellite location.", u.nT, ["Epoch"]
+            ),
             "R_Eq": VariableInfo[GFZVarNames](
                 "R0", "Radial distance of the satellite location mapped to the equator.", ep.units.RE, ["Epoch"]
             ),
@@ -99,5 +102,26 @@ class GFZStandard(DataStandard[GFZVarNames]):
             ),
             "InvK": VariableInfo[GFZVarNames](
                 "InvK", "Calculated modified second adiabatic invariant.", ep.units.RE * u.G**0.5, ["Epoch", "Alpha"]
+            ),
+            "Wave_frequency": VariableInfo[GFZVarNames](
+                "freq", "Frequency of the power spectral density.", u.Hz, ["Wave_frequency"]
+            ),
+            "Wave_ellipticity": VariableInfo[GFZVarNames](
+                "ellipticity", "Frequency of the power spectral density.", u.dimensionless_unscaled, ["Epoch", "Wave_frequency"]
+            ),
+            "Wave_planarity": VariableInfo[GFZVarNames](
+                "planarity", "Frequency of the power spectral density.", u.dimensionless_unscaled, ["Epoch", "Wave_frequency"]
+            ),
+            "Wave_frequency_bandwidth": VariableInfo[GFZVarNames](
+                "freq_bw", "Frequency of the power spectral density.", u.Hz, ["Wave_frequency"]
+            ),
+            "Wave_normal_angle": VariableInfo[GFZVarNames](
+                "wave_wna", "Frequency of the power spectral density.", u.degree, ["Epoch", "Wave_frequency"]
+            ),
+            "MLat": VariableInfo[GFZVarNames](
+                "MLat", "Frequency of the power spectral density.", u.degree, ["Epoch"]
+            ),
+            "Magnetic_Power_Spectral_Density": VariableInfo[GFZVarNames](
+                "BB", "Frequency of the power spectral density.", u.dimensionless_unscaled, ["Epoch", "Wave_frequency"]
             ),
         }

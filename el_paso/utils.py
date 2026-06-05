@@ -10,6 +10,7 @@ import logging
 import re
 import time
 import timeit
+import typing
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 from pathlib import Path
@@ -24,11 +25,12 @@ import tqdm
 from packaging import version as version_pkg
 from scipy.io.matlab import loadmat, savemat
 
+import el_paso as ep
+
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
     from multiprocessing.pool import MapResult
 
-    import el_paso as ep
     from el_paso.typing import DataStandard, SavedDataDict, StandardName, TimeInterval
 
     DataDict = SavedDataDict
@@ -545,10 +547,7 @@ def _write_data_to_netcdf_file(file: nC.Dataset | nC.Group, data_dict: DataDict,
         if len(dimensions) == 1 and value_array.ndim == 2 and value_array.shape[1] == 1:
             value_to_write = value_array.reshape(-1)
 
-        if len(dimensions) == 0:
-            data_set[...] = value_to_write
-        else:
-            data_set[:, ...] = value_to_write
+        data_set[:] = value_to_write
 
         metadata_dict = data_dict.get("metadata", {})
         metadata = {}
@@ -558,6 +557,19 @@ def _write_data_to_netcdf_file(file: nC.Dataset | nC.Group, data_dict: DataDict,
         if not isinstance(metadata, dict):
             continue
 
+        valid_internal_names = {
+            arg
+            for names in typing.get_args(ep.typing.InternalName)
+            for arg in typing.get_args(names)
+        }
+
+        coordinates = [
+            data_standard.get_standard_name(int_name)
+            for int_name in data_standard.get_dependencies(internal_name)
+            if int_name in valid_internal_names
+        ]
+
+        data_set.coordinates = " ".join(coordinates)
         data_set.units = metadata.get("unit", "unknown")
         data_set.source = metadata.get("source_files", "unknown")
         data_set.history = metadata.get("processing_notes", "unknown")
@@ -574,7 +586,7 @@ def write_netcdf_file(file_path: Path, data_dict: DataDict, data_standard: DataS
             logger.info(f"Skipping write for {file_path.name} (time has length 0).")
             return
 
-        dimensions = _calculate_dimensions(data_dict)
+        dimensions = _calculate_dimensions(data_dict, data_standard)
         for dim_name, dim_size in dimensions.items():
             if dim_name == "Epoch":
                 # we create the time dimension as unilimited to allow for append later on
@@ -585,28 +597,27 @@ def write_netcdf_file(file_path: Path, data_dict: DataDict, data_standard: DataS
         _write_data_to_netcdf_file(file, data_dict, data_standard)
 
 
-def _calculate_dimensions(data_dict: DataDict) -> dict[str, int]:
+def _calculate_dimensions(data_dict: DataDict, data_standard: DataStandard) -> dict[str, int]:
     """Calculate NetCDF dimension sizes from the data dictionary."""
-    dimensions = {
-        "Epoch": np.asarray(data_dict["Epoch"]).shape[0],
-        "Alpha": 0,
-        "Energy_FEDU": 0,
-    }
+    unique_dims = {}
 
-    if "Alpha_Eq" in data_dict and np.asarray(data_dict["Alpha_Eq"]).size > 0:
-        dimensions["Alpha"] = np.asarray(data_dict["Alpha_Eq"]).shape[1]
-    elif "Alpha" in data_dict and np.asarray(data_dict["Alpha"]).size > 0:
-        dimensions["Alpha"] = np.asarray(data_dict["Alpha"]).shape[1]
+    for internal_name in data_dict:
+        if internal_name == "metadata":
+            continue
+        dim_names = data_standard.get_dependencies(internal_name)
 
-    if "Energy_FEDU" in data_dict and np.asarray(data_dict["Energy_FEDU"]).size > 0:
-        dimensions["Energy_FEDU"] = np.asarray(data_dict["Energy_FEDU"]).shape[1]
+        for dim_name in dim_names:
+            if dim_name not in unique_dims:
+                # handle special cases
+                if dim_name == "min_max":
+                    unique_dims[dim_name] = 2
+                elif dim_name == "Position_components":
+                    unique_dims[dim_name] = 3
+                elif dim_name in data_dict:
+                    dim_name = typing.cast("ep.typing.InternalName", dim_name)
+                    unique_dims[dim_name] = data_dict[dim_name].shape[-1]
 
-    if "Position" in data_dict and np.asarray(data_dict["Position"]).size > 0:
-        dimensions["Position_components"] = 3
-
-    dimensions["min_max"] = 2
-
-    return dimensions
+    return unique_dims
 
 
 def _get_cdf_variable_attrs(var_name: str, data_dict: DataDict) -> DataDict:
