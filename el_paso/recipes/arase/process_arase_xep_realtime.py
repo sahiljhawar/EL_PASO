@@ -121,7 +121,7 @@ def process_arase_xep_real_time(  # noqa: D103
     variables_combined |= magnetic_field_variables
 
     FEDU_var = ep.processing.construct_pitch_angle_distribution(
-        variables_combined["FEDO"], variables_combined["PA_local_FEDU"], magnetic_field_variables["PA_eq_T89"]
+        variables_combined["FEDO"], variables_combined["PA_local_FEDU"], magnetic_field_variables["Alpha_Eq_T89"]
     )
     FEDU_var.apply_thresholds_on_data(lower_threshold=0)
 
