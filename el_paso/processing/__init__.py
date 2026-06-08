@@ -5,7 +5,10 @@
 
 from el_paso.processing import magnetic_field_utils
 from el_paso.processing.bin_by_time import TimeBinMethod, bin_by_time
-from el_paso.processing.calculate_geo_coords_from_tle import calculate_geo_coords_from_tle
+from el_paso.processing.calculate_geo_coords_from_file import (
+    calculate_geo_coords_from_omm,
+    calculate_geo_coords_from_tle,
+)
 from el_paso.processing.compute_equatorial_plasmaspheric_density import compute_equatorial_plasmaspheric_density
 from el_paso.processing.compute_invariant_K import compute_invariant_K
 from el_paso.processing.compute_invariant_mu import compute_invariant_mu
@@ -23,6 +26,7 @@ __all__ = [
     "TimeBinMethod",
     "VariableRequest",
     "bin_by_time",
+    "calculate_geo_coords_from_csv",
     "calculate_geo_coords_from_tle",
     "compute_equatorial_plasmaspheric_density",
     "compute_invariant_K",

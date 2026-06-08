@@ -29,7 +29,7 @@ from el_paso.extract_variables_from_files import extract_variables_from_files, E
 from el_paso.load_indices_solar_wind_parameters import load_indices_solar_wind_parameters
 from el_paso.logger import setup_logging
 from el_paso import dataset
-
+from el_paso import recipes
 
 __all__ = [
     # Public constants
@@ -52,6 +52,7 @@ __all__ = [
     "load_indices_solar_wind_parameters",
     "physics",
     "processing",
+    "recipes",
     "save",
     "saving_strategies",
     "setup_logging",
