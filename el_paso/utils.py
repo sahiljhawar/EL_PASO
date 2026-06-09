@@ -613,7 +613,14 @@ def _calculate_dimensions(data_dict: DataDict, data_standard: DataStandard) -> d
                     unique_dims[dim_name] = 3
                 elif dim_name in data_dict:
                     dim_name = typing.cast("ep.typing.InternalName", dim_name)
-                    unique_dims[dim_name] = data_dict[dim_name].shape[-1]
+
+                    dims_of_dim = data_standard.get_dependencies(dim_name)
+                    target_idx = np.where(dim_name == np.asarray(dims_of_dim))[0][0]
+
+                    if data_dict[dim_name].ndim <= target_idx:
+                        unique_dims[dim_name] = 1 # dimesion of size 1 can be collapsed
+                    else:
+                        unique_dims[dim_name] = data_dict[dim_name].shape[target_idx]
 
     return unique_dims
 
