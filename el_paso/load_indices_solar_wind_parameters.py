@@ -513,7 +513,7 @@ def _get_w_parameters_tsyganenko(target_time_variable: ep.Variable) -> dict[str,
             names=["Year", "Day", "Hour", "Min", "W1", "W2", "W3", "W4", "W5", "W6"],
             usecols=(0, 1, 2, 3, 17, 18, 19, 20, 21, 22),
             sep=r"\s+",
-        )  # ty:ignore[no-matching-overload]
+        )
 
         timestamps_data: list[float] = []
 
