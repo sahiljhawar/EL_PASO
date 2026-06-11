@@ -15,6 +15,7 @@ import pytest
 from el_paso import typing as ep_types
 
 
+@pytest.mark.basic
 @pytest.mark.parametrize(
     ("attr_name", "import_info"),
     list(ep_types._LAZY_EXPORTS.items()),
