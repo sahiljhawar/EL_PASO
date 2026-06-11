@@ -10,11 +10,12 @@ from __future__ import annotations
 
 import inspect
 import logging
-from datetime import timezone
+from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, cast
 
 import distance
 import numpy as np
+import xarray as xr
 from astropy.time import Time
 from swvo.io.utils import enforce_utc_timezone
 
@@ -25,8 +26,6 @@ from el_paso.dataset.utils import (
 )
 
 if TYPE_CHECKING:
-    from datetime import datetime
-
     from numpy.typing import NDArray
 
     from el_paso.typing import (
@@ -113,7 +112,7 @@ class DataSet:
         self._loaders: dict[str, FormatLoader] = {
             ".mat": ep.utils.load_mat_data,
             ".h5": ep.utils.load_h5_data,
-            ".nc": ep.utils.load_netcdf_data,
+            ".nc": ep.utils.load_netcdf_data_lazy,
             ".cdf": ep.utils.load_cdf_data,
         }
 
@@ -160,6 +159,14 @@ class DataSet:
     def __str__(self) -> str:
         return self.__repr__()
 
+    def __getattribute__(self, name:str) -> Any:  # noqa: ANN401
+        value = super().__getattribute__(name)
+
+        if isinstance(value, xr.Variable):
+            value = value.values
+
+        return value
+
     def __getattr__(self, name: str) -> NDArray[np.float64]:
         # Avoid recursion for internal attributes
         if name.startswith("_"):
@@ -195,6 +202,7 @@ class DataSet:
         if sat_variable is not None and hasattr(self, "_date_list"):
             self._load_variable(sat_variable)
             return getattr(self, name)
+
         if name in self.possible_variables:
             msg = f"Attribute '{name}' exists in {self.saving_strategy.data_standard} but has not been set. "
             raise AttributeError(msg)
@@ -252,6 +260,7 @@ class DataSet:
         """
         return self.saving_strategy.satellite + " " + self.saving_strategy.instrument
 
+    # @profile
     def _load_variable(self, requested_name: str) -> None:
 
         loaded_var_arrs: dict[str, NDArray[np.number]] = {}
@@ -302,19 +311,23 @@ class DataSet:
                     logger.warning(f"Tried to load {full_file_path}, but it does not exist")
                 continue
 
-            time_key = self.saving_strategy.data_standard.get_standard_name("Epoch")
-
             # 3. Process Datetimes
+            time_key = self.saving_strategy.data_standard.get_standard_name("Epoch")
             raw_times = file_content[time_key]
+            if isinstance(raw_times, xr.Variable):
+                raw_times = raw_times.values
 
             time_unit = self.saving_strategy.data_standard.variable_infos["Epoch"].unit
 
             posix_times = (raw_times * time_unit).to_value(ep.units.posixtime)
-            times = Time(posix_times, format="unix", scale="utc")
-            datetimes = times.to_datetime(timezone=timezone.utc)
+            datetimes = np.asarray([datetime.fromtimestamp(t, tz=timezone.utc) for t in posix_times])
 
             file_content["datetime"] = datetimes  # ty:ignore[invalid-assignment]
-            correct_time_idx = (datetimes >= self._start_time) & (datetimes <= self._end_time)
+            correct_time_idx = np.full_like(datetimes, np.True_, dtype=np.bool)
+            if datetimes[0] < self._start_time:
+                correct_time_idx &= datetimes >= self._start_time
+            if datetimes[-1] > self._end_time:
+                correct_time_idx &= datetimes <= self._end_time
 
             # 4. Filter and Join Arrays
             for key, var_arr in file_content.items():
@@ -328,8 +341,10 @@ class DataSet:
                                 metadata_value,
                             )
                     continue
+
                 if key != "datetime" and (
-                    not isinstance(var_arr, np.ndarray) or not np.issubdtype(var_arr.dtype, np.number)
+                    not isinstance(var_arr, xr.Variable)
+                    and (not isinstance(var_arr, np.ndarray) or not np.issubdtype(var_arr.dtype, np.number))
                 ):
                     continue
 

@@ -280,9 +280,9 @@ def _fill_file_name_and_check_version(time: datetime, file_path: Path) -> Path |
     file_path_latest = get_file_by_version(file_names_all_versions, version="latest")
 
     if file_path_latest is None:
-        warnings.warn(
+        logger.warning(
             (
-                f"No file found under path: {file_path.parent}! Have you called download()?"
+                f"No file found under path: {file_path.parent}! Have you called download()? "
                 "Check your download_path argument."
             ),
             stacklevel=2,

@@ -22,6 +22,7 @@ import netCDF4 as nC
 import numpy as np
 import pandas as pd
 import tqdm
+import xarray as xr
 from packaging import version as version_pkg
 from scipy.io.matlab import loadmat, savemat
 
@@ -330,22 +331,23 @@ def load_h5_data(file_path: Path) -> dict[StandardName, Any]:
     return loaded_data
 
 
-def load_netcdf_data(file_path: Path) -> dict[StandardName, Any]:
+def load_netcdf_data(file_path: Path, target_var_names: list[str] | None = None) -> dict[StandardName, Any]:
     """Load all variables and variable metadata from a NetCDF file."""
     loaded_data: dict[StandardName, Any] = {"metadata": {}}
 
     def _recursively_load(group: nC.Group | nC.Dataset, prefix: str = "") -> None:
         for var_name, variable in group.variables.items():
-            full_path = f"{prefix}{var_name}" if prefix else var_name
-            loaded_data[full_path] = np.array(variable[:])  # ty:ignore[invalid-assignment]
-            loaded_data["metadata"][full_path] = {
-                "unit": getattr(variable, "units", "unknown"),
-                "source_files": getattr(variable, "source", "unknown"),
-                "processing_notes": getattr(variable, "history", "unknown"),
-                "description": getattr(variable, "description", "unknown"),
-                "original_cadence_seconds": getattr(variable, "original_cadence_seconds", "unknown"),
-                "standard_name": getattr(variable, "standard_name", "unknown"),
-            }
+            if not target_var_names or var_name in target_var_names:
+                full_path = f"{prefix}{var_name}" if prefix else var_name
+                loaded_data[full_path] = np.array(variable[:])  # ty:ignore[invalid-assignment]
+                loaded_data["metadata"][full_path] = {
+                    "unit": getattr(variable, "units", "unknown"),
+                    "source_files": getattr(variable, "source", "unknown"),
+                    "processing_notes": getattr(variable, "history", "unknown"),
+                    "description": getattr(variable, "description", "unknown"),
+                    "original_cadence_seconds": getattr(variable, "original_cadence_seconds", "unknown"),
+                    "standard_name": getattr(variable, "standard_name", "unknown"),
+                }
 
         for group_name, subgroup in group.groups.items():
             _recursively_load(subgroup, f"{prefix}{group_name}/")
@@ -359,6 +361,38 @@ def load_netcdf_data(file_path: Path) -> dict[StandardName, Any]:
 
     return loaded_data
 
+def load_netcdf_data_lazy(
+    file_path: Path
+) -> dict[StandardName, Any]:
+    """Load all variables and variable metadata from a NetCDF file lazily using xarray."""
+    if not file_path.exists():
+        logger.error(f"File not found: {file_path}")
+        return {}
+
+    loaded_data: dict[StandardName, Any] = {"metadata": {}}
+    grouped_datasets = xr.open_groups(file_path)
+
+    for group_path, ds in grouped_datasets.items():
+        prefix = f"{group_path}/" if group_path != "/" else ""
+
+        for var_name, data_array in ds.variables.items():
+
+            full_path = f"{prefix}{var_name}"
+            loaded_data[full_path] = data_array  # ty:ignore[invalid-assignment]
+
+            attrs = data_array.attrs
+            loaded_data["metadata"][full_path] = {
+                "unit": attrs.get("units", "unknown"),
+                "source_files": attrs.get("source", "unknown"),
+                "processing_notes": attrs.get("history", "unknown"),
+                "description": attrs.get("description", "unknown"),
+                "original_cadence_seconds": attrs.get(
+                    "original_cadence_seconds", "unknown"
+                ),
+                "standard_name": attrs.get("standard_name", "unknown"),
+            }
+
+    return loaded_data
 
 def load_cdf_data(file_path: Path) -> dict[StandardName, Any]:
     """Load all zVariables from an existing CDF file."""
