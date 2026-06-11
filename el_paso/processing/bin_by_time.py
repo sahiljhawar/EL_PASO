@@ -73,34 +73,35 @@ class TimeBinMethod(Enum):
             data = np.sort(data, axis=0)
             data = data[num_to_remove:-num_to_remove]
 
-        match self.value:
-            case "Mean":
-                data = typing.cast("NDArray[np.floating]", data)
-                binned_array = np.mean(data, axis=0)
-            case "NanMean":
-                data = typing.cast("NDArray[np.floating]", data)
-                binned_array = np.nanmean(data, axis=0)
-            case "Median":
-                data = typing.cast("NDArray[np.floating]", data)
-                binned_array = np.nanmedian(data, axis=0)
-            case "NanMedian":
-                data = typing.cast("NDArray[np.floating]", data)
-                binned_array = np.nanmedian(data, axis=0)
-            case "Merge":
-                binned_array = np.concatenate(data, axis=0)
-            case "NanMax":
-                binned_array = np.nanmax(data, axis=0)
-            case "NanMin":
-                binned_array = np.nanmin(data, axis=0)
-            case "NoBinning":
-                binned_array = data
-            case "Repeat":
-                binned_array = data
-            case "Unique":
-                binned_array = np.unique(data, axis=0)
+        with np.errstate(invalid="ignore"):
+            match self.value:
+                case "Mean":
+                    data = typing.cast("NDArray[np.floating]", data)
+                    binned_array = np.mean(data, axis=0)
+                case "NanMean":
+                    data = typing.cast("NDArray[np.floating]", data)
+                    binned_array = np.nanmean(data, axis=0)
+                case "Median":
+                    data = typing.cast("NDArray[np.floating]", data)
+                    binned_array = np.nanmedian(data, axis=0)
+                case "NanMedian":
+                    data = typing.cast("NDArray[np.floating]", data)
+                    binned_array = np.nanmedian(data, axis=0)
+                case "Merge":
+                    binned_array = np.concatenate(data, axis=0)
+                case "NanMax":
+                    binned_array = np.nanmax(data, axis=0)
+                case "NanMin":
+                    binned_array = np.nanmin(data, axis=0)
+                case "NoBinning":
+                    binned_array = data
+                case "Repeat":
+                    binned_array = data
+                case "Unique":
+                    binned_array = np.unique(data, axis=0)
 
-                if data.dtype.kind in {"U", "S"}:
-                    binned_array = np.asarray(["".join(binned_array)])
+                    if data.dtype.kind in {"U", "S"}:
+                        binned_array = np.asarray(["".join(binned_array)])
 
         return binned_array
 

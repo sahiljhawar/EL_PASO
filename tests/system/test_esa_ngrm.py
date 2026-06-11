@@ -20,7 +20,7 @@ from el_paso.recipes.esa import process_ngrm_electron_fluxes
 def test_esa_ngrm(
     tmpdir: Path,
     *,
-    renew_solution: bool,
+    renew_solution: bool,  # noqa: ARG001
 ) -> None:
 
     client_id = os.environ.get("ESA_CLIENT_ID")

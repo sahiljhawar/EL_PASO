@@ -57,7 +57,8 @@ def _fold_pitch_angles_and_flux(
                 axes[i, ie].hist(diff_energy[mask_diff].compressed(), bins=10)
                 axes[i, ie].set_title(f"Energy = {ie}, alpha = {angle}")
 
-        folded_flux[:, :, i] = np.nanmean(masked_flux, axis=2)
+        with np.errstate(invalid="ignore"):
+            folded_flux[:, :, i] = np.nanmean(masked_flux, axis=2)
 
     # add time dimension
     unique_angles = np.tile(unique_angles.reshape(1, -1), (n_time, 1))

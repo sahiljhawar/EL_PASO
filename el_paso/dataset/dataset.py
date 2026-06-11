@@ -107,7 +107,7 @@ class DataSet:
 
         self._start_time = start_time
         self._end_time = end_time
-        self._date_list = ep.utils.get_monthly_datetime_intervals(start_time, end_time)
+        self._date_list = self.saving_strategy.get_time_intervals_to_save(start_time, end_time)
         self.metadata = DatasetMetadata(self)
 
         self._loaders: dict[str, FormatLoader] = {
@@ -272,7 +272,7 @@ class DataSet:
 
         output_file = self.saving_strategy.get_output_file(standard_name=requested_name)  # ty:ignore[invalid-argument-type]
 
-        # useful when using GFZStrategy, when multiple files are there.
+        # useful when multiple files are there, but some of them might be missing
         if original_requested_name == "datetime" and output_file is None:
             time_key = self.saving_strategy.data_standard.get_standard_name("Epoch")
             output_file = next(

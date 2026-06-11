@@ -36,14 +36,11 @@ def test_poes_ted_electron(
         calculate_Lm_Lstar=True,
     )
 
-    start_date = start_time.replace(day=1)
-    end_date = end_time.replace(day=30)
-
     out_path = (
         processed_data_path
         / "POES"
         / "metop1"
-        / f"metop1_ted_{start_date:%Y%m%d}to{end_date:%Y%m%d}_T89.nc"
+        / f"metop1_ted_{start_time:%Y%m%d}_T89.nc"
     )
     assert out_path.exists()
 
@@ -53,7 +50,7 @@ def test_poes_ted_electron(
     poes_proc = DataSet(
         start_time=start_time,
         end_time=end_time,
-        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+        saving_strategy=ep.saving_strategies.DailyLEORBStrategy(
             tmpdir,
             "POES",
             "metop1",
@@ -67,7 +64,7 @@ def test_poes_ted_electron(
     poes_true = DataSet(
         start_time=start_time,
         end_time=end_time,
-        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+        saving_strategy=ep.saving_strategies.DailyLEORBStrategy(
             Path(__file__).parent / "data" / "processed",
             "POES",
             "metop1",
@@ -100,14 +97,11 @@ def test_poes_meped_electron(
         num_cores=32,
     )
 
-    start_date = start_time.replace(day=1)
-    end_date = end_time.replace(day=30)
-
     out_path = (
         processed_data_path
         / "POES"
         / "noaa18"
-        / f"noaa18_meped_{start_date:%Y%m%d}to{end_date:%Y%m%d}_T89.nc"
+        / f"noaa18_meped_{start_time:%Y%m%d}_T89.nc"
     )
     assert out_path.exists()
 
@@ -117,7 +111,7 @@ def test_poes_meped_electron(
     poes_proc = DataSet(
         start_time=start_time,
         end_time=end_time,
-        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+        saving_strategy=ep.saving_strategies.DailyLEORBStrategy(
             tmpdir,
             "POES",
             "noaa18",
@@ -131,7 +125,7 @@ def test_poes_meped_electron(
     poes_true = DataSet(
         start_time=start_time,
         end_time=end_time,
-        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+        saving_strategy=ep.saving_strategies.DailyLEORBStrategy(
             Path(__file__).parent / "data" / "processed",
             "POES",
             "noaa18",

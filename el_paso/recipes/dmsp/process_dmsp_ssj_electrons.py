@@ -69,7 +69,7 @@ def process_dmsp_ssj_electrons(
         end_time=end_time,
     )
 
-    # calculate differential flux
+    # calculate differential omnidirectional flux
     ssj_vars["diff_energy_flux"].apply_thresholds_on_data(lower_threshold=0)
 
     en = ssj_vars["diff_energy"].get_data(u.eV)
@@ -80,11 +80,14 @@ def process_dmsp_ssj_electrons(
     diff_flux = diff_flux[:, I]
     diff_flux /= ssj_vars["diff_energy"].get_data(u.eV)
 
-    diff_flux = diff_flux[:, :, np.newaxis]  # add pitch angle dimension
-    ssj_vars["diff_flux"] = ep.Variable(data=diff_flux, original_unit=(u.cm**2 * u.s * u.eV * u.sr) ** (-1))
+    diff_omni_flux = 4 * np.pi * diff_flux # SSJ-5 observes 90 deg FOV
+
+    diff_omni_flux = diff_omni_flux[:, :, np.newaxis]  # add pitch angle dimension
+    ssj_vars["diff_omni_flux"] = ep.Variable(data=diff_omni_flux, original_unit=(u.cm**2 * u.s * u.eV) ** (-1))
 
     del ssj_vars["diff_energy_flux"]
 
+    # calculate xGEO
     geo_spherical = np.vstack(
         (
             ssj_vars["R_geo"].get_data(ep.units.RE).astype(np.float64),
@@ -93,7 +96,6 @@ def process_dmsp_ssj_electrons(
         )
     ).T
 
-    # calculate xGEO
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in binned_time_var.get_data(ep.units.posixtime)]
     xgeo_data = ep.processing.magnetic_field_utils.Coords().transform(
         datetimes,
@@ -111,6 +113,7 @@ def process_dmsp_ssj_electrons(
         tele_alpha_angles_var,
         tele_beta_angles_var,
     )
+    local_pa_var.set_data(local_pa_var.get_data()[:, np.newaxis, :], unit="same")
 
     # fold pitch angles around 90 degree
     local_pa = local_pa_var.get_data(u.degree)
@@ -142,8 +145,8 @@ def process_dmsp_ssj_electrons(
 
     variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
         "Epoch": binned_time_var,
-        "FEDU": ssj_vars["diff_flux"],
-        "Energy_FEDU": ssj_vars["diff_energy"],
+        "FEDO": ssj_vars["diff_omni_flux"],
+        "Energy_FEDO": ssj_vars["diff_energy"],
         "Alpha_range": local_pa_var,
         "Alpha_Eq_range": magnetic_field_variables["Alpha_Eq_T89"],
         "R_Eq": magnetic_field_variables["R_Eq_T89"],
@@ -158,7 +161,7 @@ def process_dmsp_ssj_electrons(
         "Alpha_LC_Eq": magnetic_field_variables["Alpha_LC_Eq_T89"],
     }
 
-    saving_strategy = ep.saving_strategies.MonthlyLEORBStrategy(
+    saving_strategy = ep.saving_strategies.DailyLEORBStrategy(
         base_data_path=Path(processed_data_path),
         mission="DMSP",
         satellite=sat_str,

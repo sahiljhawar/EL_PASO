@@ -245,7 +245,7 @@ def assert_n_dim(var: ep.Variable, n_dims: int, name_in_file: str) -> None:
 
     if provided != n_dims:
         msg = (
-            f"Encountered dimension missmatch for variable with name {name_in_file}:"
+            f"Encountered dimension missmatch for variable with name {name_in_file}: "
             f"should be {n_dims}, got: {provided}!"
         )
         raise ValueError(msg)
@@ -615,6 +615,7 @@ def _calculate_dimensions(data_dict: DataDict, data_standard: DataStandard) -> d
                     dim_name = typing.cast("ep.typing.InternalName", dim_name)
 
                     dims_of_dim = data_standard.get_dependencies(dim_name)
+
                     target_idx = np.where(dim_name == np.asarray(dims_of_dim))[0][0]
 
                     if data_dict[dim_name].ndim <= target_idx:

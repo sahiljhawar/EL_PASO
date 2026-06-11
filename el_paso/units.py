@@ -203,7 +203,6 @@ u.add_enabled_units(datetime)
 u.add_enabled_units(j2k)
 
 # Add custom equivalencies for seamless unit conversions
-u.add_enabled_equivalencies(u.dimensionless_angles())
 u.add_enabled_equivalencies(tt2000_posixtime_equiv)
 u.add_enabled_equivalencies(posixtime_datenum_equiv)
 u.add_enabled_equivalencies(tt2000_datenum_equiv)

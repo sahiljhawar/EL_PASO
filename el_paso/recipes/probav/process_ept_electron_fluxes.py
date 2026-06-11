@@ -236,7 +236,7 @@ def process_ept_electron_fluxes(  # noqa: D103
         )
 
     if save_strategy in ("netcdf", "both"):
-        strategy = ep.saving_strategies.MonthlyRBStrategy(
+        strategy = ep.saving_strategies.DailyLEORBStrategy(
             base_data_path=Path(processed_data_path),
             mission="PROBAV",
             satellite="probav",

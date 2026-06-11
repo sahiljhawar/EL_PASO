@@ -172,7 +172,7 @@ def process_poes_meped_electron(  # noqa: D103
         "Position": variables["xGEO"],
     }
 
-    saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
+    saving_strategy = ep.saving_strategies.DailyLEORBStrategy(
         base_data_path=Path(processed_data_path),
         mission="POES",
         satellite=satellite_str,

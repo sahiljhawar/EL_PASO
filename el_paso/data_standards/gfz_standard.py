@@ -40,7 +40,10 @@ class GFZStandard(DataStandard[GFZVarNames]):
                 "energy_channels", "Central energy of measured differential flux.", u.MeV, ["Epoch", "Energy_FEDU"]
             ),
             "Energy_FEIU": VariableInfo[GFZVarNames](
-                "energy_channels", "Central energy of measured integral flux.", u.MeV, ["Epoch", "Energy_FEDU"]
+                "energy_FEIU", "Central energy of measured integral flux.", u.MeV, ["Epoch", "Energy_FEIU"]
+            ),
+            "Energy_FEDO": VariableInfo[GFZVarNames](
+                "energy_FEDO", "Central energy of measured omnidirecitonal flux.", u.MeV, ["Epoch", "Energy_FEDO"]
             ),
             "FEDU": VariableInfo[GFZVarNames](
                 "Flux",
@@ -49,22 +52,34 @@ class GFZStandard(DataStandard[GFZVarNames]):
                 ["Epoch", "Energy_FEDU", "Alpha"],
             ),
             "FEIU": VariableInfo[GFZVarNames](
-                "Flux",
+                "FEIU",
                 "Electron integral unidirectional flux.",
                 (u.cm**2 * u.s * u.sr) ** (-1),
-                ["Epoch", "Energy_FEDU", "Alpha"],
+                ["Epoch", "Energy_FEIU", "Alpha"],
+            ),
+            "FEDO": VariableInfo[GFZVarNames](
+                "FEDO",
+                "Electron differential omnidirectional flux.",
+                (u.cm**2 * u.s * u.keV) ** (-1),
+                ["Epoch", "Energy_FEDO", "Alpha_range"],
             ),
             "Alpha": VariableInfo[GFZVarNames](
                 "alpha_local", "Local pitch angles of the particles.", u.radian, ["Epoch", "Alpha"]
             ),
             "Alpha_range": VariableInfo[GFZVarNames](
-                "alpha_local_range", "Local pitch angle ranges of the particles.", u.radian, ["Epoch", "min_max"]
+                "alpha_local_range",
+                "Local pitch angle ranges of the particles.",
+                u.radian,
+                ["Epoch", "Alpha_range", "min_max"],
             ),
             "Alpha_Eq": VariableInfo[GFZVarNames](
                 "alpha_eq_model", "Calculated equatorial pitch angles of the particles.", u.radian, ["Epoch", "Alpha"]
             ),
             "Alpha_Eq_range": VariableInfo[GFZVarNames](
-                "alpha_eq_range", "Equatorial pitch angle ranges of the particles.", u.radian, ["Epoch", "min_max"]
+                "alpha_eq_range",
+                "Equatorial pitch angle ranges of the particles.",
+                u.radian,
+                ["Epoch", "Alpha_range", "min_max"],
             ),
             "Alpha_LC": VariableInfo[GFZVarNames](
                 "alpha_lc", "Local loss cone size at the satellite location.", u.radian, ["Epoch"]

@@ -7,20 +7,23 @@ from __future__ import annotations
 
 import inspect
 import logging
+import shutil
+import tempfile
 from abc import ABC, abstractmethod
 from copy import deepcopy
-from typing import TYPE_CHECKING, NamedTuple
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
+import netCDF4 as nC
 import numpy as np
 from astropy import units as u
 
-from el_paso import Variable
+import el_paso as ep
 
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from datetime import datetime
-    from pathlib import Path
 
     from el_paso.typing import (
         DataStandard,
@@ -44,6 +47,20 @@ class OutputFile(NamedTuple):
     name: str
     names_to_save: list[InternalName]
     save_incomplete: bool = False
+
+
+_writers: dict[str, ep.typing.FileWriter] = {
+    ".mat": ep.utils.write_mat_file,
+    ".h5": ep.utils.write_h5_file,
+    ".nc": ep.utils.write_netcdf_file,
+    ".cdf": ep.utils.write_cdf_file,
+}
+_loaders: dict[str, ep.typing.FileLoader] = {
+    ".mat": ep.utils.load_mat_data,
+    ".h5": ep.utils.load_h5_data,
+    ".nc": ep.utils.load_netcdf_data,
+    ".cdf": ep.utils.load_cdf_data,
+}
 
 
 class SavingStrategy(ABC):
@@ -137,33 +154,179 @@ class SavingStrategy(ABC):
             Path: The generated file path where the output data should be saved.
         """
 
-    @abstractmethod
     def standardize_variable(
-        self, variable: Variable, internal_name: InternalName, *, first_call_of_interval: bool
-    ) -> Variable:
-        """Standardizes the given variable according to the specified name in the file.
+        self,
+        variable: ep.Variable,
+        internal_name: InternalName,
+        *,
+        first_call_of_interval: bool,
+    ) -> ep.Variable:
+        """Standardize a variable through the configured data standard."""
+        return self.data_standard.standardize_variable(
+            internal_name, variable, reset_consistency_check=first_call_of_interval
+        )
 
-        Standardization may include checking of units, dimensions, and size consistency.
-
-        Args:
-            variable (Variable): The variable instance to be standardized.
-            internal_name (str): The internal name of the variable, used for standardization rules.
-            first_call_of_interval (bool): Flag to indicate if it is the first call of a time interval
-
-        Returns:
-            Variable: The standardized variable instance.
-        """
-
-    @abstractmethod
     def save_single_file(self, file_path: Path, dict_to_save: SavedDataDict, *, append: bool = False) -> None:
-        """Saves the provided dictionary to a single file in one of the supported formats (.mat, .h5, .nc).
+        """Save one monthly file, optionally appending to an existing file."""
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        format_name = ep.utils.normalize_file_format(file_path.suffix)
+        writer = _writers.get(format_name)
 
-        Parameters:
-            file_path (Path): The path where the file should be saved.
-            dict_to_save (dict[str, Any]): The dictionary containing variable data and metadata to be saved.
-            append (bool, optional): If True, data will be appended to existing files rather than overwriting them.
-                    Defaults to False.
+        if writer is None:
+            msg = f"The '{format_name}' format is not implemented."
+            logger.error(msg)
+            raise NotImplementedError(msg)
+
+        if file_path.exists() and append:
+            logger.info(f"Appending and saving to existing file: {file_path.resolve()}")
+            self.append_data(file_path, dict_to_save)
+            return
+
+        logger.info(f"Saving file: {file_path.resolve()}")
+
+        writer(file_path, dict_to_save, self.data_standard)
+
+    def append_data(self, file_path: Path, data_dict_to_save: SavedDataDict) -> SavedDataDict:
+        """Append data to any supported monthly file format.
+
+        Existing data is loaded with the loader for ``file_path.suffix``, merged
+        by timestamp with the new dictionary, and written to a temporary file
+        before replacing the original file.
         """
+        if not file_path.exists():
+            msg = f"Cannot append: file does not exist: {file_path}"
+            raise FileNotFoundError(msg)
+
+        new_time = np.asarray(data_dict_to_save["Epoch"])
+        if int(new_time.shape[0]) == 0:
+            logger.info(f"No new time data to insert for {file_path.name}")
+            return data_dict_to_save
+
+        format_name = ep.utils.normalize_file_format(file_path.suffix)
+        loader = _loaders.get(format_name)
+        writer = _writers.get(format_name)
+        if loader is None or writer is None:
+            msg = f"Appending to '{format_name}' files is not supported by MonthlyRBStrategy."
+            logger.error(msg)
+            raise NotImplementedError(msg)
+
+        if format_name == ".nc":
+            self._validate_netcdf_appendable(file_path)
+
+        logger.info(f"Loading existing data from {file_path.name}")
+        existing_data = loader(file_path)
+
+        logger.info(f"Merging and sorting data for {file_path.name}")
+        merged_data = self._merge_and_sort_data(existing_data, data_dict_to_save)
+
+        with tempfile.NamedTemporaryFile(suffix=format_name, delete=False, dir=file_path.parent) as tmp_file:
+            tmp_path = Path(tmp_file.name)
+
+        try:
+            logger.info(f"Writing merged data to temporary file {tmp_path.name}")
+            writer(tmp_path, merged_data, self.data_standard)
+
+            logger.info(f"Replacing original file with merged data for {file_path.name}")
+            shutil.move(str(tmp_path), str(file_path))
+            logger.info(f"Successfully inserted data into {file_path.resolve()}")
+
+            return merged_data  # noqa: TRY300
+        except Exception:
+            if tmp_path.exists():
+                tmp_path.unlink()
+            logger.exception("Failed to write merged data to temporary file")
+            raise
+
+    def _merge_and_sort_data(
+        self,
+        existing_data: dict[StandardName | Literal["metadata"], Any],
+        new_data: SavedDataDict,
+    ) -> SavedDataDict:
+        """Merge two dictionaries along the time axis, replacing duplicate times."""
+
+        def _normalize_1d(arr: np.ndarray) -> np.ndarray:
+            arr = np.asarray(arr)
+            if arr.ndim == 2 and arr.shape[1] == 1:
+                return arr.reshape(-1)
+            return arr
+
+        existing_data_internal: SavedDataDict = {}
+        for name, value in existing_data.items():
+            if name == "metadata":
+                existing_data_internal["metadata"] = value
+            else:
+                internal_name = self.data_standard.get_internal_name(name)
+                if internal_name is None:
+                    msg = f"Could not find necessary internal name for variable: {name}"
+                    raise ValueError(msg)
+                existing_data_internal[internal_name] = value
+
+        existing_time = _normalize_1d(existing_data_internal["Epoch"])
+        new_time = _normalize_1d(new_data["Epoch"])
+        mask_keep_existing = ~np.isin(existing_time, new_time)
+        insert_idx = int(np.searchsorted(existing_time, new_time[0]))
+
+        merged: SavedDataDict = {}
+        existing_metadata = existing_data_internal.get("metadata", {})
+        new_metadata = new_data.get("metadata", {})
+        if isinstance(existing_metadata, dict) and isinstance(new_metadata, dict):
+            merged["metadata"] = {**existing_metadata, **new_metadata}
+        elif "metadata" in new_data:
+            merged["metadata"] = new_metadata
+        elif "metadata" in existing_data_internal:
+            merged["metadata"] = existing_metadata
+
+        all_keys = set(existing_data_internal.keys()) | set(new_data.keys())
+        for key in all_keys:
+            if key == "metadata" or key.startswith("__"):
+                continue
+
+            if key not in existing_data_internal:
+                merged[key] = new_data[key]
+                continue
+
+            if key not in new_data:
+                merged[key] = existing_data_internal[key]
+                continue
+
+            v1 = _normalize_1d(np.asarray(existing_data_internal[key]))
+            v2 = _normalize_1d(np.asarray(new_data[key]))
+
+            if v1.ndim != v2.ndim:
+                msg = f"{key}: ndim mismatch {v1.shape} vs {v2.shape}"
+                logger.error(msg)
+                raise ValueError(msg)
+
+            if v1.ndim > 1 and v1.shape[1:] != v2.shape[1:]:
+                msg = f"{key}: shape mismatch {v1.shape} vs {v2.shape}"
+                logger.error(msg)
+                raise ValueError(msg)
+
+            v1_trunc = v1[mask_keep_existing]
+            merged_val = v2 if v1_trunc.size == 0 else np.insert(v1_trunc, insert_idx, v2, axis=0)
+
+            if key == "Epoch":
+                t = np.asarray(merged_val)
+                if len(np.unique(t)) != len(t):
+                    msg = "Time values are not unique after merge for key 'time'"
+                    logger.error(msg)
+                    raise ValueError(msg)
+
+            merged[key] = merged_val
+
+        return merged
+
+    def _validate_netcdf_appendable(self, file_path: Path) -> None:
+        """Validate that the existing NetCDF file has an unlimited time dimension."""
+        with nC.Dataset(file_path, "r", format="NETCDF4") as file:
+            time_dim = file.dimensions.get("Epoch")
+            if time_dim is None or not time_dim.isunlimited():
+                msg = (
+                    "Cannot append: the existing NetCDF file does not have an "
+                    "unlimited 'Epoch' dimension. Recreate the file with 'Epoch' "
+                    "created as unlimited (None)."
+                )
+                raise ValueError(msg)
 
     @abstractmethod
     def get_file_path_stem(self) -> Path:
@@ -176,11 +339,11 @@ class SavingStrategy(ABC):
     def get_target_variables(
         self,
         output_file: OutputFile,
-        variables_dict: dict[InternalName, Variable],
-        time_var: Variable | None,
+        variables_dict: dict[InternalName, ep.Variable],
+        time_var: ep.Variable | None,
         start_time: datetime | None,
         end_time: datetime | None,
-    ) -> dict[InternalName, Variable] | None:
+    ) -> dict[InternalName, ep.Variable] | None:
         """Retrieves and processes target variables for saving based on the specified output file.
 
         Parameters:
@@ -201,7 +364,7 @@ class SavingStrategy(ABC):
             - Each variable is standardized using the `standardize_variable` method.
             - If a requested variable name is not found, a warning is issued and None is returned.
         """
-        target_variables: dict[InternalName, Variable] = {}
+        target_variables: dict[InternalName, ep.Variable] = {}
         first_call_of_interval = True
 
         # if no variables have been specified, we save all of them
@@ -218,6 +381,8 @@ class SavingStrategy(ABC):
 
             return target_variables
 
+        missing_names = []
+
         for name_to_save in output_file.names_to_save:
             if name_to_save in variables_dict:
                 var_to_save = deepcopy(variables_dict[name_to_save])
@@ -232,12 +397,17 @@ class SavingStrategy(ABC):
 
                 target_variables[name_to_save] = var_to_save
             else:
-                msg = f"Could not find target variable {name_to_save}!"
-                logger.warning(msg, stacklevel=2)
+                missing_names.append(name_to_save)
                 if output_file.save_incomplete:
-                    target_variables[name_to_save] = Variable(original_unit=u.dimensionless_unscaled, data=np.array([]))
+                    target_variables[name_to_save] = ep.Variable(
+                        original_unit=u.dimensionless_unscaled, data=np.array([])
+                    )
                 else:
                     return None
+
+        if len(missing_names) > 0:
+            msg = f"Could not find target variable(s) {', '.join(sorted(missing_names))}!"
+            logger.warning(msg, stacklevel=2)
 
         return target_variables
 

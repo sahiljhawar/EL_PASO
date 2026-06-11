@@ -20,7 +20,7 @@ from el_paso.recipes.probav import process_ept_electron_fluxes
 def test_probav_ept(
     tmpdir: Path,
     *,
-    renew_solution: bool,
+    renew_solution: bool,  # noqa: ARG001
 ) -> None:
 
     client_id = os.environ.get("ESA_CLIENT_ID")
@@ -42,13 +42,10 @@ def test_probav_ept(
         client_secret=client_secret,
     )
 
-    start_date = start_time.replace(day=1)
-    end_date = end_time.replace(day=30)
-
     out_path = (
         processed_data_path
         / "PROBAV"
         / "probav"
-        / f"probav_ept_{start_date:%Y%m%d}to{end_date:%Y%m%d}_T89.nc"
+        / f"probav_ept_{start_time:%Y%m%d}_T89.nc"
     )
     assert out_path.exists()

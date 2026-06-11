@@ -358,7 +358,10 @@ def _get_pa_eq(
     B_eq = computed_vars[B_eq_name].get_data(u.nT)
     B_local = computed_vars[B_local_name].get_data(u.nT)
 
-    pa_eq_rad = np.asin(np.sin(pa_local) * np.sqrt(B_eq / B_local)[:, np.newaxis])
+    # cast B ratio into correct shape
+    b_ratio = np.sqrt(B_eq / B_local).reshape(-1, *(1,) * (pa_local.ndim - 1))
+
+    pa_eq_rad = np.asin(np.sin(pa_local) * b_ratio)
 
     pa_var = Variable(data=pa_eq_rad, original_unit=u.radian)
     pa_var.metadata.add_processing_note(

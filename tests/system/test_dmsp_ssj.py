@@ -35,14 +35,11 @@ def test_dmsp_ssj(
         num_cores=32,
     )
 
-    start_date = start_time.replace(day=1)
-    end_date = end_time.replace(day=30)
-
     out_path = (
         processed_data_path
         / "DMSP"
         / "f17"
-        / f"f17_ssj_{start_date:%Y%m%d}to{end_date:%Y%m%d}_T89.nc"
+        / f"f17_ssj_{start_time:%Y%m%d}_T89.nc"
     )
     assert out_path.exists()
 
@@ -52,7 +49,7 @@ def test_dmsp_ssj(
     dmsp_proc = DataSet(
         start_time=start_time,
         end_time=end_time,
-        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+        saving_strategy=ep.saving_strategies.DailyLEORBStrategy(
             tmpdir,
             "DMSP",
             "f17",
@@ -66,7 +63,7 @@ def test_dmsp_ssj(
     dmsp_true = DataSet(
         start_time=start_time,
         end_time=end_time,
-        saving_strategy=ep.saving_strategies.MonthlyLEORBStrategy(
+        saving_strategy=ep.saving_strategies.DailyLEORBStrategy(
             Path(__file__).parent / "data" / "processed",
             "DMSP",
             "f17",

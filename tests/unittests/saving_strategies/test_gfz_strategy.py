@@ -142,7 +142,7 @@ def test_monthly_rb_strategy_saves_mocked_variables_to_netcdf_with_data_standard
                 np.asarray(loaded_data[standard_name][time_mask, ...], dtype=float),
                 np.asarray(expected_variable.get_data(), dtype=float),
             )
-            var_attrs = metadata.get(internal_name, {})
+            var_attrs = metadata.get(standard_name, {})
             assert set(var_attrs) >= _STANDARD_META_KEYS
             assert var_attrs["source_files"] == "mocked_input.cdf"
 

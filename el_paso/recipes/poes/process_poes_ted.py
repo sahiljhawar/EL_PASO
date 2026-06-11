@@ -189,7 +189,7 @@ def process_poes_ted_electron(  # noqa: D103
             "L_star": magnetic_field_variables["L_star_T89"],
         }
 
-    saving_strategy = ep.saving_strategies.MonthlyLEORBStrategy(
+    saving_strategy = ep.saving_strategies.DailyLEORBStrategy(
         base_data_path=Path(processed_data_path),
         mission="POES",
         satellite=satellite_str,
