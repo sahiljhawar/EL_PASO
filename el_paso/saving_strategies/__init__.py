@@ -9,7 +9,6 @@ from el_paso.saving_strategies.density_netcdf_strategy import DensityNetCDFStrat
 from el_paso.saving_strategies.gfz_strategy import GFZStrategy
 from el_paso.saving_strategies.daily_leo_rb_strategy import DailyLEORBStrategy
 from el_paso.saving_strategies.monthly_rb_strategy import MonthlyRBStrategy
-from el_paso.saving_strategies.monthly_leo_rb_strategy import MonthlyLEORBStrategy
 from el_paso.saving_strategies.single_file_strategy import SingleFileStrategy
 
 __all__ = [
