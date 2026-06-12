@@ -90,3 +90,36 @@ def test_request(tmp_path: Path):
     assert data_path.exists()
     assert len(list(data_path.glob("*"))) == 1
 
+
+def test_exit_after_download(caplog: pytest.LogCaptureFixture):
+
+    # test if the programs exits; it should not
+    ep.download(
+        datetime(2000, 1, 1, tzinfo=timezone.utc),
+        datetime(1999, 1, 1, tzinfo=timezone.utc),
+        save_path="",
+        download_url="",
+        file_name_stem="",
+        file_cadence="daily",
+        method="request",
+        skip_existing=True,
+        sort_raw_files_by_time=True,
+    )
+
+    ep.exit_after_download = True
+
+    with pytest.raises(SystemExit) as sample_exception:
+        ep.download(
+            datetime(2000, 1, 1, tzinfo=timezone.utc),
+            datetime(1999, 1, 1, tzinfo=timezone.utc),
+            save_path="",
+            download_url="",
+            file_name_stem="",
+            file_cadence="daily",
+            method="request",
+            skip_existing=True,
+            sort_raw_files_by_time=True,
+        )
+
+    assert sample_exception.value.code == 1
+    assert "Exiting after ep.download is completed!" in caplog.text

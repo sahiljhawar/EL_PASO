@@ -12,6 +12,7 @@ import logging
 import os
 import re
 import shutil
+import sys
 import typing
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -22,6 +23,7 @@ from typing import Literal
 import requests
 from requests.auth import HTTPDigestAuth
 
+import el_paso as ep
 from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version, timed_function
 
 ERROR_NOT_FOUND = 404
@@ -170,6 +172,9 @@ def download(
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"Download for date {t_start} generated an exception: {exc}")
 
+    if ep.exit_after_download:
+        logger.info("Exiting after ep.download is completed!")
+        sys.exit(1)
 
 def _get_next_time(curr_time: datetime, file_cadence: Literal["daily", "monthly", "single_file"]) -> datetime | None:
     match file_cadence:
