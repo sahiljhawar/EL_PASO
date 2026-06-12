@@ -66,4 +66,4 @@ def construct_pitch_angle_distribution(
             msg = f"Encountered invalid method to constrouct pitch angle distribution: {method}!"
             raise ValueError(msg)
 
-    return ep.Variable(data=differential_flux, original_unit=(omni_flux_var.metadata.unit / u.sr))
+    return ep.Variable(data=differential_flux, original_unit=(omni_flux_var.metadata.unit * u.sr))
