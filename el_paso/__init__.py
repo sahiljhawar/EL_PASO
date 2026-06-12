@@ -21,6 +21,7 @@ _release_msg: str = ""
 
 from el_paso.release_mode import activate_release_mode, get_release_msg, is_in_release_mode
 from el_paso.variable import Variable
+from el_paso.saving_strategy import SavingStrategy
 from el_paso import physics, processing, saving_strategies, units, data_standards, utils, typing
 from el_paso.save import save
 from el_paso.processing import TimeBinMethod
@@ -30,7 +31,6 @@ from el_paso.load_indices_solar_wind_parameters import load_indices_solar_wind_p
 from el_paso.logger import setup_logging
 from el_paso import dataset
 from el_paso import recipes
-from el_paso.saving_strategy import SavingStrategy
 
 __all__ = [
     # Public constants
@@ -42,6 +42,7 @@ __all__ = [
     "IRBEM_SYSAXIS_MAG",
     "IRBEM_SYSAXIS_SM",
     "ExtractionInfo",
+    "SavingStrategy"
     "TimeBinMethod",
     "Variable",
     "activate_release_mode",
