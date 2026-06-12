@@ -46,6 +46,7 @@ def process_ngrm_electron_fluxes(  # noqa: D103
     client_id: str | None = None,
     client_secret: str | None = None,
     save_strategy: Literal["gfz", "netcdf", "both"] = "netcdf",
+    *, calculate_Lstar: bool = True,
 ) -> None:
     data_path_stem = f"{raw_data_path}/NGRM/{satellite}/YYYY/MM/"
     file_name_stem = f"{satellite}_ngrm_YYYYMMDD_L1d.csv"
@@ -201,9 +202,11 @@ def process_ngrm_electron_fluxes(  # noqa: D103
         ("B_Eq", "T89"),
         ("R_Eq", "T89"),
         ("Alpha_Eq", "T89"),
-        ("L_star", "T89"),
         ("L_m", "T89"),
     ]
+
+    if calculate_Lstar:
+        variables_to_compute.append(("L_star", "T89"))  # ty:ignore[invalid-argument-type]
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
@@ -212,7 +215,7 @@ def process_ngrm_electron_fluxes(  # noqa: D103
         pa_local_var=variables["PA_local_FEDU"],
         particle_species="electron",
         variables_to_compute=variables_to_compute,
-        irbem_options=[1, 1, 4, 4, 0],
+        irbem_options=[int(calculate_Lstar), 1, 4, 4, 0],
         num_cores=num_cores,
     )
 
