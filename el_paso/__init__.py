@@ -30,6 +30,7 @@ from el_paso.load_indices_solar_wind_parameters import load_indices_solar_wind_p
 from el_paso.logger import setup_logging
 from el_paso import dataset
 from el_paso import recipes
+from el_paso.saving_strategy import SavingStrategy
 
 __all__ = [
     # Public constants

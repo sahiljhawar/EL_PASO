@@ -45,8 +45,9 @@ def process_ngrm_electron_fluxes(  # noqa: D103
     skip_existing: bool = True,  # noqa: FBT001, FBT002,
     client_id: str | None = None,
     client_secret: str | None = None,
-    save_strategy: Literal["gfz", "netcdf", "both"] = "netcdf",
-    *, calculate_Lstar: bool = True,
+    saving_strategy: ep.SavingStrategy | None = None,
+    *,
+    calculate_Lstar: bool = True,
 ) -> None:
     data_path_stem = f"{raw_data_path}/NGRM/{satellite}/YYYY/MM/"
     file_name_stem = f"{satellite}_ngrm_YYYYMMDD_L1d.csv"
@@ -245,18 +246,12 @@ def process_ngrm_electron_fluxes(  # noqa: D103
         "PSD": psd_var,
     }
 
-    if save_strategy in ("gfz", "both"):
-        strategy = ep.saving_strategies.GFZStrategy(
-            processed_data_path,
-            mission="ESA",
-            satellite=f"{satellite.lower()}_NGRM",
-            instrument="ngrm",
-            mag_field="T89",
-            data_standard=ep.data_standards.GFZStandard(),
+    if saving_strategy is None:
+        save_srat_class = (
+            ep.saving_strategies.DailyLEORBStrategy if satellite == "S6-MF" else ep.saving_strategies.MonthlyRBStrategy
         )
 
-    if save_strategy in ("netcdf", "both"):
-        strategy = ep.saving_strategies.MonthlyRBStrategy(
+        saving_strategy = save_srat_class(
             base_data_path=Path(processed_data_path),
             mission="ESA",
             satellite=f"{satellite.lower()}",
@@ -266,7 +261,7 @@ def process_ngrm_electron_fluxes(  # noqa: D103
             data_standard=ep.data_standards.GFZStandard(),
         )
 
-    ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True)
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True)
 
 
 if __name__ == "__main__":
