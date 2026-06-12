@@ -127,6 +127,10 @@ def download(
         None
 
     """
+    if ep.skip_download or os.getenv("EL_PASO_SKIP_DOWNLOAD"):
+        logger.info("Skipping ep.download!")
+        return
+
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
 

@@ -142,3 +142,58 @@ def test_exit_after_download(caplog: pytest.LogCaptureFixture):
 
     assert sample_exception.value.code == 1
     assert "Exiting after ep.download is completed!" in caplog.text
+
+def test_skip_download_via_ep_flag(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
+
+    ep.skip_download = True
+
+    was_called = False
+
+    def spy_function() -> None:
+        nonlocal was_called
+        was_called = True
+
+    monkeypatch.setattr(ep.utils, "enforce_utc_timezone", spy_function)
+
+    ep.download(
+        datetime(2000, 1, 1, tzinfo=timezone.utc),
+        datetime(1999, 1, 1, tzinfo=timezone.utc),
+        save_path="",
+        download_url="",
+        file_name_stem="",
+        file_cadence="daily",
+        method="request",
+        skip_existing=True,
+        sort_raw_files_by_time=True,
+    )
+
+    assert not was_called
+    assert "Skipping ep.download" in caplog.text
+
+
+def test_skip_download_via_env_var(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture):
+
+    os.environ["EL_PASO_SKIP_DOWNLOAD"] = "True"
+
+    was_called = False
+
+    def spy_function() -> None:
+        nonlocal was_called
+        was_called = True
+
+    monkeypatch.setattr(ep.utils, "enforce_utc_timezone", spy_function)
+
+    ep.download(
+        datetime(2000, 1, 1, tzinfo=timezone.utc),
+        datetime(1999, 1, 1, tzinfo=timezone.utc),
+        save_path="",
+        download_url="",
+        file_name_stem="",
+        file_cadence="daily",
+        method="request",
+        skip_existing=True,
+        sort_raw_files_by_time=True,
+    )
+
+    assert not was_called
+    assert "Skipping ep.download" in caplog.text
