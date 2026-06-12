@@ -178,7 +178,7 @@ def download(
 
     if ep.exit_after_download or os.getenv("EL_PASO_EXIT_AFTER_DOWNLOAD"):
         logger.info("Exiting after ep.download is completed!")
-        sys.exit(1)
+        sys.exit(0)
 
 def _get_next_time(curr_time: datetime, file_cadence: Literal["daily", "monthly", "single_file"]) -> datetime | None:
     match file_cadence:
