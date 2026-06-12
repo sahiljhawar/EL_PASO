@@ -172,7 +172,7 @@ def download(
             except Exception as exc:  # noqa: BLE001
                 logger.warning(f"Download for date {t_start} generated an exception: {exc}")
 
-    if ep.exit_after_download:
+    if ep.exit_after_download or os.getenv("EL_PASO_EXIT_AFTER_DOWNLOAD"):
         logger.info("Exiting after ep.download is completed!")
         sys.exit(1)
 
