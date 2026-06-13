@@ -205,7 +205,9 @@ def process_ept_electron_fluxes(  # noqa: D103
         pa_local_var=variables["PA_local"],
         particle_species="electron",
         variables_to_compute=variables_to_compute,
-        irbem_options=[0, 1, 4, 4, 0],
+        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(
+            lstar_quantity=ep.processing.magnetic_field_utils.LstarQuantity.NONE,
+        ),
         num_cores=num_cores,
     )
 

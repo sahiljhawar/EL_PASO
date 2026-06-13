@@ -103,7 +103,7 @@ def process_rbsp_hope_electrons(  # noqa: D103
     del variables["Epoch"]
 
     # Calculate magnetic field variables
-    irbem_options = [1, 1, 4, 4, 0]
+    irbem_options = ep.processing.magnetic_field_utils.IrbemOptions()
 
     vars_to_compute: ep.typing.VariableRequest = [
         ("B_Calc", mag_field),

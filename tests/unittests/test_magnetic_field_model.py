@@ -48,7 +48,7 @@ def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
         time_var=time_var,
         xgeo_var=xgeo_var,
         variables_to_compute=variables_to_compute,
-        irbem_options=[1, 1, 4, 4, 0],
+        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=12,
     )
 
@@ -79,8 +79,10 @@ def test_mlt_mlt_eq_equal():
         time_var=time_var,
         xgeo_var=xgeo_var,
         variables_to_compute=variables_to_compute,
-        irbem_options=[1, 1, 4, 4, 0],
+        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=12,
     )
 
-    assert np.round(magnetic_field_variables["MLT_OP77"].get_data()) == np.round(magnetic_field_variables["MLT_Eq_OP77"].get_data())
+    mlt = np.round(magnetic_field_variables["MLT_OP77"].get_data())
+    mlt_eq = np.round(magnetic_field_variables["MLT_Eq_OP77"].get_data())
+    assert mlt == mlt_eq

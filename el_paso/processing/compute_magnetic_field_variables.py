@@ -44,7 +44,7 @@ def compute_magnetic_field_variables(
     time_var: Variable,
     xgeo_var: Variable,
     variables_to_compute: VariableRequest,
-    irbem_options: list[int],
+    irbem_options: mag_utils.IrbemOptions,
     num_cores: int,
     indices_solar_wind: dict[str, Variable] | None = None,
     pa_local_var: Variable | None = None,
@@ -68,8 +68,8 @@ def compute_magnetic_field_variables(
         variables_to_compute (Sequence[tuple[MagFieldVarTypes, str | mag_utils.MagneticField]]):
             A sequence of tuples, where each tuple specifies a variable to compute. The first element is the
             variable type (e.g., "Lstar"), and the second is the magnetic field model to use (e.g., "IGRF").
-        irbem_options (list[int]): A list of 5 integer options for the IRBEM library
-            calls, controlling aspects like model selection, bounce tracing, etc.
+        irbem_options (mag_utils.IrbemOptions): The IRBEM-LIB options for the IRBEM
+            library calls, controlling aspects like model selection, bounce tracing, etc.
         num_cores (int): The number of CPU cores to use for parallel processing
             within IRBEM calls.
         indices_solar_wind (dict[str, Variable] | None): Optional. A dictionary
@@ -94,7 +94,6 @@ def compute_magnetic_field_variables(
     Raises:
         FileNotFoundError: If no IRBEM library object is found at the provided `irbem_lib_path`.
         ValueError:
-            - If `irbem_options` does not contain exactly 5 entries.
             - If a pitch-angle dependent variable is requested but `pa_local_var` is not provided.
             - If an energy-dependent variable ("invMu") is requested but `energy_var` is not provided.
             - If a particle-species dependent variable ("invMu") is requested but `particle_species` is not provided.
@@ -116,10 +115,6 @@ def compute_magnetic_field_variables(
             "Check if the file exists at the provided path."
         )
         raise FileNotFoundError(msg)
-
-    if len(irbem_options) != 5:
-        msg = f"irbem_options must be a list with exactly 5 entries! Got: {irbem_options}"
-        raise ValueError(msg)
 
     mag_variables_to_compute = [
         MagFieldVar(mag_field_var[0], mag_field_var[1]) for mag_field_var in variables_to_compute

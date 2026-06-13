@@ -120,7 +120,7 @@ def process_rbsp_ect_combined(  # noqa: D103
     del variables["Epoch"]
 
     # Calculate magnetic field variables
-    irbem_options = [1, 1, 4, 4, 0]
+    irbem_options = ep.processing.magnetic_field_utils.IrbemOptions()
 
     variables_to_compute: ep.processing.VariableRequest = [
         ("B_Calc", mag_field),

@@ -153,7 +153,7 @@ def process_poes_meped_electron(  # noqa: D103
         pa_local_var=variables["PA_local"],
         particle_species="electron",
         variables_to_compute=variables_to_compute,
-        irbem_options=[1, 1, 4, 4, 0],
+        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
     )
 

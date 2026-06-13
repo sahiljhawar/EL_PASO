@@ -216,7 +216,11 @@ def process_ngrm_electron_fluxes(  # noqa: D103
         pa_local_var=variables["PA_local_FEDU"],
         particle_species="electron",
         variables_to_compute=variables_to_compute,
-        irbem_options=[int(calculate_Lstar), 1, 4, 4, 0],
+        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(
+            lstar_quantity=ep.processing.magnetic_field_utils.LstarQuantity.LSTAR
+            if calculate_Lstar
+            else ep.processing.magnetic_field_utils.LstarQuantity.NONE,
+        ),
         num_cores=num_cores,
     )
 

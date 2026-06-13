@@ -23,7 +23,7 @@ TELE_BETA_ANGLES = np.array([-180.0, 90.0])
 DMSPSatellites = Literal["f17"]
 
 
-def process_dmsp_ssj_electrons(
+def process_dmsp_ssj_electrons(  # noqa: D103
     sat_str: DMSPSatellites,
     processed_data_path: str | Path,
     raw_data_path: str | Path,
@@ -73,11 +73,11 @@ def process_dmsp_ssj_electrons(
     ssj_vars["diff_energy_flux"].apply_thresholds_on_data(lower_threshold=0)
 
     en = ssj_vars["diff_energy"].get_data(u.eV)
-    I = np.argsort(en[0, :])
-    ssj_vars["diff_energy"].set_data(en[:, I], unit=u.eV)
+    sort_idx = np.argsort(en[0, :])
+    ssj_vars["diff_energy"].set_data(en[:, sort_idx], unit=u.eV)
 
     diff_flux = ssj_vars["diff_energy_flux"].get_data().astype(np.float64)
-    diff_flux = diff_flux[:, I]
+    diff_flux = diff_flux[:, sort_idx]
     diff_flux /= ssj_vars["diff_energy"].get_data(u.eV)
 
     diff_omni_flux = 4 * np.pi * diff_flux # SSJ-5 observes 90 deg FOV
@@ -117,7 +117,7 @@ def process_dmsp_ssj_electrons(
 
     # fold pitch angles around 90 degree
     local_pa = local_pa_var.get_data(u.degree)
-    local_pa_folded = np.where(local_pa > 90, 180 - local_pa, local_pa)  # noqa: PLR2004
+    local_pa_folded = np.where(local_pa > 90, 180 - local_pa, local_pa)
     local_pa_var.set_data(local_pa_folded, unit=u.degree)
 
     # Calculate magnetic field variables
@@ -139,7 +139,7 @@ def process_dmsp_ssj_electrons(
         pa_local_var=local_pa_var,
         particle_species="electron",
         variables_to_compute=variables_to_compute,
-        irbem_options=[1, 1, 4, 4, 0],
+        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
     )
 

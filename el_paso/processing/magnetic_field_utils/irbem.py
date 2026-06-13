@@ -14,6 +14,7 @@ import sys
 import typing
 from collections.abc import Mapping, Sequence
 from datetime import datetime
+from enum import IntEnum
 from pathlib import Path
 from typing import Literal, NamedTuple, Optional
 
@@ -212,6 +213,66 @@ class FindMirrorPointOutput(NamedTuple):
     posit: NDArray[np.float64]
 
 
+class LstarQuantity(IntEnum):
+    """Quantity computed via drift-shell tracing, i.e. IRBEM's `options(1)`.
+
+    Drift-shell tracing is the most computationally expensive part of a call to
+    `make_lstar`, so this should be set to `NONE` whenever L* or Phi are not needed.
+
+    Attributes:
+        NONE: Skip drift-shell tracing entirely. L* and Phi are not computed
+            (returned as NaN), but Lm, Bmin and Blocal are still calculated.
+        LSTAR: Compute the Roederer L* (the third adiabatic invariant expressed as
+            an equivalent dipole L value).
+        PHI: Compute the drift-shell magnetic flux Phi (the third adiabatic
+            invariant itself) instead of L*.
+    """
+
+    NONE = 0
+    LSTAR = 1
+    PHI = 2
+
+
+class InternalFieldModel(IntEnum):
+    """Internal (Earth) magnetic field model, i.e. IRBEM's `options(5)`."""
+
+    IGRF = 0
+    ECCENTRIC_TILTED_DIPOLE = 1
+    JENSEN_CAIN_1960 = 2
+    GSFC_1266_1970 = 3
+    USER_DEFINED = 4
+    CENTERED_DIPOLE = 5
+
+
+class IrbemOptions(NamedTuple):
+    """Descriptive representation of IRBEM-LIB's 5-element `options` array.
+
+    See https://prbem.github.io/IRBEM/api/general_information.html for details.
+
+    Attributes:
+        lstar_quantity (LstarQuantity): Whether and what drift-shell quantity to
+            compute. Corresponds to `options(1)`. See `LstarQuantity` for the
+            trade-off between the computed quantity and computation time.
+        igrf_update_interval_days (int): How often the IGRF coefficients are
+            updated, in days. Corresponds to `options(2)`. 0 means once per year,
+            at the middle of the year.
+        field_line_resolution (int): Resolution of the field line tracing used for
+            L*, from 0 (fastest, ~2% error at L=6) to 9 (most accurate). Corresponds
+            to `options(3)`.
+        drift_shell_resolution (int): Resolution of the drift shell tracing used for
+            L*, from 0 (sufficient outside LEO) to 9 (most accurate). Corresponds to
+            `options(4)`.
+        internal_field_model (InternalFieldModel): Internal magnetic field model
+            used by IRBEM. Corresponds to `options(5)`.
+    """
+
+    lstar_quantity: LstarQuantity = LstarQuantity.LSTAR
+    igrf_update_interval_days: int = 1
+    field_line_resolution: int = 4
+    drift_shell_resolution: int = 4
+    internal_field_model: InternalFieldModel = InternalFieldModel.IGRF
+
+
 class MagFields:
     """A class to interface with the IRBEM library for magnetic field calculations.
 
@@ -233,7 +294,7 @@ class MagFields:
         lib_path: Optional[str | Path] = DEFAULT_LIBIRBEM_PATH,
         kext: int | str = 5,
         sysaxes: int = 0,
-        options: Sequence[int] | None = None,
+        options: IrbemOptions | None = None,
     ) -> None:
         """Initializes the MagFields object and loads the IRBEM shared library.
 
@@ -244,7 +305,7 @@ class MagFields:
                                         (e.g., 5 for OPQ77) or a string (e.g., 'T96'). Defaults to 5 (OPQ77).
             sysaxes (int, optional): The coordinate system for input positions.
                                      0 for GEI/GEO (default), 1 for GSE, 2 for GSM. Defaults to 0.
-            options (Sequence[int] | None, optional): A sequence of 5 integers to control IRBEM-LIB options.
+            options (IrbemOptions | None, optional): The IRBEM-LIB options to use.
                                                       Defaults to all zeros if None.
 
         Raises:

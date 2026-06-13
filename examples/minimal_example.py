@@ -99,7 +99,7 @@ ep.processing.fold_pitch_angles_and_flux(
 )
 
 
-irbem_options = [1, 1, 4, 4, 0]
+irbem_options = ep.processing.magnetic_field_utils.IrbemOptions()
 mag_field = "T89"  # other options include: "TS04", "T96", "OP77", ...
 
 variables_to_compute: ep.processing.VariableRequest = [

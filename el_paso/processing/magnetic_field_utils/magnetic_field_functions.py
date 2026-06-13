@@ -18,7 +18,7 @@ from numpy.typing import NDArray
 
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils.construct_maginput import MagInputKeys
-from el_paso.processing.magnetic_field_utils.irbem import Coords, MagFields
+from el_paso.processing.magnetic_field_utils.irbem import Coords, IrbemOptions, LstarQuantity, MagFields
 from el_paso.processing.magnetic_field_utils.mag_field_enum import MagneticField
 from el_paso.typing import MagFieldVarTypes
 from el_paso.utils import show_process_bar_for_map_async, timed_function
@@ -53,8 +53,8 @@ class IrbemInput:
         magnetic_field (MagneticField): The magnetic field model to be used.
         maginput (dict[MagInputKeys, NDArray[np.float64]]): A dictionary of
             magnetic field input parameters required by IRBEM (e.g., Kp, Dst).
-        irbem_options (list[int]): A list of integer options to configure the
-            IRBEM library's behavior.
+        irbem_options (IrbemOptions): The IRBEM-LIB options to configure the
+            library's behavior.
         num_cores (int): The number of CPU cores to use for parallel processing.
             Defaults to 4.
         irbem_lib_path (str|Path): The file path to the compiled IRBEM library.
@@ -63,7 +63,7 @@ class IrbemInput:
 
     magnetic_field: MagneticField
     maginput: dict[MagInputKeys, NDArray[np.float64]]
-    irbem_options: list[int]
+    irbem_options: IrbemOptions
     num_cores: int = 4
     irbem_lib_path: str | Path = str(Path(ep.__file__).parent / "libirbem.so")
 
@@ -83,7 +83,7 @@ class IrbemOutput(NamedTuple):
 
 
 def _get_magequator_parallel(
-    irbem_args: tuple[Path | str, list[int], int, int],
+    irbem_args: tuple[Path | str, IrbemOptions, int, int],
     x_geo: NDArray[np.float64],
     datetimes: list[datetime],
     maginput: dict[MagInputKeys, NDArray[np.float64]],
@@ -218,7 +218,7 @@ def get_magequator(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input: Ir
 
 
 def _get_footpoint_atmosphere_parallel(
-    irbem_args: tuple[str | Path, list[int], int, int],
+    irbem_args: tuple[str | Path, IrbemOptions, int, int],
     x_geo: NDArray[np.float64],
     datetimes: list[datetime],
     maginput: dict[MagInputKeys, NDArray[np.float64]],
@@ -423,7 +423,7 @@ def get_local_B_field(xgeo_var: ep.Variable, time_var: ep.Variable, irbem_input:
 
 
 def _get_mirror_point_parallel(
-    irbem_args: tuple[str | Path, list[int], int, int],
+    irbem_args: tuple[str | Path, IrbemOptions, int, int],
     x_geo: NDArray[np.float64],
     datetimes: list[datetime],
     maginput: dict[MagInputKeys, NDArray[np.float64]],
@@ -531,7 +531,7 @@ def get_mirror_point(
 
 
 def _make_lstar_shell_splitting_parallel(
-    irbem_args: tuple[str | Path, list[int], int, int],
+    irbem_args: tuple[str | Path, IrbemOptions, int, int],
     x_geo: NDArray[np.float64],
     datetimes: list[datetime],
     maginput: dict[MagInputKeys, NDArray[np.float64]],
@@ -647,7 +647,7 @@ def get_Lstar(
     # replace bad values with nan
     for arr in [Lm, Lstar, xj]:
         arr[arr < 0] = np.nan
-        if not np.any(np.isfinite(arr)) and irbem_input.irbem_options[0] != 0:
+        if not np.any(np.isfinite(arr)) and irbem_input.irbem_options.lstar_quantity != LstarQuantity.NONE:
             msg = (
                 "Lstar calculation failed! All points are NaNs! Hints for debugging:\n"
                 "1) The calculation can fail for very low pitch-angles, where particles"

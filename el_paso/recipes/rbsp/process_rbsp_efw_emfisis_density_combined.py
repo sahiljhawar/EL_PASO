@@ -90,7 +90,7 @@ def process_efw_emfisis_density_combined(  # noqa: D103
     efw_variables["xGEO"] = ep.Variable(data=xgeo_data, original_unit=ep.units.RE)
 
     # Calculate magnetic field variables
-    irbem_options = [1, 1, 4, 4, 0]
+    irbem_options = ep.processing.magnetic_field_utils.IrbemOptions()
 
     variables_to_compute: ep.processing.VariableRequest = [
         ("MLT", mag_field),
