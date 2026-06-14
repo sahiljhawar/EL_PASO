@@ -69,21 +69,23 @@ MAGINPUT_TO_INDEX: dict[SW_Index, int | list[int]] = {
 def construct_maginput(
     time_var: ep.Variable, magnetic_field: MagneticField, indices_solar_wind: dict[SW_Index, ep.Variable] | None = None
 ) -> dict[MagInputKeys, NDArray[np.float64]]:
-    """Construct the basic magnetospheric input parameters array.
+    """Construct the magnetospheric input parameters required by IRBEM magnetic field models.
 
-    This function retrieves all solar wind data from the ACE dataset on CDAWeb, as well as the Kp and Dst indices,
-    interpolates them to the cadence of `newtime`, and returns an array with the columns as follows:
-    1: Kp, value of Kp as in OMNI2 files but as double instead of integer type.
-    (NOTE: consistent with OMNI2, this is Kp*10, and it is in the range 0 to 90)
-    2: Dst, Dst index (nT)
-    3: Dsw, solar wind density (cm-3)
-    4: Vsw, solar wind velocity (km/s)
-    5: Pdyn, solar wind dynamic pressure (nPa)
-    6: By, GSM y component of interplanetary magnetic field (nT)
-    7: Bz, GSM z component of interplanetary magnetic field (nT), from ACE
-    8-16: Qin-Denton parameters, implement this!
-    17: AL auroral index (if not in ACE, fill with NaN)
-    18-25: fill with NaN
+    This function gathers the geomagnetic indices and solar wind parameters required by the
+    given `magnetic_field` model (loading any that are not already present in
+    `indices_solar_wind` via `ep.load_indices_solar_wind_parameters`), interpolates them to the
+    cadence of `time_var`, clips them to their valid ranges where applicable, and returns them
+    as a dictionary keyed by `MagInputKeys`:
+
+    - "Kp": Kp index * 10 (as in OMNI2 files), in the range 0 to 90.
+    - "Dst": Dst index (nT).
+    - "dens": Solar wind density (cm^-3).
+    - "velo": Solar wind velocity (km/s).
+    - "Pdyn": Solar wind dynamic pressure (nPa).
+    - "ByIMF" / "BzIMF": GSM y/z components of the interplanetary magnetic field (nT).
+    - "G1", "G2", "G3": Tsyganenko G parameters.
+    - "W1"-"W6": Tsyganenko-Sitnov W parameters.
+    - "AL": AL auroral index (NaN if not available).
 
     Args:
         time_var (ep.Variable): Array of new time points for interpolation.

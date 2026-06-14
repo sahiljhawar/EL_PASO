@@ -61,7 +61,7 @@ class MonthlyRBStrategy(SavingStrategy):
     ) -> None:
         """Initialize a monthly file saving strategy.
 
-        Parameters:
+        Args:
             base_data_path (str | Path): Directory where monthly files are written.
             mission (str): Mission name, used in file path and name generation.
             satellite (str): Satellite name, used in file path and name generation.

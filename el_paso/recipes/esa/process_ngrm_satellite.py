@@ -34,7 +34,7 @@ NGRM_ENERGIES = [0.18, 0.27, 0.40, 0.60, 0.88, 1.30, 1.93, 2.90, 3.40, 4.00]
 
 
 @timed_function("process_ngrm_electron_fluxes")
-def process_ngrm_electron_fluxes(  # noqa: D103
+def process_ngrm_electron_fluxes(
     satellite: Literal["EDRS-C", "S6-MF", "MTG-S1", "MTG-I1"],
     raw_data_path: str | Path,
     processed_data_path: str | Path,
@@ -49,6 +49,45 @@ def process_ngrm_electron_fluxes(  # noqa: D103
     *,
     calculate_Lstar: bool = True,
 ) -> None:
+    """Process ESA NGRM electron flux data for the given satellite into omnidirectional fluxes and PSD.
+
+    This downloads the NGRM L1d CSV data for the given satellite from the ESA SWE HAPI service,
+    extracts the differential electron flux channels, time, ECI position, and L-shell, converts
+    the time stamps to POSIX time and the ECI position to GEO coordinates, and combines the flux
+    channels into a single omnidirectional differential flux variable (converted to
+    (cm^2 s keV)^-1 units with negative values clipped to zero). The data is then time-binned to
+    `bin_cadence`, magnetic field model quantities (B_Calc, B_Eq, MLT_Eq, R_Eq, Alpha_Eq, L_m, and
+    optionally L_star) are computed using the T89 model for a fixed set of local pitch angles, the
+    pitch angle distribution (FEDU) and phase space density (PSD) are derived from the omnidirectional
+    flux, and all resulting variables are saved to disk (appending to existing files) using either the
+    provided `saving_strategy` or a default daily/monthly strategy depending on the satellite.
+
+    Args:
+        satellite (Literal["EDRS-C", "S6-MF", "MTG-S1", "MTG-I1"]): Identifier of the NGRM-carrying
+            satellite to process.
+        raw_data_path (str | Path): Base directory used for downloading and locating the raw NGRM CSV files.
+        processed_data_path (str | Path): Base directory in which the processed output files are saved.
+        start_time (datetime): Start of the time range to process.
+        end_time (datetime): End of the time range to process.
+        num_cores (int, optional): Number of CPU cores used for the magnetic field computations. Defaults to 32.
+        bin_cadence (timedelta, optional): Time binning cadence applied to the extracted variables.
+            Defaults to timedelta(seconds=10).
+        skip_existing (bool, optional): If True, skip downloading files that already exist locally.
+            Defaults to True.
+        client_id (str | None, optional): Client ID for the ESA SWE authentication. If None, it is read
+            from the `CLIENT_ID` environment variable. Defaults to None.
+        client_secret (str | None, optional): Client secret for the ESA SWE authentication. If None, it
+            is read from the `CLIENT_SECRET` environment variable. Defaults to None.
+        saving_strategy (ep.SavingStrategy | None, optional): Strategy used to save the processed
+            variables. If None, a `DailyLEORBStrategy` is used for "S6-MF" and a `MonthlyRBStrategy`
+            for all other satellites. Defaults to None.
+        calculate_Lstar (bool, optional): If True, also compute the L* magnetic field quantity.
+            Defaults to True.
+
+    Raises:
+        ValueError: If `client_id` or `client_secret` is not provided and not available via the
+            `CLIENT_ID`/`CLIENT_SECRET` environment variables.
+    """
     data_path_stem = f"{raw_data_path}/NGRM/{satellite}/YYYY/MM/"
     file_name_stem = f"{satellite}_ngrm_YYYYMMDD_L1d.csv"
 

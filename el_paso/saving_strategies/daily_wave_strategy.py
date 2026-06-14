@@ -33,12 +33,9 @@ logger = logging.getLogger(__name__)
 
 
 class DailyWaveStrategy(SavingStrategy):
-    """Save PRBEM-standard data into one monthly file per interval.
+    """Save wave and density data into one NetCDF (.nc) file per day.
 
-    The strategy supports NetCDF, CDF, HDF5, and MATLAB output through a format
-    dispatch table. Existing files can be appended by loading the current file,
-    replacing overlapping timestamps with the new data block, and atomically
-    rewriting the merged data.
+    Appending to existing files is not yet implemented for this strategy.
     """
 
     output_files: list[OutputFile]
@@ -54,14 +51,11 @@ class DailyWaveStrategy(SavingStrategy):
     ) -> None:
         """Initialize a monthly file saving strategy.
 
-        Parameters:
-            base_data_path (str | Path): Directory where monthly files are written.
+        Args:
+            base_data_path (str | Path): Directory where daily files are written.
             mission (str): Mission name, used in file path and name generation.
             satellite (str): Satellite name, used in file path and name generation.
             instrument (str): Instrument name, used in file path and name generation.
-            mag_field (MagneticFieldLiteral): Magnetic field model name. Monthly files use one model.
-            file_format (MFSFormats): One of ``"nc"``, ``"cdf"``, ``"h5"``, or ``"mat"``.
-                A leading dot is also accepted.
             data_standard (DataStandard): Instance of the data standard implementation.
 
         Attributes:

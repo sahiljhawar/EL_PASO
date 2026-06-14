@@ -75,8 +75,9 @@ class DataSet:
     ) -> None:
         """Initializes a DataSet instance.
 
-        Constructs the saving strategy, invokes the parent DataSet initializer,
-        and populates the list of possible variables from class annotations.
+        Stores the saving strategy, determines the time intervals to save based on
+        ``start_time`` and ``end_time``, and populates the list of possible variables
+        from the saving strategy's data standard.
 
         Args:
             saving_strategy (SavingStrategy): Instance of the saving strategy used to save the data.
@@ -218,6 +219,22 @@ class DataSet:
         getattr(self, name_or_var)
 
     def find_similar_variable(self, name: str) -> tuple[None | str, dict[str, Any]]:
+        """Find a possible variable matching the given name.
+
+        Searches `possible_variables` for an exact match. If none is found, also
+        tracks the closest match by Levenshtein distance (treating a case-insensitive
+        substring match as a distance of 1), which can be used to suggest an
+        alternative to the user.
+
+        Args:
+            name (str): The variable name to search for.
+
+        Returns:
+            tuple[None | str, dict[str, Any]]: A tuple of:
+                - The matching variable name if an exact match was found, otherwise `None`.
+                - A dictionary with keys `"min_distance"` (int) and `"var_name"` (str)
+                  describing the closest non-exact match found.
+        """
         levenstein_info: dict[str, Any] = {"min_distance": 10, "var_name": ""}
         sat_variable = None
         for var in self.possible_variables:
@@ -384,7 +401,19 @@ class DataSet:
         return [var for var in self.possible_variables if var in self.__dict__]
 
     def assert_equal(self, other: DataSet) -> None:
-        """Assert that two DataSet objects are equal."""
+        """Assert that two DataSet objects are equal.
+
+        Compares the data standards, the set of standard variable names defined by
+        the saving strategies, and the values of all currently loaded variables.
+
+        Args:
+            other (DataSet): The other DataSet instance to compare against.
+
+        Raises:
+            AssertionError: If the data standards differ, if the sets of standard
+                variable names differ, or if any loaded variable differs in value
+                between the two datasets.
+        """
         assert self.saving_strategy.data_standard == other.saving_strategy.data_standard, (
             "Data standards are different:\n"
             f"{self.saving_strategy.data_standard!r} != {other.saving_strategy.data_standard!r}"

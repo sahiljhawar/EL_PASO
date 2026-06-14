@@ -43,7 +43,7 @@ def posixtime_to_datenum(posixtime_array: NDArray[np.floating]) -> NDArray[np.fl
     The MATLAB datenum format is the number of days since 0000-01-01 plus 1.
     This function handles the time zone and reference date differences.
 
-    Parameters:
+    Args:
         posixtime_array (NDArray[np.floating]): An array of POSIX timestamps (seconds since 1970-01-01 UTC).
 
     Returns:
@@ -68,7 +68,7 @@ def posixtime_to_datenum(posixtime_array: NDArray[np.floating]) -> NDArray[np.fl
 def datenum_to_posixtime(datenum_array: NDArray[np.floating]) -> NDArray[np.floating]:
     """Converts an array of MATLAB datenums to POSIX timestamps.
 
-    Parameters:
+    Args:
         datenum_array (NDArray[np.floating]): An array of MATLAB datenums.
 
     Returns:

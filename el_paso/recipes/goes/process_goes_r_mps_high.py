@@ -24,7 +24,7 @@ TELE_ALPHA_ANGLES = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
 TELE_BETA_ANGLES = np.array([-35.0, 35.0, -70.0, 0, 70.0])
 
 
-def process_goes_r_mps_high(  # noqa: D103
+def process_goes_r_mps_high(
     sat_str: Literal["goes18", "goes19"],
     processed_data_path: str | Path,
     raw_data_path: str | Path,
@@ -33,6 +33,28 @@ def process_goes_r_mps_high(  # noqa: D103
     save_strategy: Literal["gfz", "netcdf"] = "netcdf",
     num_cores: int = 32,
 ) -> None:
+    """Process GOES-R MPS-HI MAGED electron data into pitch-angle resolved phase space densities.
+
+    Downloads and extracts the magnetometer (MAGN), MPS-HI energetic particle (MPSH), and
+    ephemeris (EPHE) L2 data products for the given GOES-R satellite, bins them onto a common
+    5-minute time cadence, computes the local telescope pitch angles from the magnetic field
+    direction, sorts the differential electron fluxes by ascending pitch angle, transforms the
+    spacecraft position to GEO coordinates, computes T89 magnetic field quantities (B_Calc, B_Eq,
+    MLT, R_Eq, Alpha_Eq, L_star, L_m, InvMu, InvK), and derives the electron phase space density.
+    The resulting variables are saved using the requested saving strategy.
+
+    Args:
+        sat_str (Literal["goes18", "goes19"]): The GOES-R satellite to process.
+        processed_data_path (str | Path): Directory where the processed output files are saved.
+        raw_data_path (str | Path): Directory where the raw downloaded data files are stored.
+        start_time (datetime): Start of the time interval to process.
+        end_time (datetime): End of the time interval to process.
+        save_strategy (Literal["gfz", "netcdf"], optional): Strategy used to save the processed
+            data. "gfz" saves using the GFZ format, "netcdf" saves monthly NetCDF files. Defaults
+            to "netcdf".
+        num_cores (int, optional): Number of CPU cores used for the magnetic field computations.
+            Defaults to 32.
+    """
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     data_path_stem = f"{raw_data_path}/YYYY/MM/{sat_str}/"

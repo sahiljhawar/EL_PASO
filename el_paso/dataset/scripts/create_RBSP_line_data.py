@@ -65,9 +65,10 @@ def create_RBSP_line_data(
         tuple[list[DataSet], list[str]]: Tuple containing the processed datasets and the list of instruments used.
 
     Raises:
-        ValueError: If the provided target configuration is invalid.
-        FileNotFoundError: If required RBSP data files cannot be found.
-        RuntimeError: If no valid datasets could be created for the requested interval.
+        ValueError: If no available energy channel is found within `energy_offset_threshold`
+            of a requested target energy.
+        AssertionError: If `target_en` and `target_al` have different lengths when
+            `target_type` is `TargetType.TargetPairs`.
     """
     # Instruments represents also the priority of the instrument for overlapping energies. The first instrument will be prefered.  # noqa: E501
 

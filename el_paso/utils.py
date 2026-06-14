@@ -46,7 +46,7 @@ def fill_str_template_with_time(input_str: str, time: datetime) -> str:
     the corresponding values from a `datetime` object. The placeholders
     are case-sensitive.
 
-    Parameters:
+    Args:
         input_str (str): The input string containing placeholders like 'yyyymmdd', 'YYYYMMDD',
                          'YYYY', 'MM', and 'DD'.
         time (datetime): The datetime object to use for filling the template.
@@ -76,7 +76,7 @@ def extract_version(file_name: str | Path) -> tuple[str, version_pkg.Version]:
     parsed version object. If no version is found, it returns the original file name
     and a default version '0'.
 
-    Parameters:
+    Args:
         file_name (str | Path): The name or path of the file.
 
     Returns:
@@ -108,7 +108,7 @@ def get_file_by_version(file_paths: Iterable[T], version: str) -> T | None:
     the file that matches exactly. If the `version` parameter is 'latest', it
     returns the file with the highest version number among all provided file paths.
 
-    Parameters:
+    Args:
         file_paths (Iterable[T]): An iterable of file paths (as strings or `Path` objects).
         version (str): The specific version string to match (e.g., 'v1.2.3') or 'latest'
                        to retrieve the most recent version.
@@ -151,7 +151,7 @@ def timed_function(func_name: str | None = None) -> Callable[[Callable[P, R]], C
     and logs the result to a logger at the INFO level. The log message can be
     prefixed with an optional function name.
 
-    Parameters:
+    Args:
         func_name (str | None): An optional name to use in the log message. If `None`,
                                 a generic message is used.
 
@@ -182,7 +182,7 @@ def enforce_utc_timezone(time: datetime) -> datetime:
     If the provided datetime object is naive (lacks timezone info), it is assigned
     the UTC timezone. If it already has a timezone, it is returned unchanged.
 
-    Parameters:
+    Args:
         time (datetime): The datetime object to process.
 
     Returns:
@@ -199,7 +199,7 @@ def datenum_to_datetime(datenum_val: float) -> datetime:
     This function leverages pandas to convert the datenum (days since year 0)
     into a UTC-aware datetime object.
 
-    Parameters:
+    Args:
         datenum_val (float): The MATLAB datenum value.
 
     Returns:
@@ -218,7 +218,7 @@ def datetime_to_datenum(datetime_val: datetime) -> float:
     This function calculates the datenum value, which represents the number of days
     since year 0, including a fractional component for the time of day.
 
-    Parameters:
+    Args:
         datetime_val (datetime): The datetime object to convert.
 
     Returns:
@@ -237,7 +237,7 @@ def assert_n_dim(var: ep.Variable, n_dims: int, name_in_file: str) -> None:
     Raises a `ValueError` if the provided variable's data does not match the
     expected number of dimensions.
 
-    Parameters:
+    Args:
         var (ep.Variable): The variable instance to check.
         n_dims (int): The expected number of dimensions.
         name_in_file (str): The name of the variable, used in the error message.
@@ -259,7 +259,7 @@ def show_process_bar_for_map_async(map_result: MapResult[Any], chunksize: int) -
     a parallel map operation. It polls the `MapResult`'s internal state to
     update the progress bar until the operation is complete.
 
-    Parameters:
+    Args:
         map_result (MapResult): The result object from `Pool.map_async()`.
         chunksize (int): The chunk size used in the `map_async` call.
     """
@@ -300,7 +300,7 @@ def make_dict_hashable(dict_input: dict[Any, Any] | None) -> Hashabledict | None
     If the input is `None`, it is returned as is. Otherwise, a new `Hashabledict`
     instance is created and returned.
 
-    Parameters:
+    Args:
         dict_input (dict | None): The dictionary to convert.
 
     Returns:

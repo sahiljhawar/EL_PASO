@@ -19,7 +19,7 @@ import el_paso as ep
 logger = logging.getLogger(__name__)
 
 
-def process_efw_emfisis_density_combined(  # noqa: D103
+def process_efw_emfisis_density_combined(
     start_time: datetime,
     end_time: datetime,
     sat_str: Literal["a", "b"],
@@ -32,6 +32,39 @@ def process_efw_emfisis_density_combined(  # noqa: D103
     add_hiss_derived_densitites: bool = True,
     hiss_derived_densities_data_path: str | Path = ".",
 ) -> None:
+    """Process and combine RBSP EFW and EMFISIS electron density data.
+
+    Downloads and extracts EFW (level-3) and EMFISIS (level-4) density data for the given time
+    range and satellite, time-bins both to a 1-minute cadence, cleans the EMFISIS density by
+    masking out "fpe"-flagged digitizer-type entries, transforms the EFW position from GSE to GEO
+    coordinates using IRBEM, computes magnetic-field-related quantities (MLT, equatorial radial
+    distance, equatorial position) with the given magnetic field model, and maps both the EFW and
+    EMFISIS local densities to the magnetic equator using the Denton-average model. If requested,
+    also loads and time-bins hiss-derived densities and maps those to the equator as well.
+
+    Args:
+        start_time (datetime): Start of the time range to process.
+        end_time (datetime): End of the time range to process.
+        sat_str (Literal["a", "b"]): RBSP satellite identifier ("a" or "b").
+        irbem_lib_path (str | Path): Path to the compiled IRBEM library, used for coordinate
+            transforms and magnetic field computations.
+        mag_field (Literal["T89", "T96", "TS04"]): Magnetic field model used to compute the
+            magnetic-field-related variables.
+        raw_data_path (str | Path, optional): Directory where raw CDF files are downloaded to and
+            read from. Defaults to ".".
+        processed_data_path (str | Path, optional): Directory where the processed output files
+            would be written to. Defaults to ".".
+        num_cores (int, optional): Number of CPU cores used for the magnetic field computations.
+            Defaults to 4.
+        add_hiss_derived_densitites (bool, optional): If True, also load, time-bin, and map to the
+            equator the hiss-derived density data. Defaults to True.
+        hiss_derived_densities_data_path (str | Path, optional): Directory containing the
+            hiss-derived density text files. Defaults to ".".
+
+    Raises:
+        NotImplementedError: Always raised before the processed variables are saved; saving via
+            `DensityNetCDFStrategy` is not yet implemented.
+    """
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 

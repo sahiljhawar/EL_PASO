@@ -70,12 +70,14 @@ class GFZStrategy(SavingStrategy):
     ) -> None:
         """Initializes the data organization strategy.
 
-        Parameters:
+        Args:
             base_data_path (str | Path): The base directory for saving all data.
             mission (str): The mission name.
             satellite (str): The satellite name.
             instrument (str): The instrument name.
             mag_field (str): The model extension type. "TS04" is remapped to "T04s".
+            data_standard (DataStandard | None, optional): An optional `DataStandard` instance to use for
+                standardizing variables. If `None`, `ep.data_standards.GFZStandard` is used by default.
         """
         self.base_data_path = Path(base_data_path)
         self.mission = mission
@@ -109,7 +111,7 @@ class GFZStrategy(SavingStrategy):
         This method iterates from the start month to the end month, creating a new
         (start, end) tuple for each calendar month.
 
-        Parameters:
+        Args:
             start_time (datetime | None): The start of the time range.
             end_time (datetime | None): The end of the time range.
 
@@ -136,7 +138,7 @@ class GFZStrategy(SavingStrategy):
         The path follows a specific format:
         `base_path/MISSION/SATELLITE/Processed_Mat_Files/satellite_instrument_YYYYMMDDtoYYYYMMDD_filename_ver4.mat`
 
-        Parameters:
+        Args:
             interval_start (datetime): The start of the time interval.
             interval_end (datetime): The end of the time interval.
             output_file (OutputFile): The output file configuration.

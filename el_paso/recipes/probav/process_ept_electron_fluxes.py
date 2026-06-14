@@ -28,7 +28,7 @@ load_dotenv()
 
 
 @timed_function("process_ept_electron_fluxes")
-def process_ept_electron_fluxes(  # noqa: D103
+def process_ept_electron_fluxes(
     raw_data_path: str | Path,
     processed_data_path: str | Path,
     start_time: datetime,
@@ -40,6 +40,40 @@ def process_ept_electron_fluxes(  # noqa: D103
     client_secret: str | None = None,
     save_strategy: typing.Literal["gfz", "netcdf", "both"] = "netcdf",
 ) -> None:
+    """Process PROBA-V EPT electron flux data into pitch-angle-resolved fluxes with magnetic field coordinates.
+
+    This downloads the PROBA-V EPT L1d data for the given time range from the ESA SWE service,
+    extracts the per-channel differential electron fluxes, quality flag (chi2), local pitch angle,
+    timestamps, and spacecraft position, and combines the six energy channels into a single FEDU
+    flux variable. Values with a chi2 quality flag above a fixed threshold are masked to NaN. The
+    local pitch angle is folded around 90 degrees, the timestamps are converted to POSIX time, and
+    center energies are computed from a fixed set of energy limits. The data is then time-binned to
+    `bin_cadence`, the spacecraft position is transformed from spherical to GEO coordinates, and
+    magnetic field model quantities (B_Calc, B_Eq, MLT_Eq, R_Eq, Alpha_Eq, L_m) are computed using
+    the T89 model. The resulting variables are saved to disk (appending to existing files) using a
+    GFZ and/or NetCDF daily LEO/RB saving strategy depending on `save_strategy`.
+
+    Args:
+        raw_data_path (str | Path): Base directory used for downloading and locating the raw EPT data files.
+        processed_data_path (str | Path): Base directory in which the processed output files are saved.
+        start_time (datetime): Start of the time range to process.
+        end_time (datetime): End of the time range to process.
+        num_cores (int, optional): Number of CPU cores used for the magnetic field computations. Defaults to 32.
+        bin_cadence (timedelta, optional): Time binning cadence applied to the extracted variables.
+            Defaults to timedelta(seconds=10).
+        skip_existing (bool, optional): If True, skip downloading files that already exist locally.
+            Defaults to True.
+        client_id (str | None, optional): Client ID for the ESA SWE authentication. If None, it is read
+            from the `CLIENT_ID` environment variable. Defaults to None.
+        client_secret (str | None, optional): Client secret for the ESA SWE authentication. If None, it
+            is read from the `CLIENT_SECRET` environment variable. Defaults to None.
+        save_strategy (typing.Literal["gfz", "netcdf", "both"], optional): Which saving strategy (or
+            strategies) to use for the processed output. Defaults to "netcdf".
+
+    Raises:
+        ValueError: If `client_id` or `client_secret` is not provided and not available via the
+            `CLIENT_ID`/`CLIENT_SECRET` environment variables.
+    """
     if client_id is None:
         client_id = os.environ.get("CLIENT_ID")
     if client_secret is None:

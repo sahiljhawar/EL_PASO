@@ -79,11 +79,33 @@ def _linearize_trajectories(
     return lin_x_axis, [datetime.fromtimestamp(ts, tz=timezone.utc) for ts in bend_time_axis]
 
 
-def linearize_trajectories(  # noqa: D103
+def linearize_trajectories(
     self: DataSet,
     trajectories: list[Trajectory],
     orbit_type: Literal["R", "L*"] = "R",
 ) -> tuple[NDArray[np.floating], list[datetime]]:
+    """Map the dataset's time series onto a linearized radial-distance axis.
+
+    Each trajectory (inbound or outbound segment, as produced by `identify_orbits`)
+    is mapped onto a half-unit interval of a continuous "linearized" axis, scaled by
+    the trajectory's local (or, for the first/last trajectory, global) minimum and
+    maximum radial distance. A corresponding "bent" time axis is also computed by
+    interpolating the original timestamps onto this linearized axis, which can be used
+    to plot data against a monotonic position axis instead of time.
+
+    Args:
+        self (DataSet): The DataSet instance this method operates on.
+        trajectories (list[Trajectory]): The orbit segments to linearize, as returned
+            by `identify_orbits`.
+        orbit_type (Literal["R", "L*"], optional): Which radial distance to linearize:
+            ``"R"`` uses `self.R0`, ``"L*"`` uses the last column of `self.Lstar`.
+            Defaults to `"R"`.
+
+    Returns:
+        tuple[NDArray[np.floating], list[datetime]]: A tuple of:
+            - The linearized position axis, with one value per time step.
+            - The corresponding "bent" time axis, with one datetime per time step.
+    """
     dist = self.R0 if orbit_type == "R" else self.Lstar[:, -1]
 
     return _linearize_trajectories(self.datetime, dist, trajectories)

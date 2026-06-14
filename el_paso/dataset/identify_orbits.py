@@ -19,7 +19,16 @@ if TYPE_CHECKING:
     from el_paso.dataset import DataSet
 
 
-class Trajectory(NamedTuple):  # noqa: D101
+class Trajectory(NamedTuple):
+    """A single orbit segment, identified between two consecutive radial extrema.
+
+    Attributes:
+        start (int): Index into the time/distance arrays where the trajectory starts.
+        end (int): Index into the time/distance arrays where the trajectory ends.
+        direction (Literal["inbound", "outbound"]): Whether the radial distance is
+            decreasing ("inbound") or increasing ("outbound") over the trajectory.
+    """
+
     start: int
     end: int
     direction: Literal["inbound", "outbound"]
@@ -55,13 +64,35 @@ def _identify_orbits(
     return orbits
 
 
-def identify_orbits(  # noqa: D103
+def identify_orbits(
     self: DataSet,
     orbit_type: Literal["R", "L*"] = "R",
     minimal_distance: int = 60,
     *,
     apply_smoothing: bool = True,
 ) -> list[Trajectory]:
+    """Split the dataset's time series into individual orbit segments.
+
+    The radial distance (``R0`` or the last column of ``Lstar``, depending on
+    `orbit_type`) is interpolated to fill any gaps and, optionally, smoothed with a
+    spline. Local minima and maxima (perigee/apogee or their L* equivalents) are then
+    used as the boundaries between consecutive inbound/outbound trajectories.
+
+    Args:
+        self (DataSet): The DataSet instance this method operates on.
+        orbit_type (Literal["R", "L*"], optional): Which radial distance to use to
+            identify orbits: ``"R"`` uses `self.R0`, ``"L*"`` uses the last column of
+            `self.Lstar`. Defaults to `"R"`.
+        minimal_distance (int, optional): Minimal number of samples between two
+            consecutive extrema, passed to `scipy.signal.find_peaks` as `distance`.
+            Defaults to `60`.
+        apply_smoothing (bool, optional): If `True`, smooth the radial distance with a
+            cubic spline before locating extrema. Defaults to `True`.
+
+    Returns:
+        list[Trajectory]: The list of inbound/outbound trajectories that together
+        cover the full time series.
+    """
     dist = self.R0 if orbit_type == "R" else self.Lstar[:, -1]
 
     return _identify_orbits(self.datetime, dist, minimal_distance, apply_smoothing=apply_smoothing)

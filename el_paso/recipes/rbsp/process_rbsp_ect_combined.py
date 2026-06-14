@@ -14,7 +14,7 @@ from astropy import units as u
 import el_paso as ep
 
 
-def process_rbsp_ect_combined(  # noqa: D103
+def process_rbsp_ect_combined(
     start_time: datetime,
     end_time: datetime,
     sat_str: Literal["a", "b"],
@@ -25,6 +25,33 @@ def process_rbsp_ect_combined(  # noqa: D103
     save_strategy: Literal["gfz", "netcdf", "both"] = "netcdf",
     num_cores: int = 4,
 ) -> None:
+    """Process combined RBSP ECT (REPT/MagEIS) electron flux data into the EL-PASO data standard.
+
+    Downloads the daily RBSP ECT combined level-3 electron CDF files for the given time range and
+    satellite, extracts the energy/pitch-angle-resolved flux (FEDU), omni-directional flux (FEDO),
+    and position, time-bins all variables to the given cadence, folds the pitch angles and flux to
+    the [0, 90] degree range, computes magnetic-field-related quantities (B field, equatorial
+    pitch angle, L*, L_m, MLT, InvMu, InvK, etc.) with the given magnetic field model via IRBEM,
+    computes the electron phase space density from FEDU, and saves all resulting variables using
+    the requested saving strategy/strategies.
+
+    Args:
+        start_time (datetime): Start of the time range to process.
+        end_time (datetime): End of the time range to process.
+        sat_str (Literal["a", "b"]): RBSP satellite identifier ("a" or "b").
+        mag_field (Literal["T89", "T96", "TS04", "OP77"]): Magnetic field model used to compute the
+            magnetic-field-related variables.
+        raw_data_path (str | Path, optional): Directory where raw CDF files are downloaded to and
+            read from. Defaults to ".".
+        processed_data_path (str | Path, optional): Directory where the processed output files are
+            written to. Defaults to ".".
+        cadence (timedelta, optional): Time-binning cadence applied to all variables. Defaults to
+            timedelta(minutes=5).
+        save_strategy (Literal["gfz", "netcdf", "both"], optional): Which saving strategy/strategies
+            to use for writing the processed output. Defaults to "netcdf".
+        num_cores (int, optional): Number of CPU cores used for the magnetic field computations.
+            Defaults to 4.
+    """
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 

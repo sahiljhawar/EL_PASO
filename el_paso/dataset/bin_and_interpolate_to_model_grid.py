@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 # TODO(SJ or BH): fix the RBMDataSet  # noqa: FIX002, TD003
 
 
-def bin_and_interpolate_to_model_grid(  # noqa: D103
+def bin_and_interpolate_to_model_grid(
     self: RBMDataSet,
     sim_time: list[datetime],
     grid_R: NDArray[np.float64],
@@ -36,6 +36,39 @@ def bin_and_interpolate_to_model_grid(  # noqa: D103
     target_var_name: Literal["PSD", "density"] = "PSD",
     mu_or_V: Literal["Mu", "V"] = "V",
 ) -> NDArray[np.float64]:
+    """Bin and interpolate a dataset variable onto a model's grid and time axis.
+
+    The variable named by `target_var_name` (e.g. ``PSD``) is processed in three
+    steps: (1) it is interpolated onto the model's V-K (or Mu-K) grid, (2) it is
+    binned in space onto the model's R (or L*) and, if `grid_P` is given, P/MLT
+    grid, and (3) it is binned in time onto `sim_time`. After each step, a sanity
+    check ensures the resulting values stay within the range of the original data.
+
+    Args:
+        self (RBMDataSet): The RBMDataSet instance this method operates on.
+        sim_time (list[datetime]): Target simulation time steps to bin the data onto.
+        grid_R (NDArray[np.float64]): Radial distance (R or L*) grid of the model.
+        grid_mu_V (NDArray[np.float64]): Mu or V grid of the model, matching `mu_or_V`.
+        grid_K (NDArray[np.float64]): Second adiabatic invariant (K) grid of the model.
+        grid_P (NDArray[np.float64] | None, optional): Azimuthal (P/MLT) grid of the
+            model. If `None`, the data is binned by R (or L*) only, as for a
+            plasmasphere model. Defaults to `None`.
+        debug_plot_settings (DebugPlotSettings | None, optional): If provided, debug
+            figures are generated for each simulation time step. Defaults to `None`.
+        target_var_name (Literal["PSD", "density"], optional): Name of the dataset
+            attribute to bin and interpolate. Defaults to `"PSD"`.
+        mu_or_V (Literal["Mu", "V"], optional): Whether to use `InvMu` or `InvV` as the
+            velocity-space coordinate when interpolating onto `grid_mu_V`. Defaults to `"V"`.
+
+    Returns:
+        NDArray[np.float64]: The values of `target_var_name`, binned and interpolated
+        onto `sim_time` and the provided model grids.
+
+    Raises:
+        ValueError: If the V-K interpolation, the spatial binning, or the temporal
+            binning produces values outside the range of the original data,
+            indicating an inconsistency in the binning/interpolation.
+    """
     # make sure everything is 4D
 
     if grid_R.ndim == 3:
@@ -393,7 +426,18 @@ def _parallel_func_VK(
 
 
 @dataclass
-class DebugPlotSettings:  # noqa: D101
+class DebugPlotSettings:
+    """Settings controlling debug plot generation in `bin_and_interpolate_to_model_grid`.
+
+    Attributes:
+        folder_path (Path): Directory in which the generated debug figures are saved.
+        satellite_name (str): Satellite name, used in the output figure file names.
+        target_V (float | None): Target V value to highlight in the V-K debug plot.
+            If `None`, the plasmasphere debug plots are generated instead.
+        target_K (float | None): Target K value to highlight in the V-K debug plot.
+            If `None`, the plasmasphere debug plots are generated instead.
+    """
+
     folder_path: Path
     satellite_name: str
     target_V: float | None = None  # noqa: N815

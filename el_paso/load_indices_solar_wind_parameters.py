@@ -66,7 +66,7 @@ def load_indices_solar_wind_parameters(
     directory. The function can either return the data with its original timestamps
     or interpolate the data to a new set of timestamps provided by a `target_time_variable`.
 
-    Parameters:
+    Args:
         start_time (datetime): The start time for the data retrieval.
         end_time (datetime): The end time for the data retrieval.
         requested_outputs (Iterable[SW_Index]): A list of space weather indices to load.

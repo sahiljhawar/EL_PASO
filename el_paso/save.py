@@ -57,8 +57,10 @@ def save(
     Raises:
         TypeError: If `variables_dict` is not a dictionary of `Variable` objects.
         KeyError: If `variables_dict` contains invalid internal variable names.
-        UserWarning: If the saving process is attempted for an output file but one
-            or more of its required variables are missing from `variables_dict`.
+
+    Note:
+        If an output file is missing one or more of its required variables, a
+        warning is logged and that output file is skipped (no exception is raised).
     """
     if not ignore_validation:
         _validate_variables_dict(variables_dict)

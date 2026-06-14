@@ -78,7 +78,7 @@ class SingleFileStrategy(SavingStrategy):
     ) -> None:
         """Initializes the SingleFileStrategy with the specified file path and optional custom format writers.
 
-        Parameters:
+        Args:
             file_path (str | Path): The full path to the output file. The file extension determines
                 the format unless a custom writer is registered.
             format_writers (dict[str, SingleFileFormatWriter] | None): Optional dictionary mapping file extensions
@@ -120,7 +120,7 @@ class SingleFileStrategy(SavingStrategy):
 
         This strategy does not split data by time; it saves everything in one go.
 
-        Parameters:
+        Args:
             start_time (datetime): The start time of the data range.
             end_time (datetime): The end time of the data range.
 
@@ -139,7 +139,7 @@ class SingleFileStrategy(SavingStrategy):
 
         This method ensures all data is saved to the same file, regardless of the time interval.
 
-        Parameters:
+        Args:
             interval_start (datetime): The start of the time interval (ignored).
             interval_end (datetime): The end of the time interval (ignored).
             output_file (OutputFile): The output file configuration (ignored).
@@ -160,9 +160,9 @@ class SingleFileStrategy(SavingStrategy):
 
         This strategy does not perform any specific standardization on the variables before saving.
 
-        Parameters:
+        Args:
             variable (Variable): The variable instance to be standardized.
-            name_in_file (str): The name of the variable as it appears in the file (ignored).
+            internal_name (InternalName): The internal name of the variable (ignored).
             first_call_of_interval (bool): Flag to indicate if it is the first call of a time interval
 
         Returns:
@@ -177,7 +177,7 @@ class SingleFileStrategy(SavingStrategy):
         or to override built-in writers. Custom writers are called when a file with the matching
         extension is saved.
 
-        Parameters:
+        Args:
             extension (str): The file extension (including the dot), e.g., ".myformat" or ".bin".
             writer (SingleFileFormatWriter): A callable with signature `(Path, dict[str, Any]) -> None` that
                 handles writing the data dictionary to the specified file path.
@@ -216,7 +216,7 @@ class SingleFileStrategy(SavingStrategy):
         Applies zlib compression, shuffle filter, and creates dimension variables automatically.
         Writes metadata as variable attributes.
 
-        Parameters:
+        Args:
             file_path (Path): Path to save the .nc file.
             data_dict (dict[str, Any]): Dictionary with variable data and metadata.
                 Keys are path strings (e.g., "var_name" or "group/subgroup/var_name").
@@ -270,7 +270,7 @@ class SingleFileStrategy(SavingStrategy):
         It is primarily designed to be used with the `el_paso.save()` function, which handles the logic of determining
         what data to save and when.
 
-        Parameters:
+        Args:
             file_path (Path): The path to the file where the dictionary will be saved.
                               The file extension determines the format.
             dict_to_save (dict[str, Any]): The dictionary containing variable data to save.
@@ -313,7 +313,7 @@ class SingleFileStrategy(SavingStrategy):
     def _write_mat_file(self, file_path: Path, data_dict: dict[str, Any]) -> None:
         """Write data dictionary to MATLAB .mat format.
 
-        Parameters:
+        Args:
             file_path (Path): Path to save the .mat file.
             data_dict (dict[str, Any]): Dictionary with variable data and metadata.
         """
@@ -325,7 +325,7 @@ class SingleFileStrategy(SavingStrategy):
         Creates hierarchical groups based on paths (e.g., "group1/group2/dataset" becomes nested groups).
         Applies gzip compression and shuffling to all datasets. Writes metadata as dataset attributes.
 
-        Parameters:
+        Args:
             file_path (Path): Path to save the .h5 file.
             data_dict (dict[str, Any]): Dictionary with variable data and metadata.
                 Keys are path strings (e.g., "var_name" or "group/subgroup/var_name").
@@ -360,7 +360,7 @@ class SingleFileStrategy(SavingStrategy):
         Supports global attributes and per-variable attributes from the metadata dictionary.
         Applies gzip compression (Compress=6) to all variables.
 
-        Parameters:
+        Args:
             file_path (Path): Path to save the .cdf file.
             data_dict (dict[str, Any]): Dictionary with variable data and metadata.
                 Keys are variable names. The "metadata" key contains global and variable attributes.

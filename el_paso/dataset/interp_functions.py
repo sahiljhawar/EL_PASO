@@ -21,7 +21,16 @@ if TYPE_CHECKING:
     from el_paso.dataset import DataSet
 
 
-class TargetType(Enum):  # noqa: D101
+class TargetType(Enum):
+    """Specifies how two target coordinate vectors should be combined for interpolation.
+
+    Attributes:
+        TargetPairs: Interpolate at each pair formed by zipping the two target
+            vectors together; the two vectors must have the same length.
+        TargetMeshGrid: Interpolate at every combination of values from the two
+            target vectors (the Cartesian product), producing a 2D grid of results.
+    """
+
     TargetPairs = 0
     TargetMeshGrid = 1
 
@@ -95,13 +104,42 @@ def _interp_flux_parallel(
     return result
 
 
-def interp_flux(  # noqa: D103
+def interp_flux(
     self: DataSet,
     target_en: float | list[float] | NDArray[np.float64],
     target_al: float | list[float],
     target_type: TargetType | Literal["TargetPairs", "TargetMesh"],
     n_threads: int = 10,
 ) -> NDArray[np.float64]:
+    """Interpolate flux to requested (energy, pitch angle) targets for every time.
+
+    For each time step, `self.Flux` is interpolated in energy at the two pitch angles
+    (from `self.alpha_eq_model`) bracketing each target pitch angle, and the two
+    resulting flux values are then linearly interpolated in pitch angle to the target.
+
+    Args:
+        self (DataSet): The DataSet instance this method operates on.
+        target_en (float | list[float] | NDArray[np.float64]): Target energy value(s)
+            to interpolate to.
+        target_al (float | list[float]): Target equatorial pitch angle value(s) to
+            interpolate to.
+        target_type (TargetType | Literal["TargetPairs", "TargetMesh"]): How to combine
+            `target_en` and `target_al`. `TargetPairs` interpolates each
+            `(energy, pitch angle)` pair (the two vectors must have the same length),
+            producing a result of shape `(time, N)`. `TargetMeshGrid` interpolates
+            every combination of the two vectors, producing a result of shape
+            `(time, n_en, n_al)`.
+        n_threads (int, optional): Number of worker processes used to parallelize the
+            interpolation over time. Defaults to `10`.
+
+    Returns:
+        NDArray[np.float64]: The interpolated flux values, with shape `(time, N)` for
+        `TargetType.TargetPairs` or `(time, n_en, n_al)` for `TargetType.TargetMeshGrid`.
+
+    Raises:
+        AssertionError: If `target_type` is `TargetType.TargetPairs` and `target_en`
+            and `target_al` do not have the same length.
+    """
     if not isinstance(target_en, Iterable):
         target_en = [target_en]
     if not isinstance(target_al, Iterable):
@@ -280,11 +318,33 @@ def interp_psd(
     target_type: TargetType | Literal["TargetPairs", "TargetMesh"],
     n_threads: int = 10,
 ) -> NDArray[np.float64]:
-    """Interpolate PSD to requested (mu, K) targets for every time.
+    """Interpolate phase space density (PSD) to requested (mu, K) targets for every time.
 
-    Output shapes (matching interp_flux semantics):
-      - TargetPairs     -> (time, N)
-      - TargetMeshGrid  -> (time, n_mu, n_K)
+    For each time step, `self.PSD` is interpolated in `self.InvMu` at the two K values
+    (from `self.InvK`) bracketing each target K, and the two resulting PSD values are
+    then linearly interpolated in K to the target.
+
+    Args:
+        self (DataSet): The DataSet instance this method operates on.
+        target_mu (float | list[float] | NDArray[np.float64]): Target first adiabatic
+            invariant (mu) value(s) to interpolate to.
+        target_K (float | list[float] | NDArray[np.float64]): Target second adiabatic
+            invariant (K) value(s) to interpolate to.
+        target_type (TargetType | Literal["TargetPairs", "TargetMesh"]): How to combine
+            `target_mu` and `target_K`. `TargetPairs` interpolates each `(mu, K)` pair
+            (the two vectors must have the same length), producing a result of shape
+            `(time, N)`. `TargetMeshGrid` interpolates every combination of the two
+            vectors, producing a result of shape `(time, n_mu, n_K)`.
+        n_threads (int, optional): Number of worker processes used to parallelize the
+            interpolation over time. Defaults to `10`.
+
+    Returns:
+        NDArray[np.float64]: The interpolated PSD values, with shape `(time, N)` for
+        `TargetType.TargetPairs` or `(time, n_mu, n_K)` for `TargetType.TargetMeshGrid`.
+
+    Raises:
+        AssertionError: If `target_type` is `TargetType.TargetPairs` and `target_mu`
+            and `target_K` do not have the same length.
     """
     if not isinstance(target_mu, Iterable):
         target_mu = [target_mu]

@@ -19,7 +19,7 @@ from el_paso.processing.magnetic_field_utils.irbem import Coords
 from el_paso.recipes.arase.get_arase_orbit_variables import get_arase_orbit_level_2_variables
 
 
-def process_arase_pwe_density(  # noqa: D103
+def process_arase_pwe_density(
     start_time: datetime,
     end_time: datetime,
     mag_field: Literal["T89", "TS04", "OP77Q"],
@@ -28,6 +28,30 @@ def process_arase_pwe_density(  # noqa: D103
     num_cores: int = 4,
     cadence: timedelta = timedelta(minutes=5),
 ) -> None:
+    """Process Arase PWE/HFA electron density data and save the mapped equatorial density.
+
+    Downloads the Arase Level 2 orbit data and the daily Arase PWE/HFA Level 3 1-minute electron
+    density CDF files for the requested time range, time-bins the density and the SM position
+    onto a common cadence, applies a lower density threshold, converts the position to GEO
+    coordinates, computes the magnetic-field-related quantities (MLT, equatorial radial distance
+    and equatorial position) via IRBEM for the given `mag_field`, maps the local density to the
+    magnetic equator, and saves the resulting variables using a `DensityNetCDFStrategy`.
+
+    Args:
+        start_time (datetime): Start of the time range to process.
+        end_time (datetime): End of the time range to process.
+        mag_field (Literal["T89", "TS04", "OP77Q"]): The magnetic field model used for the
+                                                    magnetic-field-related output variables and
+                                                    the equatorial density mapping.
+        raw_data_path (str | Path, optional): Directory where downloaded raw data files are
+                                            stored. Defaults to ".".
+        processed_data_path (str | Path, optional): Base directory where the processed output
+                                                    data is saved. Defaults to ".".
+        num_cores (int, optional): Number of CPU cores used for the IRBEM magnetic field
+                                computations. Defaults to 4.
+        cadence (timedelta, optional): Time binning cadence applied to all variables.
+                                    Defaults to timedelta(minutes=5).
+    """
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 

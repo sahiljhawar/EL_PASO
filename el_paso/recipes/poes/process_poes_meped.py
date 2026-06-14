@@ -18,7 +18,7 @@ import el_paso as ep
 from el_paso.recipes.poes import poes_satellite_literal
 
 
-def process_poes_meped_electron(  # noqa: D103
+def process_poes_meped_electron(
     satellite_str: poes_satellite_literal,
     raw_data_path: str | Path,
     processed_data_path: str | Path,
@@ -27,6 +27,26 @@ def process_poes_meped_electron(  # noqa: D103
     num_cores: int = 32,
     bin_cadence: timedelta = timedelta(minutes=5),
 ) -> None:
+    """Process POES/MetOp MEPED electron flux data into magnetic-field-resolved data products.
+
+    Downloads and extracts the SEM-2 "fluxes-2sec" CDF files for the given POES/MetOp satellite,
+    bins the integral electron flux, energy channels, local pitch angles, and ephemeris onto the
+    given time cadence. The two local pitch angles (0 and 90 degrees relative to the spacecraft)
+    are stacked into a single pitch-angle variable, and the geodetic position is converted to GEO
+    coordinates. T89 magnetic field quantities (B_Calc, B_Eq, MLT_Eq, R_Eq, Alpha_Eq, L_star, L_m)
+    are computed and the resulting variables are saved using a daily LEO saving strategy.
+
+    Args:
+        satellite_str (poes_satellite_literal): The POES/MetOp satellite to process.
+        raw_data_path (str | Path): Directory where the raw downloaded data files are stored.
+        processed_data_path (str | Path): Directory where the processed output files are saved.
+        start_time (datetime): Start of the time interval to process.
+        end_time (datetime): End of the time interval to process.
+        num_cores (int, optional): Number of CPU cores used for the magnetic field computations.
+            Defaults to 32.
+        bin_cadence (timedelta, optional): Time cadence used to bin the extracted variables.
+            Defaults to timedelta(minutes=5).
+    """
     data_path_stem = f"{raw_data_path}/POES/{satellite_str}/YYYY/MM/"
     url = f"https://spdf.gsfc.nasa.gov/pub/data/noaa/{satellite_str}/sem2_fluxes-2sec/YYYY/"
     file_name_stem = satellite_str + "_poes-sem2_fluxes-2sec_YYYYMMDD_.{3}.cdf"

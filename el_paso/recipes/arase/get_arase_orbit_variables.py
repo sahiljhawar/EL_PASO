@@ -17,9 +17,23 @@ if typing.TYPE_CHECKING:
     from datetime import datetime
 
 
-def get_arase_orbit_level_2_variables(  # noqa: D103
+def get_arase_orbit_level_2_variables(
     start_time: datetime, end_time: datetime, raw_data_path: str | Path = "."
 ) -> dict[str, ep.Variable]:
+    """Download and extract Arase Level 2 orbit (definitive) data.
+
+    Downloads the daily Arase ``orb/def`` Level 2 CDF files covering the requested time range
+    (skipping files that already exist) and extracts the epoch and SM position variables from them.
+
+    Args:
+        start_time (datetime): Start of the time range to retrieve data for.
+        end_time (datetime): End of the time range to retrieve data for.
+        raw_data_path (str | Path, optional): Directory where the downloaded raw data files are
+                                            stored. Defaults to ".".
+
+    Returns:
+        dict[str, ep.Variable]: A dictionary containing the extracted "Epoch" and "pos_sm" variables.
+    """
     raw_data_path = Path(raw_data_path)
 
     file_name_stem = "erg_orb_l2_YYYYMMDD_.{3}.cdf"
@@ -60,12 +74,34 @@ def get_arase_orbit_level_2_variables(  # noqa: D103
     return variables
 
 
-def get_arase_orbit_level_3_variables(  # noqa: D103
+def get_arase_orbit_level_3_variables(
     start_time: datetime,
     end_time: datetime,
     mag_field: Literal["OP77Q", "T89", "TS04"],
     raw_data_path: str | Path = ".",
 ) -> dict[str, ep.Variable]:
+    """Download and extract Arase Level 3 orbit data for a given magnetic field model.
+
+    Downloads the daily Arase ``orb/l3`` Level 3 CDF files corresponding to the given `mag_field`
+    model (skipping files that already exist), extracts the epoch, local and equatorial magnetic
+    field magnitude, Lm, Lstar and equatorial position variables, truncates all variables to the
+    requested time range, and derives "MLT" and "R0" variables from the equatorial position.
+
+    Args:
+        start_time (datetime): Start of the time range to retrieve data for.
+        end_time (datetime): End of the time range to retrieve data for.
+        mag_field (Literal["OP77Q", "T89", "TS04"]): The magnetic field model whose Level 3 orbit
+                                                    data should be downloaded and extracted.
+        raw_data_path (str | Path, optional): Directory where the downloaded raw data files are
+                                            stored. Defaults to ".".
+
+    Returns:
+        dict[str, ep.Variable]: A dictionary containing the extracted and derived variables
+                            ("Epoch", "B_local", "B_eq", "Lm", "Lstar", "MLT", "R0").
+
+    Raises:
+        ValueError: If `mag_field` is not one of "OP77Q", "T89" or "TS04".
+    """
     raw_data_path = Path(raw_data_path)
 
     match mag_field:

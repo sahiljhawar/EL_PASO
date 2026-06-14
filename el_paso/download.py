@@ -108,8 +108,11 @@ def download(
                                                      (used with wget). Defaults to "".
         download_arguments_suffixes (str, optional): Additional arguments to suffix to the download command
                                                      (used with wget). Defaults to "".
-        method (Literal["request", "wget"], optional): Download method to use. Either "request" (Python requests) or
-                                                       "wget" (system wget). Defaults to "request".
+        method (Literal["request", "wget", "esa_swe"], optional): Download method to use. "request" uses the Python
+                                                       requests library, "wget" uses the system wget command, and
+                                                       "esa_swe" uses the ESA Space Weather Service API (requires
+                                                       `authentication_info` and `rename_file_name_stem`).
+                                                       Defaults to "request".
         authentication_info (tuple[str, str], optional): Tuple of (username, password) for authentication.
                                                            Defaults to ("", "").
         rename_file_name_stem (str | None, optional): If provided, rename the downloaded file to this stem.

@@ -23,13 +23,35 @@ if TYPE_CHECKING:
     from el_paso.processing.interpolate_in_time import InterpolationMethod
 
 
-def process_rbsp_emfisis_waves(  # noqa: D103
+def process_rbsp_emfisis_waves(
     start_time: datetime,
     end_time: datetime,
     sat_str: Literal["a", "b"],
     raw_data_path: str | Path = ".",
     processed_data_path: str | Path = ".",
 ) -> None:
+    """Process RBSP EMFISIS wave, density, and magnetometer data and save derived wave properties.
+
+    Downloads and extracts the EMFISIS WFR spectral-matrix-diagonal data, the EMFISIS density
+    data, the EMFISIS magnetometer data, and the EMFISIS wave-normal-angle (WNA) survey data for
+    the given time range and satellite. The density and magnetometer data are interpolated onto
+    the WFR time grid, the magnetometer data is cleaned using a quality flag, orbital quantities
+    (L-shell, MLAT, MLT, electron cyclotron frequency) are derived from the cleaned magnetometer
+    data, and the total magnetic wave power spectral density is computed from the WFR
+    spectral-matrix components. The wave frequency, frequency bandwidth, wave normal angle,
+    planarity, and ellipticity are saved using `DailyWaveStrategy`. Finally, diagnostic plots of
+    the density, orbit, magnetometer, WFR spectrogram, and WNA properties are generated and shown
+    or saved to disk.
+
+    Args:
+        start_time (datetime): Start of the time range to process.
+        end_time (datetime): End of the time range to process.
+        sat_str (Literal["a", "b"]): RBSP satellite identifier ("a" or "b").
+        raw_data_path (str | Path, optional): Base directory where raw CDF files are downloaded to
+            and read from. Defaults to ".".
+        processed_data_path (str | Path, optional): Directory where the processed output files are
+            written to. Defaults to ".".
+    """
     wfr_vars = _get_wfr_data(start_time, end_time, Path(raw_data_path), sat_str)
 
     target_time_var = wfr_vars["Epoch"]

@@ -93,7 +93,7 @@ class GFZDataSet(DataSet):
         Constructs the saving strategy, invokes the parent DataSet initializer,
         and populates the list of possible variables from class annotations.
 
-        Parameters:
+        Args:
             saving_strategy (SavingStrategy): Instance of the saving strategy used to resolve file paths.
             start_time (dt.datetime): Beginning of the time range to load.
             end_time (dt.datetime): End of the time range to load.
@@ -139,27 +139,26 @@ class PRBEMDataSet(DataSet):
 
     Attributes:
         datetime (list[dt.datetime]): List of datetime objects corresponding to each time step.
-        Epoch (NDArray[np.float64]): Array of time values as floats (e.g. seconds since epoch).
-        #TODO: Add detailed descriptions and units for each variable based on the PRBEMStandard documentation.
-        datetime (list[dt.datetime])
-        Epoch (NDArray[np.float64])
-        FEDU (NDArray[np.float64])
-        FEDO (NDArray[np.float64])
-        FEIU (NDArray[np.float64])
-        Energy_FEDU (NDArray[np.float64])
-        Alpha (NDArray[np.float64])
-        Alpha_Eq (NDArray[np.float64])
-        Position (NDArray[np.float64])
-        B_Calc (NDArray[np.float64])
-        B_Eq (NDArray[np.float64])
-        L_star (NDArray[np.float64])
-        I (NDArray[np.float64])
-        MLT (NDArray[np.float64])
-        L_m (NDArray[np.float64])
-        PSD (NDArray[np.float64])
-        R_Eq (NDArray[np.float64])
-        InvMu (NDArray[np.float64])
-        InvK (NDArray[np.float64])
+        Epoch (NDArray[np.float64]): Array of time values as POSIX timestamps (seconds since epoch).
+        FEDU (NDArray[np.float64]): Processed unidirectional differential electron flux,
+            in (cm^2 s sr keV)^-1.
+        FEDO (NDArray[np.float64]): Processed omnidirectional differential electron flux.
+        FEIU (NDArray[np.float64]): Processed unidirectional integral electron flux.
+        Energy_FEDU (NDArray[np.float64]): Central energy of the FEDU channels, in MeV.
+        Alpha (NDArray[np.float64]): Local pitch angle the instrument is looking at, in degrees.
+        Alpha_Eq (NDArray[np.float64]): Computed equatorial pitch angle, in degrees.
+        Position (NDArray[np.float64]): Spacecraft position in geographic cartesian coordinates, in km.
+        B_Calc (NDArray[np.float64]): Calculated magnetic field strength at the spacecraft position, in nT.
+        B_Eq (NDArray[np.float64]): Calculated magnetic field strength at the magnetic equator, in nT.
+        L_star (NDArray[np.float64]): Calculated Roederer's L* parameter.
+        I (NDArray[np.float64]): Second adiabatic invariant integral, PRBEM standard name "I".
+        MLT (NDArray[np.float64]): Magnetic local time at the satellite location, in hours.
+        L_m (NDArray[np.float64]): Calculated McIlwain's L parameter.
+        PSD (NDArray[np.float64]): Calculated phase space density of particles.
+        R_Eq (NDArray[np.float64]): Radial distance of the satellite location mapped to the equator, in Earth radii.
+        InvMu (NDArray[np.float64]): Calculated first adiabatic invariant, in MeV/G.
+        InvK (NDArray[np.float64]): Calculated modified second adiabatic invariant, in Earth radii * G^0.5.
+        metadata (PRBEMMetaData): Metadata container for all loaded variables.
     """
 
     datetime: list[dt.datetime]
@@ -197,10 +196,8 @@ class PRBEMDataSet(DataSet):
         Constructs the saving strategy, invokes the parent DataSet initializer,
         and populates the list of possible variables from class annotations.
 
-        Parameters:
-            saving_strategy (SavingStrategy):  Instance of
-                the saving strategy used to resolve file paths. Defaults to
-                ``ep.saving_strategies.MonthlyRBStrategy``.
+        Args:
+            saving_strategy (SavingStrategy): Instance of the saving strategy used to resolve file paths.
             start_time (dt.datetime): Beginning of the time range to load.
             end_time (dt.datetime): End of the time range to load.
             preferred_extension (MFSFormats): File format to prefer when reading

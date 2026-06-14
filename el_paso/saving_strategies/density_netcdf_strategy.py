@@ -58,16 +58,16 @@ class DensityNetCDFStrategy(MonthlyRBStrategy):
     ) -> None:
         """Initializes the monthly NetCDF saving strategy.
 
-        Parameters:
+        Args:
             base_data_path (str | Path): The base directory where the output NetCDF files will be saved.
-            file_name_stem (str): The base name for the output files (e.g., "my_data").
+            mission (str): The mission name, used in file path and name generation.
+            instrument (str): The instrument name, used in file path and name generation.
             mag_field (MagneticFieldLiteral):
                 A string specifying the magnetic field model used.
             satellite (Literal["RBSP", "Other"], optional):
-                            Specifies the satellite associated with the data. This is often used to trigger
-                            specific metadata or formatting conventions. Defaults to "Other".
+                            Specifies the satellite associated with the data. This determines which set of
+                            density-related variables are included in the output file. Defaults to "Other".
             data_standard (DataStandard | None, optional):
-            data_standard (DataStandard | None):
                 An optional `DataStandard` instance to use for standardizing variables.
                 If `None`, `ep.data_standards.PRBEMStandard` is used by default.
         """
@@ -153,7 +153,7 @@ class DensityNetCDFStrategy(MonthlyRBStrategy):
         ensuring that the variable's units and dimensions are consistent with the
         defined standard.
 
-        Parameters:
+        Args:
             variable (ep.Variable): The variable instance to be standardized.
             name_in_file (str): The name of the variable as it will appear in the file.
             first_call_of_interval (bool): Flag to indicate if it is the first call of a time interval

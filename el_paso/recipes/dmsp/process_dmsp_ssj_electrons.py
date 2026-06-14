@@ -23,7 +23,7 @@ TELE_BETA_ANGLES = np.array([-180.0, 90.0])
 DMSPSatellites = Literal["f17"]
 
 
-def process_dmsp_ssj_electrons(  # noqa: D103
+def process_dmsp_ssj_electrons(
     sat_str: DMSPSatellites,
     processed_data_path: str | Path,
     raw_data_path: str | Path,
@@ -31,6 +31,24 @@ def process_dmsp_ssj_electrons(  # noqa: D103
     end_time: datetime,
     num_cores: int = 32,
 ) -> None:
+    """Process DMSP SSJ precipitating electron data into omnidirectional fluxes with magnetic field coordinates.
+
+    This downloads and extracts SSM magnetometer data and SSJ precipitating electron/ion data for the
+    given DMSP satellite and time range, bins both to a common 10-second cadence, and converts the SSJ
+    differential energy flux into an omnidirectional differential flux (assuming a 90-degree SSJ-5
+    field of view). It computes the spacecraft position in GEO coordinates, derives local pitch angles
+    for the two SSJ telescopes from the SSM magnetic field, folds them around 90 degrees, and computes
+    T89 magnetic field model quantities (B_Calc, B_Eq, MLT, B_fofl, R_Eq, Alpha_Eq, Alpha_LC_Eq,
+    Alpha_LC). The resulting variables are saved to disk using a daily LEO/RB saving strategy.
+
+    Args:
+        sat_str (DMSPSatellites): Identifier of the DMSP satellite to process (e.g. "f17").
+        processed_data_path (str | Path): Base directory in which the processed output files are saved.
+        raw_data_path (str | Path): Base directory used for downloading and locating the raw SSM/SSJ CDF files.
+        start_time (datetime): Start of the time range to process.
+        end_time (datetime): End of the time range to process.
+        num_cores (int, optional): Number of CPU cores used for the magnetic field computations. Defaults to 32.
+    """
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     data_path_stem = f"{raw_data_path}/DMSP/{sat_str}/YYYY/MM/"

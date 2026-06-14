@@ -74,16 +74,16 @@ def calculate_geo_coords_from_omm(
     omm_line: dict[str,str],
     target_times: list[datetime],
 ) -> ep.Variable:
-    """Calculate GEO coordinates (x, y, z) in kilometers from a CSV/OMM orbital file.
+    """Calculate GEO coordinates (x, y, z) in kilometers from an OMM orbital element set.
 
     Args:
-        csv_filename (str | Path): The file path containing the CSV orbital data.
+        omm_line (dict[str, str]): Dictionary containing the OMM (Orbit Mean-Elements Message)
+            orbital element data for the satellite, as consumed by
+            `skyfield.api.EarthSatellite.from_omm`.
+        target_times (list[datetime]): UTC datetimes at which to evaluate the satellite position.
 
     Returns:
-        tuple[str, list[datetime], ep.Variable]: A tuple of:
-            - satellite_name: The name of the satellite.
-            - tle_times: UTC datetime for each epoch.
-            - geo_coordinate variable.
+        ep.Variable: The GEO coordinate variable (x, y, z) in kilometers, evaluated at `target_times`.
     """
     timescale = sf_api.load.timescale()
     geo_coordinates: list[NDArray[np.float64]] = []

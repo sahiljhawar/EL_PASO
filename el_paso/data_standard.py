@@ -86,7 +86,7 @@ class DataStandard(ABC, Generic[T_co]):
         and returns a new `el_paso.Variable` that conforms to the specified standard.
 
         Args:
-            internal_name (str): The name of the standard to apply to the variable.
+            internal_name (str): The internal name of the variable to be standardized.
             variable (Variable): The variable to be standardized.
             reset_consistency_check (bool): If set to true, the consistency check will be reseted.
 
@@ -131,12 +131,9 @@ class ConsistencyCheck:
     the same length for shared dimensions (e.g., time, pitch angle, energy).
 
     Attributes:
-        len_time (_SizeAttr | None): Stores the size of the time dimension from
-                                     the first variable checked.
-        len_pitch_angle (_SizeAttr | None): Stores the size of the pitch angle
-                                            dimension from the first variable checked.
-        len_energy (_SizeAttr | None): Stores the size of the energy dimension
-                                       from the first variable checked.
+        lengths (dict[str | int, _SizeAttr]): Maps each named dimension (e.g. "time",
+            "pitch_angle", "energy") to the variable name and size that were first
+            observed for that dimension.
     """
 
     lengths: dict[str | int, _SizeAttr] = field(default_factory=dict[str | int, _SizeAttr])

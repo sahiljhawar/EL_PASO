@@ -45,7 +45,7 @@ def interpolate_in_time(
             unit (e.g., `ep.units.posixtime` or `ep.units.datenum`).
         variables (dict[str, ep.Variable]): A dictionary where keys are variable names (str) and values
             are the `ep.Variable` objects to be interpolated.
-        interpolation_method_dict (dict[str, InterpolationMethodStr]): A dictionary mapping variable names (str) to
+        interpolation_method_dict (dict[str, InterpolationMethod]): A dictionary mapping variable names (str) to
             interpolation method strings (e.g., "linear", "nearest"), specifying how each variable should be
             interpolated. If a variable is not present in this dictionary, it will be skipped.
         target_cadence (timedelta | None): Optional. A `datetime.timedelta` object specifying the
@@ -57,8 +57,8 @@ def interpolate_in_time(
             is used.
         end_time (datetime | None): Optional. A `datetime.datetime` object specifying the end
             time for generating the target axis. If None, the end time of `time_variable` is used.
-        fill_value (Any): Optional. The value used to fill data points outside the bounds of the
-            original time variable. Defaults to `np.nan`. Can also be set to `"extrapolate"`.
+        fill_value (Literal["extrapolate"] | float): Optional. The value used to fill data points outside the bounds
+            of the original time variable. Defaults to `np.nan`. Can also be set to `"extrapolate"`.
         max_gap_seconds (float | None): Optional. The maximum allowable time gap (in seconds) between two
             consecutive original timestamps. Target timestamps falling within a gap larger than this
             value will not be interpolated and will be masked with `np.nan`.

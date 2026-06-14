@@ -26,7 +26,7 @@ import el_paso as ep
 
 
 @timed_function("process_arase_xep_real_time")
-def process_arase_xep_real_time(  # noqa: D103
+def process_arase_xep_real_time(
     processed_data_path: str | Path,
     download_data_dir: str | Path,
     start_time: datetime,
@@ -39,6 +39,43 @@ def process_arase_xep_real_time(  # noqa: D103
     download: bool = True,
     skip_existing: bool = True,
 ) -> None:
+    """Process Arase XEP real-time electron flux data and save derived products.
+
+    Downloads (unless `download` is False) and extracts the daily Arase real-time XEP
+    omnidirectional flux (FEDO) text files and the real-time orbit position text files for the
+    requested time range, converts the orbit position from SM to GEO coordinates, time-bins the
+    flux and position variables onto a 5-minute cadence, computes magnetic-field-related
+    quantities (B_Calc, B_Eq, MLT, R_Eq, Alpha_Eq, L_star, L_m, InvMu, InvK) for the T89 model via
+    IRBEM, constructs a pitch-angle distribution (FEDU) from the omnidirectional flux, applies a
+    lower flux threshold, computes the electron phase space density, and saves the resulting
+    variables using the requested saving strategy/strategies.
+
+    Args:
+        processed_data_path (str | Path): Base directory where the processed output data is saved.
+        download_data_dir (str | Path): Base directory where downloaded raw data files are stored.
+        start_time (datetime): Start of the time range to process.
+        end_time (datetime): End of the time range to process.
+        erg_user (str | None, optional): Username for the ERG data server. If None, it is read
+                                        from the ``ERG_USER`` environment variable.
+                                        Defaults to None.
+        erg_password (str | None, optional): Password for the ERG data server. If None, it is
+                                            read from the ``ERG_PASSWORD`` environment variable.
+                                            Defaults to None.
+        num_cores (int, optional): Number of CPU cores used for the IRBEM magnetic field
+                                computations. Defaults to 32.
+        save_strategy (Literal["gfz", "netcdf", "both"], optional): Which saving strategy/strategies
+                                                                    to use for writing the processed
+                                                                    data. Defaults to "netcdf".
+        download (bool, optional): Whether to download the raw data files before processing.
+                                Defaults to True.
+        skip_existing (bool, optional): Whether to skip downloading files that already exist
+                                        locally. Defaults to True.
+
+    Raises:
+        ValueError: If `erg_user` is not provided and the ``ERG_USER`` environment variable is
+                not set, or if `erg_password` is not provided and the ``ERG_PASSWORD``
+                environment variable is not set.
+    """
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     if erg_user is None:

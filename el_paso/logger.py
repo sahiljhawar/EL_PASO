@@ -34,10 +34,10 @@ def setup_logging(level: str = "INFO", log_file: Optional[Path] = None, file_mod
     """Setup logging for the el_paso package and root logger.
 
     Args:
-        level (str, optional): Logging level, by default is INFO
-        log_file (Path, optional): Path to log file. If None, only console logging is enabled. I
-                f provided, logs will be written to both console and file., by default None
-        file_mode (str, optional): Mode for writing to the log file, by default is "w".
+        level (str, optional): Logging level. Defaults to "INFO".
+        log_file (Path, optional): Path to a log file. If None, only console logging is enabled.
+                If provided, logs are written to both console and file. Defaults to None.
+        file_mode (str, optional): Mode for writing to the log file. Defaults to "w".
                 Use "a" to append to an existing log file instead of overwriting it.
     """
     try:

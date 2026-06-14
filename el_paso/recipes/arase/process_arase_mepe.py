@@ -23,7 +23,7 @@ from el_paso.recipes.arase import (
 )
 
 
-def process_arase_mepe(  # noqa: D103
+def process_arase_mepe(
     start_time: datetime,
     end_time: datetime,
     mag_field: Literal["T89", "TS04", "OP77Q"],
@@ -36,6 +36,42 @@ def process_arase_mepe(  # noqa: D103
     *,
     use_level_3_orbit_data: bool = True,
 ) -> None:
+    """Process Arase MEP-e Level 3 electron flux data and save derived products.
+
+    Downloads the corresponding Arase orbit data (Level 3 if `use_level_3_orbit_data` is True,
+    otherwise Level 2) and the daily Arase MEP-e Level 3 pitch-angle resolved flux (FEDU) CDF
+    files for the requested time range, then sorts energies into ascending order, time-bins the
+    flux, position and pitch-angle variables onto a common cadence, folds the pitch-angle
+    distribution, applies a lower flux threshold, and computes the equatorial pitch angle and
+    magnetic-field-related quantities (Lm, MLT, R0) either from the Level 3 orbit data directly
+    or via IRBEM using the SM position from Level 2 orbit data. The resulting variables are
+    saved using the requested saving strategy.
+
+    Args:
+        start_time (datetime): Start of the time range to process.
+        end_time (datetime): End of the time range to process.
+        mag_field (Literal["T89", "TS04", "OP77Q"]): The magnetic field model used for the
+                                                    magnetic-field-related output variables.
+        raw_data_path (str | Path, optional): Directory where downloaded raw data files are
+                                            stored. Defaults to ".".
+        processed_data_path (str | Path, optional): Base directory where the processed output
+                                                    data is saved. Defaults to ".".
+        num_cores (int, optional): Number of CPU cores used for the IRBEM magnetic field
+                                computations (only used when `use_level_3_orbit_data` is
+                                False). Defaults to 4.
+        cadence (timedelta, optional): Time binning cadence applied to all variables.
+                                    Defaults to timedelta(minutes=5).
+        save_strategy (Literal["gfz", "h5", "netcdf"], optional): The saving strategy used to
+                                                                write the processed data.
+                                                                Defaults to "gfz".
+        data_standard (Literal["gfz", "prbem"], optional): The data standard used when saving
+                                                            the processed data. Defaults to "gfz".
+        use_level_3_orbit_data (bool, optional): If True, use Arase Level 3 orbit data (which
+                                                already contains precomputed magnetic field
+                                                quantities for `mag_field`); if False, use Level 2
+                                                orbit data and compute the magnetic field
+                                                quantities via IRBEM. Defaults to True.
+    """
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 

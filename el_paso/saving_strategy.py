@@ -93,8 +93,8 @@ class SavingStrategy(ABC):
             optionally appending data.
 
         append_data:
-            Abstract method to append data to an existing file; must be implemented by subclasses.
-            All subclasses may not need it, so it is not defined in the base class.
+            Appends data to an existing output file by merging it with newly computed data
+            and rewriting the file. Supported for any format with a registered loader/writer.
     """
 
     output_files: list[OutputFile]
@@ -130,10 +130,8 @@ class SavingStrategy(ABC):
         """Generates a list of time intervals to save between the specified start and end times.
 
         Args:
-            start_time (datetime | None): The starting datetime for the intervals.
-                                          If None, intervals may start from the earliest available time.
-            end_time (datetime | None): The ending datetime for the intervals.
-                                        If None, intervals may end at the latest available time.
+            start_time (datetime): The starting datetime for the intervals.
+            end_time (datetime): The ending datetime for the intervals.
 
         Returns:
             list[TimeInterval]: A list of tuples, each representing a time interval (start, end)
@@ -346,7 +344,7 @@ class SavingStrategy(ABC):
     ) -> dict[InternalName, ep.Variable] | None:
         """Retrieves and processes target variables for saving based on the specified output file.
 
-        Parameters:
+        Args:
             output_file (OutputFile): The output file configuration containing variable names to save.
             variables_dict (dict[str, Variable]): Dictionary mapping variable names to Variable objects.
             time_var (Variable | None): The time variable used for truncation, if applicable.

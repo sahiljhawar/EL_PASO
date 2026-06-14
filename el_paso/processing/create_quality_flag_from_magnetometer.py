@@ -17,12 +17,12 @@ def create_quality_flag_from_magnetometer(bt_var: ep.Variable, threshold: int = 
     2. Consecutive differences |ΔBt| must be below the spike threshold.
 
     Args:
-        bt_var (dict): Variable holding total magnetic field.
-        threshold(int, optional): Spike detection threshold in nT.
+        bt_var (ep.Variable): Variable holding the total magnetic field.
+        threshold (int, optional): Spike detection threshold in nT.
             Defaults to 500.
 
     Returns:
-        np.ndarray: Boolean array where ``True`` indicates valid data and
+        ep.Variable: A boolean mask variable where ``True`` indicates valid data and
         ``False`` indicates flagged samples.
     """
     bt = bt_var.get_data(u.nT)

@@ -37,7 +37,7 @@ def _remove_unit_from_energy_channels(energy_channels: NDArray[np.generic]) -> N
 
 
 @timed_function("process_goes_real_time")
-def process_goes_real_time(  # noqa: D103
+def process_goes_real_time(
     sat_str: Literal["primary", "secondary"],
     processed_data_path: str | Path,
     raw_data_path: str | Path,
@@ -47,6 +47,32 @@ def process_goes_real_time(  # noqa: D103
     num_cores: int = 32,
     skip_existing: bool = True,  # noqa: FBT001, FBT002,
 ) -> None:
+    """Process GOES real-time differential electron flux data into pitch-angle resolved phase space densities.
+
+    Downloads and extracts the real-time "differential-electrons-3-day" JSON product for the
+    given GOES satellite, converts the timestamps and energy channel labels, sorts the energy
+    channels and fluxes in ascending order, and bins the data onto a 5-minute time cadence.
+    A fixed spacecraft position (from `GEOCOORDS_DICT`) and a fixed set of local pitch angles
+    (5 to 90 degrees in 5-degree steps) are assigned, T89 magnetic field quantities (B_Calc, B_Eq,
+    MLT, R_Eq, Alpha_Eq, L_star, L_m, InvMu, InvK) are computed, the omnidirectional flux is
+    converted to a pitch-angle distribution, and the electron phase space density is derived.
+    The resulting variables are saved using the requested saving strategy.
+
+    Args:
+        sat_str (Literal["primary", "secondary"]): Which GOES real-time satellite to process
+            ("primary" corresponds to GOES19, "secondary" to GOES18).
+        processed_data_path (str | Path): Directory where the processed output files are saved.
+        raw_data_path (str | Path): Directory where the raw downloaded data files are stored.
+        start_time (datetime): Start of the time interval to process.
+        end_time (datetime): End of the time interval to process.
+        save_strategy (Literal["gfz", "netcdf", "both"], optional): Strategy used to save the
+            processed data. "gfz" saves using the GFZ format, "netcdf" saves monthly NetCDF files,
+            and "both" saves using both strategies. Defaults to "netcdf".
+        num_cores (int, optional): Number of CPU cores used for the magnetic field computations.
+            Defaults to 32.
+        skip_existing (bool, optional): If True, skip downloading files that already exist on
+            disk. Defaults to True.
+    """
     # Part 1: specify source files to extract variables
     data_path_stem = f"{raw_data_path}/GOES/YYYY/MM/{sat_str}/"
     rename_file_name_stem = f"{sat_str}_YYYYMMDD.json"
