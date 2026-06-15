@@ -354,7 +354,8 @@ def test_save_raises_when_required_dimension_is_missing(
     )
 
     with pytest.raises(
-        ValueError, match="Data for dimension 'Energy_FEDU' is not saved! Required by: FEDU, InvMu, PSD"
+        ValueError,
+        match=r"Data for the following dimensions is not saved: 'Energy_FEDU' \(required by: FEDU, InvMu, PSD\)",
     ):
         ep.save(
             variables,

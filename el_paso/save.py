@@ -117,14 +117,18 @@ def _validate_variables_dict(variables_dict: dict[InternalName, Variable], data_
     # check if necessary dimensions are saved
     all_dependencies = [data_standard.get_dependencies(name) for name in variables_dict]
     unique_dimensions = np.unique(list(itertools.chain.from_iterable(all_dependencies)))
-    for dim in unique_dimensions:
-        if dim in get_args(FixedDimensionName):
-            continue
-
-        if dim not in variables_dict:
-            required_by = [name for name in variables_dict if dim in data_standard.get_dependencies(name)]
-            msg = f"Data for dimension '{dim}' is not saved! Required by: {', '.join(required_by)}"
-            raise ValueError(msg)
+    missing = {
+        dim: [name for name in variables_dict if dim in data_standard.get_dependencies(name)]
+        for dim in unique_dimensions
+        if dim not in get_args(FixedDimensionName) and dim not in variables_dict
+    }
+    if len(missing) > 0:
+        missing_details = "; ".join(
+            f"'{dim}' (required by: {', '.join(required_by)})"
+            for dim, required_by in missing.items()
+        )
+        msg = f"Data for the following dimensions is not saved: {missing_details}"
+        raise ValueError(msg)
 
 
 def _get_data_dict_to_save(
