@@ -6,4 +6,3 @@ SPDX-License-Identifier: Apache-2.0
 -->
 
 ::: el_paso.dataset.GFZDataSet
-::: el_paso.dataset.PRBEMDataSet
