@@ -7,7 +7,6 @@ import typing
 
 import netCDF4
 import pytest
-from _pytest.config.argparsing import ArgumentError, NotSet
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -20,8 +19,4 @@ def renew_solution(request: pytest.FixtureRequest) -> bool:
         return v.lower() in ("yes", "true", "t", "1")
 
     option = request.config.getoption("--renew_solution")
-    if option is NotSet:
-        msg = "renew_solution not provided!"
-        raise ArgumentError(msg, "renew_solution")
-
     return str2bool(typing.cast("str", option))
