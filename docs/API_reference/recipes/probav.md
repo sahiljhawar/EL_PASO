@@ -6,3 +6,5 @@ SPDX-License-Identifier: Apache-2.0
 -->
 
 ::: el_paso.recipes.probav.process_ept_electron_fluxes.process_ept_electron_fluxes
+
+::: el_paso.recipes.probav.process_ept_proton_fluxes.process_ept_proton_fluxes
