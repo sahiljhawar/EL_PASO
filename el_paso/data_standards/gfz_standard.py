@@ -45,6 +45,9 @@ class GFZStandard(DataStandard[GFZVarNames]):
             "Energy_FEDO": VariableInfo[GFZVarNames](
                 "energy_FEDO", "Central energy of measured omnidirecitonal flux.", u.MeV, ["Epoch", "Energy_FEDO"]
             ),
+            "Energy_FPDU": VariableInfo[GFZVarNames](
+                "energy_FPDU", "Central energy of measured proton differential flux.", u.MeV, ["Epoch", "Energy_FPDU"]
+            ),
             "FEDU": VariableInfo[GFZVarNames](
                 "Flux",
                 "Electron differential unidirectional flux.",
@@ -62,6 +65,12 @@ class GFZStandard(DataStandard[GFZVarNames]):
                 "Electron differential omnidirectional flux.",
                 (u.cm**2 * u.s * u.keV) ** (-1),
                 ["Epoch", "Energy_FEDO", "Alpha_range"],
+            ),
+            "FPDU": VariableInfo[GFZVarNames](
+                "FPDU",
+                "Proton differential unidirectional flux.",
+                (u.cm**2 * u.s * u.sr * u.keV) ** (-1),
+                ["Epoch", "Energy_FPDU", "Alpha"],
             ),
             "Alpha": VariableInfo[GFZVarNames](
                 "alpha_local", "Local pitch angles of the particles.", u.radian, ["Epoch", "Alpha"]

@@ -5,6 +5,7 @@
 
 import logging
 import typing
+import warnings
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Literal
@@ -73,7 +74,8 @@ class TimeBinMethod(Enum):
             data = np.sort(data, axis=0)
             data = data[num_to_remove:-num_to_remove]
 
-        with np.errstate(invalid="ignore"):
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=RuntimeWarning)
             match self.value:
                 case "Mean":
                     data = typing.cast("NDArray[np.floating]", data)

@@ -6,3 +6,6 @@
 from el_paso.recipes.probav.process_ept_electron_fluxes import (
     process_ept_electron_fluxes as process_ept_electron_fluxes,
 )
+from el_paso.recipes.probav.process_ept_proton_fluxes import (
+    process_ept_proton_fluxes as process_ept_proton_fluxes,
+)

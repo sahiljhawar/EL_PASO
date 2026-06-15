@@ -53,14 +53,21 @@ MagFieldVarTypes: TypeAlias = Literal[
     "I",
 ]
 
+FixedDimensionName = Literal[
+    "Position_components",
+    "min_max"
+]
+
 InternalName: TypeAlias = (
     Literal[
         "FEDU",
         "FEDO",
         "FEIU",
+        "FPDU",
         "Energy_FEDU",
         "Energy_FEDO",
         "Energy_FEIU",
+        "Energy_FPDU",
         "Epoch",
         "Alpha",
         "Alpha_range",
@@ -92,9 +99,11 @@ GFZVarNames: TypeAlias = Literal[
     "energy_channels",
     "energy_FEIU",
     "energy_FEDO",
+    "energy_FPDU",
     "Flux",
     "FEIU",
     "FEDO",
+    "FPDU",
     "alpha_local",
     "alpha_eq_model",
     "PSD",

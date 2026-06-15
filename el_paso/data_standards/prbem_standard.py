@@ -35,6 +35,12 @@ class PRBEMStandard(DataStandard[PRBEMName]):
                 (u.cm**2 * u.s * u.sr * u.keV) ** (-1),
                 dependencies=["Epoch", "Energy_FEDU", "Alpha"],
             ),
+            "FPDU": VariableInfo[PRBEMName](
+                "FPDU",
+                "Processed unidirectional differential proton flux",
+                (u.cm**2 * u.s * u.sr * u.keV) ** (-1),
+                dependencies=["Epoch", "Energy_FPDU", "Alpha"],
+            ),
             "Alpha": VariableInfo[PRBEMName](
                 "Alpha", "Local pitch angle the instrument is looking at", u.deg, dependencies=["Epoch", "Alpha"]
             ),
@@ -49,6 +55,12 @@ class PRBEMStandard(DataStandard[PRBEMName]):
                 "Central energy of unidirectional differential electron flux",
                 u.MeV,
                 dependencies=["Epoch", "Energy_FEDU"],
+            ),
+            "Energy_FPDU": VariableInfo[PRBEMName](
+                "Energy_FPDU",
+                "Central energy of unidirectional differential proton flux",
+                u.MeV,
+                dependencies=["Epoch", "Energy_FPDU"],
             ),
             "Position": VariableInfo[PRBEMName](
                 "Position",

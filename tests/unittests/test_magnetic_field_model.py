@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -17,7 +18,10 @@ mag_field_list = ["OP77", "T89", "T01s", "TS04"]
 
 @pytest.mark.parametrize("mag_field", mag_field_list)
 @pytest.mark.basic
-def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"]):
+def test_magnetic_field(mag_field: Literal["T89", "OP77", "TS04", "T01s"], skip_if_unreachable: Callable[..., None]):
+    if mag_field in ("T01s", "TS04"):
+        skip_if_unreachable("https://omniweb.gsfc.nasa.gov", "https://spdf.gsfc.nasa.gov")
+
     true_data = {
         "OP77": (92.3, 97.27, 106.77),
         "T89": (82.31, 90.91, 96.11),
