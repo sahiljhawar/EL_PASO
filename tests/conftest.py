@@ -5,12 +5,12 @@
 
 import typing
 
-import netCDF4  # noqa: F401
+import netCDF4
 import pytest
-from _pytest.config.argparsing import ArgumentError, NotSet, Parser
+from _pytest.config.argparsing import ArgumentError, NotSet
 
 
-def pytest_addoption(parser: Parser) -> None:
+def pytest_addoption(parser: pytest.Parser) -> None:
     parser.addoption("--renew_solution", action="store", default="false")
 
 
