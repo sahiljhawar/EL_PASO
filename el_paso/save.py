@@ -65,7 +65,8 @@ def save(
         warning is logged and that output file is skipped (no exception is raised).
     """
     if not ignore_validation:
-        _validate_variables_dict(variables_dict, saving_strategy.data_standard)
+        data_standard = saving_strategy.data_standard if hasattr(saving_strategy, "data_standard") else None
+        _validate_variables_dict(variables_dict, data_standard)
 
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
@@ -91,7 +92,7 @@ def save(
                 file_path.chmod(0o660)
 
 
-def _validate_variables_dict(variables_dict: dict[InternalName, Variable], data_standard: DataStandard) -> None:
+def _validate_variables_dict(variables_dict: dict[InternalName, Variable], data_standard: DataStandard | None) -> None:
     """Validates runtime types for data passed to ``save``.
 
     This guard complements static type checking by rejecting invalid keys and
@@ -115,20 +116,21 @@ def _validate_variables_dict(variables_dict: dict[InternalName, Variable], data_
         raise TypeError(msg)
 
     # check if necessary dimensions are saved
-    all_dependencies = [data_standard.get_dependencies(name) for name in variables_dict]
-    unique_dimensions = np.unique(list(itertools.chain.from_iterable(all_dependencies)))
-    missing = {
-        dim: [name for name in variables_dict if dim in data_standard.get_dependencies(name)]
-        for dim in unique_dimensions
-        if dim not in get_args(FixedDimensionName) and dim not in variables_dict
-    }
-    if len(missing) > 0:
-        missing_details = "; ".join(
-            f"'{dim}' (required by: {', '.join(required_by)})"
-            for dim, required_by in missing.items()
-        )
-        msg = f"Data for the following dimensions is not saved: {missing_details}"
-        raise ValueError(msg)
+    if data_standard:
+        all_dependencies = [data_standard.get_dependencies(name) for name in variables_dict]
+        unique_dimensions = np.unique(list(itertools.chain.from_iterable(all_dependencies)))
+        missing = {
+            dim: [name for name in variables_dict if dim in data_standard.get_dependencies(name)]
+            for dim in unique_dimensions
+            if dim not in get_args(FixedDimensionName) and dim not in variables_dict
+        }
+        if len(missing) > 0:
+            missing_details = "; ".join(
+                f"'{dim}' (required by: {', '.join(required_by)})"
+                for dim, required_by in missing.items()
+            )
+            msg = f"Data for the following dimensions is not saved: {missing_details}"
+            raise ValueError(msg)
 
 
 def _get_data_dict_to_save(

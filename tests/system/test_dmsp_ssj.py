@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import shutil
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -18,9 +19,12 @@ from el_paso.recipes.dmsp import process_dmsp_ssj_electrons
 @pytest.mark.basic
 def test_dmsp_ssj(
     tmpdir: Path,
+    skip_if_unreachable: Callable[..., None],
     *,
     renew_solution: bool,
 ) -> None:
+    skip_if_unreachable("https://spdf.gsfc.nasa.gov")
+
     start_time = datetime(2013, 9, 8, tzinfo=timezone.utc)
     end_time = start_time + timedelta(hours=4)
 

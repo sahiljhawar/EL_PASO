@@ -3,6 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+from collections.abc import Callable
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -14,7 +15,9 @@ import el_paso as ep
 
 
 @pytest.mark.basic
-def test_calculate_w_parameters() -> None:
+def test_calculate_w_parameters(skip_if_unreachable: Callable[..., None]) -> None:
+    skip_if_unreachable("https://omniweb.gsfc.nasa.gov")
+
     start_time = datetime(2015, 3, 17, 0, 0, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=1)
 
@@ -30,7 +33,9 @@ def test_calculate_w_parameters() -> None:
 
 
 @pytest.mark.visual
-def test_w_parameters_comparison() -> None:
+def test_w_parameters_comparison(skip_if_unreachable: Callable[..., None]) -> None:
+    skip_if_unreachable("https://omniweb.gsfc.nasa.gov", "https://geo.phys.spbu.ru")
+
     start_time = datetime(2015, 3, 17, 0, 0, tzinfo=timezone.utc)
     end_time = start_time + timedelta(days=1)
 
