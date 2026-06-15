@@ -165,6 +165,8 @@ def process_ept_proton_fluxes(
     del variables["ch0"], variables["ch1"], variables["ch2"], variables["ch3"], variables["ch4"]
     del variables["ch5"], variables["ch6"], variables["ch7"], variables["ch8"], variables["ch9"]
 
+    variables["FPDU"].apply_thresholds_on_data(lower_threshold=1e-21)
+
     # apply chi-2 quality check
     variables["FPDU"].apply_mask(variables["chi2"].get_data().astype(np.float64) < CHI2_BAD_QUALITY_THRESHOLD)
     variables["FPDU"].metadata.add_processing_note(
@@ -294,22 +296,22 @@ def process_ept_proton_fluxes(
 
 
 if __name__ == "__main__":
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    logging.getLogger().setLevel(logging.INFO)
+
+    ep.setup_logging()
 
     parser = argparse.ArgumentParser(description="Process EPT proton flux data.")
     parser.add_argument(
         "--start_time",
         type=str,
         help="Start time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2024, 5, 8, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2025, 5, 8, tzinfo=timezone.utc).isoformat(),
         required=False,
     )
     parser.add_argument(
         "--end_time",
         type=str,
         help="End time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2024, 5, 8, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2025, 5, 15, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
         required=False,
     )
 
