@@ -156,6 +156,8 @@ def process_ept_electron_fluxes(
     variables["FEDU"] = ep.Variable(data=flux_data, original_unit=flux_unit)
     del variables["ch0"], variables["ch1"], variables["ch2"], variables["ch3"], variables["ch4"], variables["ch5"]
 
+    variables["FEDU"].apply_thresholds_on_data(lower_threshold=1e-21)
+
     # apply chi-2 quality check
     variables["FEDU"].apply_mask(variables["chi2"].get_data().astype(np.float64) < CHI2_BAD_QUALITY_THRESHOLD)
     variables["FEDU"].metadata.add_processing_note(
