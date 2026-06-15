@@ -328,3 +328,38 @@ def test_append_data(
         var_attrs = metadata.get(var_key, {})
         assert meta_keys_check(var_attrs.keys())
         assert var_attrs.get("unit", "unknown") != "unknown"
+
+
+@pytest.mark.basic
+def test_save_raises_when_required_dimension_is_missing(
+    tmp_path: Path,
+) -> None:
+    """Saving variables whose required dimension variable is absent must raise ValueError."""
+    variables = _mock_monthly_variables()
+
+    std = ep.data_standards.GFZStandard()
+
+    variables.pop("Energy_FEDU")
+
+    start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_time = datetime(2013, 1, 7, tzinfo=timezone.utc)
+    strategy = ep.saving_strategies.MonthlyRBStrategy(
+        base_data_path=tmp_path,
+        mission="GOES",
+        satellite="primary",
+        instrument="MAGED",
+        mag_field="T89",
+        file_format="nc",
+        data_standard=std,
+    )
+
+    with pytest.raises(
+        ValueError, match="Data for dimension 'Energy_FEDU' is not saved! Required by: FEDU, InvMu, PSD"
+    ):
+        ep.save(
+            variables,
+            strategy,
+            start_time=start_time,
+            end_time=end_time,
+            time_var=variables["Epoch"],
+        )

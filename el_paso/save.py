@@ -5,12 +5,14 @@
 
 from __future__ import annotations
 
+import itertools
 import logging
 from typing import TYPE_CHECKING, Any, get_args
 
 import numpy as np
 
-from el_paso.typing import InternalName, Variable
+from el_paso.data_standard import DataStandard
+from el_paso.typing import FixedDimensionName, InternalName, Variable
 from el_paso.utils import enforce_utc_timezone, timed_function
 
 if TYPE_CHECKING:
@@ -63,7 +65,7 @@ def save(
         warning is logged and that output file is skipped (no exception is raised).
     """
     if not ignore_validation:
-        _validate_variables_dict(variables_dict)
+        _validate_variables_dict(variables_dict, saving_strategy.data_standard)
 
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
@@ -89,7 +91,7 @@ def save(
                 file_path.chmod(0o660)
 
 
-def _validate_variables_dict(variables_dict: dict[InternalName, Variable]) -> None:
+def _validate_variables_dict(variables_dict: dict[InternalName, Variable], data_standard: DataStandard) -> None:
     """Validates runtime types for data passed to ``save``.
 
     This guard complements static type checking by rejecting invalid keys and
@@ -111,6 +113,18 @@ def _validate_variables_dict(variables_dict: dict[InternalName, Variable]) -> No
     if invalid_values:
         msg = f"variables_dict must map each internal name to an ep.Variable. Invalid entries: {invalid_values}"
         raise TypeError(msg)
+
+    # check if necessary dimensions are saved
+    all_dependencies = [data_standard.get_dependencies(name) for name in variables_dict]
+    unique_dimensions = np.unique(list(itertools.chain.from_iterable(all_dependencies)))
+    for dim in unique_dimensions:
+        if dim in get_args(FixedDimensionName):
+            continue
+
+        if dim not in variables_dict:
+            required_by = [name for name in variables_dict if dim in data_standard.get_dependencies(name)]
+            msg = f"Data for dimension '{dim}' is not saved! Required by: {', '.join(required_by)}"
+            raise ValueError(msg)
 
 
 def _get_data_dict_to_save(
