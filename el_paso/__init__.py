@@ -44,7 +44,7 @@ __all__ = [
     "IRBEM_SYSAXIS_MAG",
     "IRBEM_SYSAXIS_SM",
     "ExtractionInfo",
-    "SavingStrategy"
+    "SavingStrategy",
     "TimeBinMethod",
     "Variable",
     "activate_release_mode",

@@ -8,7 +8,14 @@ from pathlib import Path
 import el_paso as ep
 
 
-class DailyLEORBStrategy(ep.typing.MonthlyRBStrategy):  # noqa: D101
+class DailyLEORBStrategy(ep.typing.MonthlyRBStrategy):
+    """Save PRBEM-standard LEO radiation-belt data into one NetCDF file per day.
+
+    This strategy extends `MonthlyRBStrategy` but splits the output into daily
+    files instead of monthly ones, and fixes the output variable list and file
+    format (NetCDF) for low-Earth-orbit radiation-belt missions.
+    """
+
     def _get_output_file_entries(self) -> list[ep.typing.InternalName]:
         """Return the standard variable list plus user-defined custom variables."""
         return [

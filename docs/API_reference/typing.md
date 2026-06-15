@@ -9,6 +9,14 @@ SPDX-License-Identifier: Apache-2.0
     options:
       members: false
 
+::: el_paso.typing.DailyLEORBStrategy
+    options:
+      members: false
+
+::: el_paso.typing.DailyWaveStrategy
+    options:
+      members: false
+
 ::: el_paso.typing.DataStandard
     options:
       members: false
@@ -22,6 +30,18 @@ SPDX-License-Identifier: Apache-2.0
       members: false
 
 ::: el_paso.typing.FileWriter
+    options:
+      members: false
+
+::: el_paso.typing.GFZMetaData
+    options:
+      members: false
+
+::: el_paso.typing.GFZStandard
+    options:
+      members: false
+
+::: el_paso.typing.GFZStrategy
     options:
       members: false
 
@@ -49,12 +69,23 @@ SPDX-License-Identifier: Apache-2.0
     options:
       members: false
 
+::: el_paso.typing.MonthlyRBStrategy
+    options:
+      members: false
 
 ::: el_paso.typing.OutputFile
     options:
       members: false
 
+::: el_paso.typing.PRBEMMetaData
+    options:
+      members: false
+
 ::: el_paso.typing.PRBEMName
+    options:
+      members: false
+
+::: el_paso.typing.PRBEMStandard
     options:
       members: false
 

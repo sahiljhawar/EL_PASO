@@ -26,7 +26,7 @@ __all__ = [
     "TimeBinMethod",
     "VariableRequest",
     "bin_by_time",
-    "calculate_geo_coords_from_csv",
+    "calculate_geo_coords_from_omm",
     "calculate_geo_coords_from_tle",
     "compute_equatorial_plasmaspheric_density",
     "compute_invariant_K",

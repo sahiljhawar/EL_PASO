@@ -52,6 +52,9 @@ nav:
           - API_reference/save.md
       - Processing Functions:
           - API_reference/processing/bin_by_time.md
+          - API_reference/processing/calculate_geo_coords_from_omm.md
+          - API_reference/processing/calculate_geo_coords_from_tle.md
+          - API_reference/processing/compute_equatorial_plasmaspheric_density.md
           - API_reference/processing/compute_invariant_K.md
           - API_reference/processing/compute_invariant_mu.md
           - API_reference/processing/compute_magnetic_field_variables.md
@@ -59,16 +62,22 @@ nav:
           - API_reference/processing/compute_pitch_angles_for_telescopes.md
           - API_reference/processing/construct_pitch_angle_distribution.md
           - API_reference/processing/convert_string_to_datetime.md
+          - API_reference/processing/create_quality_flag_from_magnetometer.md
           - API_reference/processing/fold_pitch_angles_and_flux.md
-          - API_reference/processing/calculate_geo_coords_from_tle.md
+          - API_reference/processing/get_real_time_tipsod.md
+          - API_reference/processing/interpolate_in_time.md
       - Utilities:
           - General Utilities: API_reference/utilities/general_utilities.md
           - Loading Geomagnetic Indices and Solar Wind Parameters: API_reference/utilities/load_indices_solar_wind_parameters.md
           - Magnetic Field Utilities: API_reference/utilities/magnetic_field_utilities.md
+          - Physics: API_reference/physics.md
           - Release mode: API_reference/utilities/release_mode.md
           - Scripts: API_reference/utilities/scripts.md
           - Units: API_reference/utilities/units.md
       - Saving Strategies:
+          - Daily LEO RB Strategy: API_reference/saving_strategies/daily_leo_rb.md
+          - Daily Wave Strategy: API_reference/saving_strategies/daily_wave.md
+          - Density NetCDF Strategy: API_reference/saving_strategies/density_netcdf.md
           - GFZ Strategy: API_reference/saving_strategies/gfz.md
           - Monthly File Strategy: API_reference/saving_strategies/monthly.md
           - Single File Strategy: API_reference/saving_strategies/single_file.md
@@ -78,6 +87,14 @@ nav:
       - Datasets: API_reference/dataset/dataset_implementations.md
       - Metadata: API_reference/metadata.md
       - Typing: API_reference/typing.md
+      - Recipes:
+          - Arase: API_reference/recipes/arase.md
+          - DMSP: API_reference/recipes/dmsp.md
+          - ESA (NGRM): API_reference/recipes/esa.md
+          - GOES: API_reference/recipes/goes.md
+          - POES: API_reference/recipes/poes.md
+          - ProbaV: API_reference/recipes/probav.md
+          - RBSP: API_reference/recipes/rbsp.md
   - Tutorial Notebooks:
       - Data Downloading and Extraction: tutorials/1_download_data_and_extracting_variables.ipynb
       - Variable Processing: tutorials/2_variable_class.ipynb

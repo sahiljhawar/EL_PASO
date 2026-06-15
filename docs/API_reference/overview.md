@@ -35,6 +35,8 @@ This section provides a detailed reference for all modules, classes, and functio
 
 [Magnetic field utilities](utilities/magnetic_field_utilities.md)
 
+[Physics](physics.md)
+
 [Scripts](utilities/scripts.md)
 
 [Release mode](utilities/release_mode.md)
@@ -45,11 +47,15 @@ This section provides a detailed reference for all modules, classes, and functio
 
 [bin_by_time](processing/bin_by_time.md)
 
+[calculate_geo_coords_from_omm](processing/calculate_geo_coords_from_omm.md)
+
 [calculate_geo_coords_from_tle](processing/calculate_geo_coords_from_tle.md)
 
-[compute_invariank_K](processing/compute_invariant_K.md)
+[compute_equatorial_plasmaspheric_density](processing/compute_equatorial_plasmaspheric_density.md)
 
-[compute_invariank_mu](processing/compute_invariant_mu.md)
+[compute_invariant_K](processing/compute_invariant_K.md)
+
+[compute_invariant_mu](processing/compute_invariant_mu.md)
 
 [compute_magnetic_field_variables](processing/compute_magnetic_field_variables.md)
 
@@ -59,11 +65,23 @@ This section provides a detailed reference for all modules, classes, and functio
 
 [construct_pitch_angle_distribution](processing/construct_pitch_angle_distribution.md)
 
-[fold_pitch_angles_and_flux](processing/fold_pitch_angles_and_flux.md)
-
 [convert_string_to_datetime](processing/convert_string_to_datetime.md)
 
+[create_quality_flag_from_magnetometer](processing/create_quality_flag_from_magnetometer.md)
+
+[fold_pitch_angles_and_flux](processing/fold_pitch_angles_and_flux.md)
+
+[get_real_time_tipsod](processing/get_real_time_tipsod.md)
+
+[interpolate_in_time](processing/interpolate_in_time.md)
+
 ## Saving standards
+
+[DailyLEORBStrategy](saving_strategies/daily_leo_rb.md)
+
+[DailyWaveStrategy](saving_strategies/daily_wave.md)
+
+[DensityNetCDFStrategy](saving_strategies/density_netcdf.md)
 
 [GFZStrategy](saving_strategies/gfz.md)
 
@@ -90,3 +108,19 @@ This section provides a detailed reference for all modules, classes, and functio
 ## Typing
 
 [Typing](typing.md)
+
+## Recipes
+
+[Arase](recipes/arase.md)
+
+[DMSP](recipes/dmsp.md)
+
+[ESA (NGRM)](recipes/esa.md)
+
+[GOES](recipes/goes.md)
+
+[POES](recipes/poes.md)
+
+[ProbaV](recipes/probav.md)
+
+[RBSP](recipes/rbsp.md)
