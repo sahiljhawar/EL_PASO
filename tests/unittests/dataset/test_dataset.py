@@ -6,7 +6,8 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+import pathlib
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 from unittest import mock
 
@@ -15,13 +16,13 @@ import pytest
 from astropy import units as u
 
 import el_paso as ep
-from el_paso.dataset import DataSet
+from el_paso.dataset import DataSet, GFZDataSet
 from el_paso.dataset.utils import python2matlab
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from el_paso.typing import InternalName, MFSFormats
+    from el_paso.typing import DataStandard, InternalName, MFSFormats
 
 
 def _mock_monthly_variables() -> dict[InternalName, ep.Variable]:
@@ -122,6 +123,34 @@ def mock_dataset(request, tmp_path: Path) -> DataSet:  # noqa: ANN001
         preferred_extension=formats,
         verbose=True,
     )
+
+
+@pytest.fixture
+def gfz_dataset(tmp_path: Path) -> DataSet:
+    variables = _mock_monthly_variables()
+    start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_time = datetime(2013, 1, 2, tzinfo=timezone.utc)
+    strategy = ep.saving_strategies.MonthlyRBStrategy(
+        tmp_path, "TEST", "sat", "inst", "T89",
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format="nc",
+    )
+    ep.save(variables, strategy, start_time=start_time, end_time=end_time, time_var=variables["Epoch"])
+    return DataSet(saving_strategy=strategy, start_time=start_time, end_time=end_time, preferred_extension="nc")
+
+
+@pytest.fixture
+def prbem_dataset(tmp_path: Path) -> DataSet:
+    variables = _mock_monthly_variables()
+    start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_time = datetime(2013, 1, 2, tzinfo=timezone.utc)
+    strategy = ep.saving_strategies.MonthlyRBStrategy(
+        tmp_path, "TEST", "sat", "inst", "T89",
+        data_standard=ep.data_standards.PRBEMStandard(),
+        file_format="nc",
+    )
+    ep.save(variables, strategy, start_time=start_time, end_time=end_time, time_var=variables["Epoch"])
+    return DataSet(saving_strategy=strategy, start_time=start_time, end_time=end_time, preferred_extension="nc")
 
 
 @pytest.mark.basic
@@ -306,3 +335,218 @@ class TestDataSet:  # noqa: D101
             assert (
                 caplog.text.count("/GOES/primary/primary_maged_20130101to20130131_T89") == log_count_after_first_load
             ), "File should not have been loaded again"
+
+@pytest.mark.basic
+@pytest.mark.parametrize("file_format", ["nc", "h5", "cdf", "mat"])
+def test_dataset_equality_rejects_data_saved_with_different_standards(tmp_path: Path, file_format: MFSFormats) -> None:
+    variables = _mock_monthly_variables()
+    start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_time = datetime(2013, 1, 2, tzinfo=timezone.utc)
+
+    gfz_strategy = ep.saving_strategies.MonthlyRBStrategy(
+        base_data_path=tmp_path / "gfz",
+        mission="GOES",
+        satellite="primary",
+        instrument="MAGED",
+        mag_field="T89",
+        file_format=file_format,
+        data_standard=ep.data_standards.GFZStandard(),
+    )
+    prbem_strategy = ep.saving_strategies.MonthlyRBStrategy(
+        base_data_path=tmp_path / "prbem",
+        mission="GOES",
+        satellite="primary",
+        instrument="MAGED",
+        mag_field="T89",
+        file_format=file_format,
+        data_standard=ep.data_standards.PRBEMStandard(),
+    )
+
+    for strategy in (gfz_strategy, prbem_strategy):
+        ep.save(variables, strategy, start_time=start_time, end_time=end_time, time_var=variables["Epoch"])
+
+    gfz_dataset = DataSet(
+        saving_strategy=gfz_strategy, start_time=start_time, end_time=end_time,
+        preferred_extension=file_format, verbose=False,
+    )
+    prbem_dataset = DataSet(
+        saving_strategy=prbem_strategy, start_time=start_time, end_time=end_time,
+        preferred_extension=file_format, verbose=False,
+    )
+
+    gfz_dataset.load(gfz_strategy.data_standard.get_standard_name("FEDU"))
+    prbem_dataset.load(prbem_strategy.data_standard.get_standard_name("FEDU"))
+
+    assert "Flux" in gfz_dataset.get_loaded_variables()
+    assert "FEDU" in prbem_dataset.get_loaded_variables()
+    assert gfz_dataset != prbem_dataset
+    with pytest.raises(AssertionError, match="Data standards are different"):
+        gfz_dataset.assert_equal(prbem_dataset)
+
+
+@pytest.mark.basic
+@pytest.mark.parametrize("file_format", ["nc", "h5", "cdf", "mat"])
+def test_comparison_loads_all_strategy_variables(tmp_path: Path, file_format: MFSFormats) -> None:
+    """After == comparison every standard-name variable must be in get_loaded_variables()."""
+    variables = _mock_monthly_variables()
+    start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_time = datetime(2013, 1, 2, tzinfo=timezone.utc)
+
+    strategy = ep.saving_strategies.MonthlyRBStrategy(
+        base_data_path=tmp_path,
+        mission="GOES",
+        satellite="primary",
+        instrument="MAGED",
+        mag_field="T89",
+        file_format=file_format,
+        data_standard=ep.data_standards.GFZStandard(),
+    )
+    ep.save(variables, strategy, start_time=start_time, end_time=end_time, time_var=variables["Epoch"])
+
+    ds1 = DataSet(saving_strategy=strategy, start_time=start_time, end_time=end_time,
+                  preferred_extension=file_format, verbose=False)
+    ds2 = DataSet(saving_strategy=strategy, start_time=start_time, end_time=end_time,
+                  preferred_extension=file_format, verbose=False)
+
+    assert [v for v in ds1.get_loaded_variables() if v != "metadata"] == [], (
+        "No data variables should be loaded before comparison"
+    )
+
+    _ = ds1 == ds2
+
+    loaded = set(ds1.get_loaded_variables())
+    expected = set(strategy.get_all_standard_names())
+    assert expected.issubset(loaded), f"Variables not loaded after comparison: {expected - loaded}"
+
+
+@pytest.mark.basic
+@pytest.mark.parametrize("file_format", ["nc", "h5", "cdf", "mat"])
+@pytest.mark.parametrize("data_standard", [ep.data_standards.PRBEMStandard, ep.data_standards.GFZStandard])
+def test_dataset_equality_accepts_data_saved_with_different_strategies_but_same_standards(
+    tmp_path: Path, file_format: MFSFormats, data_standard: type[DataStandard]
+) -> None:
+    variables = _mock_monthly_variables()
+    start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_time = datetime(2013, 1, 2, tzinfo=timezone.utc)
+
+    gfz_strategy = ep.saving_strategies.GFZStrategy(
+        base_data_path=tmp_path / "gfz",
+        mission="GOES",
+        satellite="primary",
+        instrument="MAGED",
+        mag_field="T89",
+        data_standard=data_standard(),
+    )
+    mfs_strategy = ep.saving_strategies.MonthlyRBStrategy(
+        base_data_path=tmp_path / "prbem",
+        mission="GOES",
+        satellite="primary",
+        instrument="MAGED",
+        mag_field="T89",
+        file_format=file_format,
+        data_standard=data_standard(),
+    )
+
+    for strategy in (gfz_strategy, mfs_strategy):
+        ep.save(variables, strategy, start_time=start_time, end_time=end_time, time_var=variables["Epoch"])
+
+    gfz_strategy_dataset = DataSet(
+        saving_strategy=gfz_strategy, start_time=start_time, end_time=end_time,
+        preferred_extension=file_format, verbose=False,
+    )
+    mfs_strategy_dataset = DataSet(
+        saving_strategy=mfs_strategy, start_time=start_time, end_time=end_time,
+        preferred_extension=file_format, verbose=False,
+    )
+
+    assert gfz_strategy_dataset.datetime == mfs_strategy_dataset.datetime
+
+    gfz_strategy_dataset.load(gfz_strategy.data_standard.get_standard_name("FEDU"))
+    mfs_strategy_dataset.load(mfs_strategy.data_standard.get_standard_name("FEDU"))
+
+    assert gfz_strategy.data_standard.get_standard_name("FEDU") in gfz_strategy_dataset.get_loaded_variables()
+    assert mfs_strategy.data_standard.get_standard_name("FEDU") in mfs_strategy_dataset.get_loaded_variables()
+    gfz_strategy_dataset.assert_equal(mfs_strategy_dataset)
+    assert gfz_strategy_dataset == mfs_strategy_dataset
+
+
+_PROCESSED = pathlib.Path(__file__).parent.parent.parent / "system" / "data" / "processed"
+_ECT_START = datetime(2017, 9, 8, tzinfo=timezone.utc)
+_ECT_END = _ECT_START + timedelta(days=0.4, seconds=-1)
+
+
+@pytest.mark.basic
+def test_dataset_equals_gfz_dataset_on_ect_combined() -> None:
+    """DataSet and GFZDataSet loaded from the same file must compare equal."""
+    strategy = ep.saving_strategies.MonthlyRBStrategy(
+        _PROCESSED,
+        "RBSP",
+        "rbspa",
+        "ect_combined",
+        "T89",
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format="nc",
+    )
+    base_ds = DataSet(saving_strategy=strategy, start_time=_ECT_START, end_time=_ECT_END, verbose=False)
+    gfz_ds = GFZDataSet(saving_strategy=strategy, start_time=_ECT_START, end_time=_ECT_END, verbose=False)
+
+    assert base_ds == gfz_ds
+
+@pytest.mark.basic
+def test_gfz_epoch_resolves_to_time(gfz_dataset: DataSet) -> None:
+    result = gfz_dataset.get_by_internal_name("Epoch")
+    np.testing.assert_array_equal(result, gfz_dataset.time)
+
+
+@pytest.mark.basic
+def test_gfz_fedu_resolves_to_flux(gfz_dataset: DataSet) -> None:
+    result = gfz_dataset.get_by_internal_name("FEDU")
+    np.testing.assert_array_equal(result, gfz_dataset.Flux)
+
+
+@pytest.mark.basic
+def test_gfz_r_eq_resolves_to_r0(gfz_dataset: DataSet) -> None:
+    result = gfz_dataset.get_by_internal_name("R_Eq")
+    np.testing.assert_array_equal(result, gfz_dataset.R0)
+
+
+@pytest.mark.basic
+def test_gfz_l_star_resolves_to_lstar(gfz_dataset: DataSet) -> None:
+    result = gfz_dataset.get_by_internal_name("L_star")
+    np.testing.assert_array_equal(result, gfz_dataset.Lstar)
+
+
+@pytest.mark.basic
+def test_gfz_energy_fedu_resolves_to_energy_channels(gfz_dataset: DataSet) -> None:
+    result = gfz_dataset.get_by_internal_name("Energy_FEDU")
+    np.testing.assert_array_equal(result, gfz_dataset.energy_channels)
+
+
+@pytest.mark.basic
+def test_gfz_alpha_eq_resolves_to_alpha_eq_model(gfz_dataset: DataSet) -> None:
+    result = gfz_dataset.get_by_internal_name("Alpha_Eq")
+    np.testing.assert_array_equal(result, gfz_dataset.alpha_eq_model)
+
+
+@pytest.mark.basic
+def test_prbem_epoch_resolves_to_epoch(prbem_dataset: DataSet) -> None:
+    result = prbem_dataset.get_by_internal_name("Epoch")
+    np.testing.assert_array_equal(result, prbem_dataset.Epoch)
+
+
+@pytest.mark.basic
+def test_prbem_r_eq_resolves_to_r_eq(prbem_dataset: DataSet) -> None:
+    result = prbem_dataset.get_by_internal_name("R_Eq")
+    np.testing.assert_array_equal(result, prbem_dataset.R_Eq)
+
+
+@pytest.mark.basic
+def test_prbem_l_star_resolves_to_l_star(prbem_dataset: DataSet) -> None:
+    result = prbem_dataset.get_by_internal_name("L_star")
+    np.testing.assert_array_equal(result, prbem_dataset.L_star)
+
+
+@pytest.mark.basic
+def test_unknown_internal_name_raises(gfz_dataset: DataSet) -> None:
+    with pytest.raises(ValueError):  # noqa: PT011
+        gfz_dataset.get_by_internal_name("NotAnInternalName")  # ty:ignore[invalid-argument-type]

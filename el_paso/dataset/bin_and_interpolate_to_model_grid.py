@@ -86,9 +86,9 @@ def bin_and_interpolate_to_model_grid(
         if target_var_init.ndim == 1:
             target_var_init = target_var_init[:, np.newaxis, np.newaxis]
 
-        mu_or_V_arr = self.InvMu if mu_or_V == "Mu" else self.InvV
+        mu_or_V_arr = self.get_by_internal_name("InvMu") if mu_or_V == "Mu" else self.InvV
         if grid_mu_V.shape[2] > 1:
-            psd_interp = _interpolate_in_V_K(target_var_init, mu_or_V_arr, self.InvK, grid_mu_V, grid_K)
+            psd_interp = _interpolate_in_V_K(target_var_init, mu_or_V_arr, self.get_by_internal_name("InvK"), grid_mu_V, grid_K)
         else:
             psd_interp = target_var_init
 
@@ -104,7 +104,11 @@ def bin_and_interpolate_to_model_grid(
 
     # 2. Bin in space
 
-    R_or_Lstar_arr = self.R0 if grid_P is not None else self.Lstar[:, -1]
+    R_or_Lstar_arr = (
+        self.get_by_internal_name("R_Eq")
+        if grid_P is not None
+        else self.get_by_internal_name("L_star")[:, -1]
+    )
 
     psd_binned_in_space = _bin_in_space(psd_interp, self.P, R_or_Lstar_arr, grid_R, grid_P)
     # sanity check

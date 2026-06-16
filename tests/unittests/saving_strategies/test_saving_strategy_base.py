@@ -58,7 +58,7 @@ def test_output_file_defaults() -> None:
 
 @pytest.mark.basic
 def test_output_file_save_incomplete_true() -> None:
-    of = OutputFile(name="wave", names_to_save=["FPDU"], save_incomplete=True)
+    of = OutputFile(name="wave", names_to_save=["FEDU"], save_incomplete=True)
     assert of.save_incomplete is True
 
 

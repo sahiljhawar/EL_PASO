@@ -93,6 +93,10 @@ def identify_orbits(
         list[Trajectory]: The list of inbound/outbound trajectories that together
         cover the full time series.
     """
-    dist = self.R0 if orbit_type == "R" else self.Lstar[:, -1]
+    dist = (
+        self.get_by_internal_name("R_Eq")
+        if orbit_type == "R"
+        else self.get_by_internal_name("L_star")[:, -1]
+    )
 
     return _identify_orbits(self.datetime, dist, minimal_distance, apply_smoothing=apply_smoothing)

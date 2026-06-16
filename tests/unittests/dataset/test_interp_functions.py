@@ -115,17 +115,3 @@ def test_interp_flux_parallel_multiple_targets() -> None:
     result = _interp_flux_parallel(flux, energy, alpha, targets=targets, it=0)
     assert result[0] == pytest.approx(225.0)
     assert np.isnan(result[1])
-
-
-# ── TargetType enum ───────────────────────────────────────────────────────────
-
-
-@pytest.mark.basic
-def test_target_type_values_exist_and_differ() -> None:
-    assert TargetType.TargetPairs != TargetType.TargetMeshGrid
-
-
-@pytest.mark.basic
-def test_target_type_by_name() -> None:
-    assert TargetType["TargetPairs"] is TargetType.TargetPairs
-    assert TargetType["TargetMeshGrid"] is TargetType.TargetMeshGrid

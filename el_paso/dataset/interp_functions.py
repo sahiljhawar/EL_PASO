@@ -148,27 +148,32 @@ def interp_flux(
     if isinstance(target_type, str):
         target_type = TargetType[target_type]
 
+    epoch = self.get_by_internal_name("Epoch")
+    flux = self.get_by_internal_name("FEDU")
+    energy = self.get_by_internal_name("Energy_FEDU")
+    alpha_eq = self.get_by_internal_name("Alpha_Eq")
+
     if target_type == TargetType.TargetPairs:
         assert len(target_en) == len(  # ty:ignore[invalid-argument-type]
             target_al  # ty:ignore[invalid-argument-type]
         ), "For TargetType.Pairs, the target vectors must have the same size!"
 
-        result_arr = np.empty((len(self.time), len(target_en)))  # ty:ignore[invalid-argument-type]
+        result_arr = np.empty((len(epoch), len(target_en)))  # ty:ignore[invalid-argument-type]
         targets = cast("TARGETS", list(zip(target_en, target_al, strict=False)))
     else:
-        result_arr = np.empty((len(self.time), len(target_en), len(target_al)))  # ty:ignore[invalid-argument-type]
+        result_arr = np.empty((len(epoch), len(target_en), len(target_al)))  # ty:ignore[invalid-argument-type]
         targets = cast("TARGETS", list(itertools.product(target_en, target_al)))
 
     func = partial(
         _interp_flux_parallel,
-        self.Flux,
-        self.energy_channels,
-        self.alpha_eq_model,
+        flux,
+        energy,
+        alpha_eq,
         targets,
     )
 
     with Pool(n_threads) as p:
-        rs = p.map_async(func, range(len(self.time)))
+        rs = p.map_async(func, range(len(epoch)))
 
         # display progress bar if verbose
         if self._verbose:
@@ -354,24 +359,24 @@ def interp_psd(
     if isinstance(target_type, str):
         target_type = TargetType[target_type]
 
+    epoch = self.get_by_internal_name("Epoch")
+    psd = self.get_by_internal_name("PSD")
+    inv_mu = self.get_by_internal_name("InvMu")
+    inv_k = self.get_by_internal_name("InvK")
+
     if target_type == TargetType.TargetPairs:
         assert len(target_mu) == len(target_K), "For TargetType.Pairs, mu and K vectors must have the same size!"  # ty:ignore[invalid-argument-type]
-        result_arr = np.empty((len(self.time), len(target_mu)))  # ty:ignore[invalid-argument-type]
+        result_arr = np.empty((len(epoch), len(target_mu)))  # ty:ignore[invalid-argument-type]
         targets = cast("TARGETS", list(zip(target_mu, target_K, strict=False)))
     else:
-        result_arr = np.empty((len(self.time), len(target_mu), len(target_K)))  # ty:ignore[invalid-argument-type]
+        result_arr = np.empty((len(epoch), len(target_mu), len(target_K)))  # ty:ignore[invalid-argument-type]
         targets = cast("TARGETS", list(itertools.product(target_mu, target_K)))
 
-    # ensure needed fields are loaded (triggers lazy loader if any)
-    _ = self.PSD
-    _ = self.InvMu
-    _ = self.InvK
-
     # parallel over time (same pattern as interp_flux)
-    func = partial(_interp_psd_parallel, self.PSD, self.InvMu, self.InvK, targets)
+    func = partial(_interp_psd_parallel, psd, inv_mu, inv_k, targets)
 
     with Pool(n_threads) as p:
-        rs = p.map_async(func, range(len(self.time)))
+        rs = p.map_async(func, range(len(epoch)))
 
         if self._verbose:
             total_elements = rs._number_left  # ty:ignore[unresolved-attribute]

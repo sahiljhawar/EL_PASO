@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 
     from el_paso.typing import (
         FileLoader,
+        InternalName,
         MFSFormats,
         SavedDataDict,
         SavingStrategy,
@@ -252,6 +253,26 @@ class DataSet:
                 levenstein_info["var_name"] = var
 
         return sat_variable, levenstein_info
+
+    def get_by_internal_name(self, internal_name: InternalName) -> NDArray[np.float64]:
+        """Load and return a variable by its internal name.
+
+        Translates `internal_name` through the dataset's data standard to the
+        appropriate standard name and returns the loaded array, making callers
+        data-standard-agnostic.
+
+        Args:
+            internal_name (InternalName): Data-standard-independent name (e.g.
+                ``"Epoch"``, ``"FEDU"``, ``"R_Eq"``).
+
+        Returns:
+            NDArray[np.float64]: The loaded variable array.
+
+        Raises:
+            ValueError: If `internal_name` is not registered in the data standard.
+        """
+        standard_name = self.saving_strategy.data_standard.get_standard_name(internal_name)
+        return getattr(self, standard_name)
 
     def get_satellite_name(self) -> str:
         """Get Satellite name from the saving strategy.

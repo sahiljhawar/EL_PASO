@@ -106,6 +106,10 @@ def linearize_trajectories(
             - The linearized position axis, with one value per time step.
             - The corresponding "bent" time axis, with one datetime per time step.
     """
-    dist = self.R0 if orbit_type == "R" else self.Lstar[:, -1]
+    dist = (
+        self.get_by_internal_name("R_Eq")
+        if orbit_type == "R"
+        else self.get_by_internal_name("L_star")[:, -1]
+    )
 
     return _linearize_trajectories(self.datetime, dist, trajectories)
