@@ -5,6 +5,7 @@
 
 import pytest
 
+import el_paso as ep
 from el_paso.data_standard import ConsistencyCheck
 
 TIME_LEN = 100
@@ -55,3 +56,29 @@ def test_numbers():
 
     with pytest.raises(ValueError, match="Length mismatch! Variable call2 should have length 2, but encountered 3!"):
         consistency_check.check((TIME_LEN, 3, PITCH_ANGLE_LEN), ["Time", 2, "Alpha"], "call2")
+
+
+@pytest.mark.basic
+def test_consistency_same_dim_different_size_raises():
+    """Second call with the same dimension name but a different size must raise."""
+    consistency_check = ConsistencyCheck()
+
+    consistency_check.check_size(TIME_LEN, "Time", "var_a")
+
+    with pytest.raises(ValueError):  # noqa: PT011
+        consistency_check.check_size(TIME_LEN + 1, "Time", "var_b")
+
+
+@pytest.mark.basic
+def test_data_standard_repr_and_str():
+    """DataStandard.__repr__ / __str__ should return a non-empty string without raising."""
+    standard = ep.data_standards.GFZStandard()
+
+    r = repr(standard)
+    s = str(standard)
+
+    assert isinstance(r, str)
+    assert r
+    assert isinstance(s, str)
+    assert s
+    assert "GFZStandard" in r
