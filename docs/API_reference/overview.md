@@ -19,6 +19,8 @@ This section provides a detailed reference for all modules, classes, and functio
 
 [DataSet](dataset/dataset.md)
 
+[Metadata](metadata.md)
+
 ## Core functions
 
 [download](download.md)
@@ -40,6 +42,8 @@ This section provides a detailed reference for all modules, classes, and functio
 [Scripts](utilities/scripts.md)
 
 [Release mode](utilities/release_mode.md)
+
+[Typing](utilities/typing.md)
 
 [Units](utilities/units.md)
 
@@ -97,17 +101,9 @@ This section provides a detailed reference for all modules, classes, and functio
 
 ## Datasets
 
-[GFZDataSet](dataset/dataset_implementations.md#el_paso.dataset.GFZDataSet)
+[GFZDataSet](dataset/gfz.md)
 
-[PRBEMDataSet](dataset/dataset_implementations.md#el_paso.dataset.PRBEMDataSet)
-
-## Metadata
-
-[Metadata](metadata.md)
-
-## Typing
-
-[Typing](typing.md)
+[PRBEMDataSet](dataset/prbem.md)
 
 ## Recipes
 

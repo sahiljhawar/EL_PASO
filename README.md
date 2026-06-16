@@ -44,7 +44,7 @@ Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest
     - MEPED (electrons)
     - TED (electrons)
 - **PROBA-V**
-    - EPT
+    - EPT (electrons and protons)
 - **Van Allen Probes**
     - HOPE (electrons) and ECT-combined
     - EMFISIS and EFW density

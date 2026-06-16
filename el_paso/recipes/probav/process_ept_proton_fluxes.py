@@ -19,7 +19,7 @@ import el_paso as ep
 from el_paso.utils import timed_function
 
 CHI2_BAD_QUALITY_THRESHOLD = 2
-EPT_ENERGY_LIMITS = [0.5, 0.6, 0.7, 0.8, 1.0, 2.4, 8.0]
+EPT_ENERGY_LIMITS = [9.5, 13.0, 29.0, 61.0, 92.0, 126.0, 155.0, 182.0, 205.0, 227.0, 248.0]
 
 logger = logging.getLogger(__name__)
 
@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 
-@timed_function("process_ept_electron_fluxes")
-def process_ept_electron_fluxes(
+@timed_function("process_ept_proton_fluxes")
+def process_ept_proton_fluxes(
     raw_data_path: str | Path,
     processed_data_path: str | Path,
     start_time: datetime,
@@ -40,11 +40,11 @@ def process_ept_electron_fluxes(
     client_secret: str | None = None,
     save_strategy: typing.Literal["gfz", "netcdf", "both"] = "netcdf",
 ) -> None:
-    """Process PROBA-V EPT electron flux data into pitch-angle-resolved fluxes with magnetic field coordinates.
+    """Process PROBA-V EPT proton flux data into pitch-angle-resolved fluxes with magnetic field coordinates.
 
     This downloads the PROBA-V EPT L1d data for the given time range from the ESA SWE service,
-    extracts the per-channel differential electron fluxes, quality flag (chi2), local pitch angle,
-    timestamps, and spacecraft position, and combines the six energy channels into a single FEDU
+    extracts the per-channel differential proton fluxes, quality flag (chi2), local pitch angle,
+    timestamps, and spacecraft position, and combines the ten energy channels into a single FPDU
     flux variable. Values with a chi2 quality flag above a fixed threshold are masked to NaN. The
     local pitch angle is folded around 90 degrees, the timestamps are converted to POSIX time, and
     center energies are computed from a fixed set of energy limits. The data is then time-binned to
@@ -118,13 +118,17 @@ def process_ept_electron_fluxes(
             result_key="millisecond", name_or_column="mS", unit=u.dimensionless_unscaled, np_dtype=np.int32
         ),
         ep.ExtractionInfo(result_key="flag", name_or_column="FLAG", unit=u.dimensionless_unscaled),
-        ep.ExtractionInfo(result_key="chi2", name_or_column="e-Chi2", unit=u.dimensionless_unscaled),
-        ep.ExtractionInfo(result_key="ch0", name_or_column="e-fl-00", unit=flux_unit),
-        ep.ExtractionInfo(result_key="ch1", name_or_column="e-fl-01", unit=flux_unit),
-        ep.ExtractionInfo(result_key="ch2", name_or_column="e-fl-02", unit=flux_unit),
-        ep.ExtractionInfo(result_key="ch3", name_or_column="e-fl-03", unit=flux_unit),
-        ep.ExtractionInfo(result_key="ch4", name_or_column="e-fl-04", unit=flux_unit),
-        ep.ExtractionInfo(result_key="ch5", name_or_column="e-fl-05", unit=flux_unit),
+        ep.ExtractionInfo(result_key="chi2", name_or_column="p-Chi2", unit=u.dimensionless_unscaled),
+        ep.ExtractionInfo(result_key="ch0", name_or_column="p-fl-00", unit=flux_unit),
+        ep.ExtractionInfo(result_key="ch1", name_or_column="p-fl-01", unit=flux_unit),
+        ep.ExtractionInfo(result_key="ch2", name_or_column="p-fl-02", unit=flux_unit),
+        ep.ExtractionInfo(result_key="ch3", name_or_column="p-fl-03", unit=flux_unit),
+        ep.ExtractionInfo(result_key="ch4", name_or_column="p-fl-04", unit=flux_unit),
+        ep.ExtractionInfo(result_key="ch5", name_or_column="p-fl-05", unit=flux_unit),
+        ep.ExtractionInfo(result_key="ch6", name_or_column="p-fl-06", unit=flux_unit),
+        ep.ExtractionInfo(result_key="ch7", name_or_column="p-fl-07", unit=flux_unit),
+        ep.ExtractionInfo(result_key="ch8", name_or_column="p-fl-08", unit=flux_unit),
+        ep.ExtractionInfo(result_key="ch9", name_or_column="p-fl-09", unit=flux_unit),
         ep.ExtractionInfo(result_key="PA_local", name_or_column="Pitch", unit=u.deg),
         ep.ExtractionInfo(result_key="rad", name_or_column="Rad", unit=u.km),
         ep.ExtractionInfo(result_key="lon", name_or_column="Long", unit=u.deg),
@@ -150,17 +154,22 @@ def process_ept_electron_fluxes(
             variables["ch3"].get_data(),
             variables["ch4"].get_data(),
             variables["ch5"].get_data(),
+            variables["ch6"].get_data(),
+            variables["ch7"].get_data(),
+            variables["ch8"].get_data(),
+            variables["ch9"].get_data(),
         ]
     ).T
     flux_data = flux_data[:, :, np.newaxis]
-    variables["FEDU"] = ep.Variable(data=flux_data, original_unit=flux_unit)
-    del variables["ch0"], variables["ch1"], variables["ch2"], variables["ch3"], variables["ch4"], variables["ch5"]
+    variables["FPDU"] = ep.Variable(data=flux_data, original_unit=flux_unit)
+    del variables["ch0"], variables["ch1"], variables["ch2"], variables["ch3"], variables["ch4"]
+    del variables["ch5"], variables["ch6"], variables["ch7"], variables["ch8"], variables["ch9"]
 
-    variables["FEDU"].apply_thresholds_on_data(lower_threshold=1e-21)
+    variables["FPDU"].apply_thresholds_on_data(lower_threshold=1e-21)
 
     # apply chi-2 quality check
-    variables["FEDU"].apply_mask(variables["chi2"].get_data().astype(np.float64) < CHI2_BAD_QUALITY_THRESHOLD)
-    variables["FEDU"].metadata.add_processing_note(
+    variables["FPDU"].apply_mask(variables["chi2"].get_data().astype(np.float64) < CHI2_BAD_QUALITY_THRESHOLD)
+    variables["FPDU"].metadata.add_processing_note(
         f"Values with CHI2 >= {CHI2_BAD_QUALITY_THRESHOLD:0.1f} are set to NaN."
     )
 
@@ -192,18 +201,18 @@ def process_ept_electron_fluxes(
 
     # calculate mean of energy limits to get center energies
     energy_data = np.convolve(EPT_ENERGY_LIMITS, np.ones(2), "valid") / 2
-    variables["Energy_FEDU"] = ep.Variable(data=energy_data, original_unit=u.MeV)
-    variables["Energy_FEDU"].metadata.add_processing_note(
+    variables["Energy_FPDU"] = ep.Variable(data=energy_data, original_unit=u.MeV)
+    variables["Energy_FPDU"].metadata.add_processing_note(
         f"Created by calculating center energies from {', '.join(map(str, EPT_ENERGY_LIMITS))}."
     )
 
     time_bin_methods = {
-        "Energy_FEDU": ep.TimeBinMethod.Repeat,
+        "Energy_FPDU": ep.TimeBinMethod.Repeat,
         "rad": ep.TimeBinMethod.NanMean,
         "lat": ep.TimeBinMethod.NanMean,
         "lon": ep.TimeBinMethod.NanMean,
         "PA_local": ep.TimeBinMethod.NanMean,
-        "FEDU": ep.TimeBinMethod.NanMedian,
+        "FPDU": ep.TimeBinMethod.NanMedian,
     }
 
     binned_time_var = ep.processing.bin_by_time(
@@ -237,9 +246,9 @@ def process_ept_electron_fluxes(
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=variables["xGEO"],
-        energy_var=variables["Energy_FEDU"],
+        energy_var=variables["Energy_FPDU"],
         pa_local_var=variables["PA_local"],
-        particle_species="electron",
+        particle_species="proton",
         variables_to_compute=variables_to_compute,
         irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(
             lstar_quantity=ep.processing.magnetic_field_utils.LstarQuantity.NONE,
@@ -251,8 +260,8 @@ def process_ept_electron_fluxes(
 
     variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
         "Epoch": binned_time_var,
-        "FEDU": variables["FEDU"],
-        "Energy_FEDU": variables["Energy_FEDU"],
+        "FPDU": variables["FPDU"],
+        "Energy_FPDU": variables["Energy_FPDU"],
         "Alpha": variables["PA_local"],
         "Alpha_Eq": magnetic_field_variables["Alpha_Eq_T89"],
         "R_Eq": magnetic_field_variables["R_Eq_T89"],
@@ -268,7 +277,7 @@ def process_ept_electron_fluxes(
             processed_data_path,
             mission="PROBAV",
             satellite="probav",
-            instrument="ept",
+            instrument="EPT-proton",
             mag_field="T89",
             data_standard=ep.data_standards.GFZStandard(),
         )
@@ -278,7 +287,7 @@ def process_ept_electron_fluxes(
             base_data_path=Path(processed_data_path),
             mission="PROBAV",
             satellite="probav",
-            instrument="ept",
+            instrument="EPT-proton",
             mag_field="T89",
             file_format=".nc",
             data_standard=ep.data_standards.GFZStandard(),
@@ -287,22 +296,22 @@ def process_ept_electron_fluxes(
 
 
 if __name__ == "__main__":
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    logging.getLogger().setLevel(logging.INFO)
 
-    parser = argparse.ArgumentParser(description="Process EPT electron fulx data.")
+    ep.setup_logging()
+
+    parser = argparse.ArgumentParser(description="Process EPT proton flux data.")
     parser.add_argument(
         "--start_time",
         type=str,
         help="Start time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2024, 5, 8, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2025, 5, 8, tzinfo=timezone.utc).isoformat(),
         required=False,
     )
     parser.add_argument(
         "--end_time",
         type=str,
         help="End time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2024, 5, 8, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2025, 5, 15, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
         required=False,
     )
 
@@ -312,7 +321,7 @@ if __name__ == "__main__":
     dt_end = dateutil.parser.parse(args.end_time)
 
     #    with tempfile.TemporaryDirectory() as tmpdir:
-    process_ept_electron_fluxes(
+    process_ept_proton_fluxes(
         start_time=dt_start,
         end_time=dt_end,
         raw_data_path=".",

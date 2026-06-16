@@ -4,6 +4,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -13,7 +14,9 @@ from astropy import units as u
 import el_paso as ep
 
 
-def test_esa_api(tmp_path: Path):
+def test_esa_api(tmp_path: Path, skip_if_unreachable: Callable[..., None]):
+
+    skip_if_unreachable("https://swe.ssa.esa.int", "https://sso.s2p.esa.int")
 
     client_id = os.environ.get("ESA_CLIENT_ID")
     client_secret = os.environ.get("ESA_CLIENT_SECRET")
@@ -49,7 +52,9 @@ def test_esa_api(tmp_path: Path):
 
 
 @pytest.mark.basic
-def test_request(tmp_path: Path):
+def test_request(tmp_path: Path, skip_if_unreachable: Callable[..., None]):
+
+    skip_if_unreachable("https://spdf.gsfc.nasa.gov")
 
     start_time = datetime(2013, 3, 17, tzinfo=timezone.utc)
     end_time = datetime(2013, 3, 17, 1, tzinfo=timezone.utc)

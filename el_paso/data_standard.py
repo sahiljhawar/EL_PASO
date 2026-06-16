@@ -18,7 +18,7 @@ if TYPE_CHECKING:
 
     from astropy import units as u
 
-    from el_paso.typing import InternalName, StandardName, Variable
+    from el_paso.typing import FixedDimensionName, InternalName, StandardName, Variable
 
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ class VariableInfo(NamedTuple, Generic[T_co]):
     standard_name: T_co
     description: str
     unit: u.UnitBase
-    dependencies: list[InternalName | str]
+    dependencies: list[InternalName | FixedDimensionName]
 
 
 class DataStandard(ABC, Generic[T_co]):
@@ -74,7 +74,7 @@ class DataStandard(ABC, Generic[T_co]):
 
         return self.variable_infos[internal_name].standard_name
 
-    def get_dependencies(self, internal_name: InternalName) -> list[InternalName | str]:
+    def get_dependencies(self, internal_name: InternalName) -> list[InternalName | FixedDimensionName]:
         return self.variable_infos[internal_name].dependencies
 
     def standardize_variable(

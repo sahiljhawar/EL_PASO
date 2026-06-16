@@ -46,6 +46,7 @@ nav:
           - API_reference/saving_strategy.md
           - API_reference/variable.md
           - API_reference/dataset/dataset.md
+          - API_reference/metadata.md
       - Core Functions:
           - API_reference/download.md
           - API_reference/extract_variables_from_files.md
@@ -73,6 +74,7 @@ nav:
           - Physics: API_reference/physics.md
           - Release mode: API_reference/utilities/release_mode.md
           - Scripts: API_reference/utilities/scripts.md
+          - Typing: API_reference/utilities/typing.md
           - Units: API_reference/utilities/units.md
       - Saving Strategies:
           - Daily LEO RB Strategy: API_reference/saving_strategies/daily_leo_rb.md
@@ -84,9 +86,9 @@ nav:
       - Data Standards:
           - PRBEM Standard: API_reference/data_standards/prbem.md
           - GFZ Standard: API_reference/data_standards/gfz.md
-      - Datasets: API_reference/dataset/dataset_implementations.md
-      - Metadata: API_reference/metadata.md
-      - Typing: API_reference/typing.md
+      - Datasets:
+          - PRBEM DataSet: API_reference/dataset/prbem.md
+          - GFZ DataSet: API_reference/dataset/gfz.md
       - Recipes:
           - Arase: API_reference/recipes/arase.md
           - DMSP: API_reference/recipes/dmsp.md

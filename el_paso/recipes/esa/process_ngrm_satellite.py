@@ -275,7 +275,7 @@ def process_ngrm_electron_fluxes(
     variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
         "Epoch": binned_time_var,
         "FEDU": FEDU_var,
-        "FEDO": variables["FEDO"],
+        # "FEDO": variables["FEDO"], disabled for now, since Alpha_range is missing
         "Energy_FEDU": variables["Energy"],
         "Alpha": variables["PA_local_FEDU"],
         "Alpha_Eq": magnetic_field_variables["Alpha_Eq_T89"],
