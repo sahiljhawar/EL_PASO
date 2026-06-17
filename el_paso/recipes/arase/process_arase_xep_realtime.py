@@ -252,7 +252,7 @@ def _get_xep_variables(
             skip_existing=skip_existing,
         )
 
-    fedo_unit = typing.cast("u.Unit", (u.cm**2 * u.s * u.sr * u.keV) ** (-1))
+    fedo_unit = typing.cast("u.Unit", (u.cm**2 * u.s * u.keV) ** (-1))
 
     extraction_infos = [
         ep.ExtractionInfo(name_or_column="time", unit=u.dimensionless_unscaled, result_key="Epoch"),
