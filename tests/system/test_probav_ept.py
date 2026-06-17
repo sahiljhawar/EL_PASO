@@ -17,11 +17,13 @@ from el_paso.dataset import GFZDataSet
 from el_paso.recipes.probav import process_ept_electron_fluxes
 
 
+@pytest.mark.parametrize("apply_correction_factors", [True, False])
 @pytest.mark.basic
 def test_probav_ept(
     tmpdir: Path,
     skip_if_unreachable: Callable[..., None],
     *,
+    apply_correction_factors: bool,
     renew_solution: bool,  # noqa: ARG001
 ) -> None:
 
@@ -46,6 +48,7 @@ def test_probav_ept(
         save_strategy="netcdf",
         client_id=client_id,
         client_secret=client_secret,
+        apply_correction_factors=apply_correction_factors,
     )
 
     out_path = (

@@ -20,6 +20,7 @@ from el_paso.utils import timed_function
 
 CHI2_BAD_QUALITY_THRESHOLD = 2
 EPT_ENERGY_LIMITS = [0.5, 0.6, 0.7, 0.8, 1.0, 2.4, 8.0]
+EPT_ELECTRON_CORRECTION_FACTORS = [2, 5, 3, 4, 10, 10]
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,8 @@ def process_ept_electron_fluxes(
     client_id: str | None = None,
     client_secret: str | None = None,
     save_strategy: typing.Literal["gfz", "netcdf", "both"] = "netcdf",
+    *,
+    apply_correction_factors: bool = False,
 ) -> None:
     """Process PROBA-V EPT electron flux data into pitch-angle-resolved fluxes with magnetic field coordinates.
 
@@ -157,6 +160,17 @@ def process_ept_electron_fluxes(
     del variables["ch0"], variables["ch1"], variables["ch2"], variables["ch3"], variables["ch4"], variables["ch5"]
 
     variables["FEDU"].apply_thresholds_on_data(lower_threshold=1e-21)
+
+    if apply_correction_factors:
+        print(variables["FEDU"].get_data().shape)
+        variables["FEDU"].set_data(
+            variables["FEDU"].get_data() * np.asarray(EPT_ELECTRON_CORRECTION_FACTORS)[np.newaxis, :, np.newaxis],
+            unit="same",
+        )
+        variables["FEDU"].metadata.add_processing_note(
+            f"Applied correction factors: {', '.join(str(f) for f in EPT_ELECTRON_CORRECTION_FACTORS)}"
+        )
+        print(variables["FEDU"].get_data().shape)
 
     # apply chi-2 quality check
     variables["FEDU"].apply_mask(variables["chi2"].get_data().astype(np.float64) < CHI2_BAD_QUALITY_THRESHOLD)
