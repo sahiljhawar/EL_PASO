@@ -72,6 +72,7 @@ def process_ept_electron_fluxes(
             is read from the `CLIENT_SECRET` environment variable. Defaults to None.
         save_strategy (typing.Literal["gfz", "netcdf", "both"], optional): Which saving strategy (or
             strategies) to use for the processed output. Defaults to "netcdf".
+        apply_correction_factors (bool): Flag whether to apply correction factors to fluxes. Defaults to False.
 
     Raises:
         ValueError: If `client_id` or `client_secret` is not provided and not available via the
@@ -162,7 +163,6 @@ def process_ept_electron_fluxes(
     variables["FEDU"].apply_thresholds_on_data(lower_threshold=1e-21)
 
     if apply_correction_factors:
-        print(variables["FEDU"].get_data().shape)
         variables["FEDU"].set_data(
             variables["FEDU"].get_data() * np.asarray(EPT_ELECTRON_CORRECTION_FACTORS)[np.newaxis, :, np.newaxis],
             unit="same",
@@ -170,7 +170,7 @@ def process_ept_electron_fluxes(
         variables["FEDU"].metadata.add_processing_note(
             f"Applied correction factors: {', '.join(str(f) for f in EPT_ELECTRON_CORRECTION_FACTORS)}"
         )
-        print(variables["FEDU"].get_data().shape)
+        logger.info("Applied flux correction factors.")
 
     # apply chi-2 quality check
     variables["FEDU"].apply_mask(variables["chi2"].get_data().astype(np.float64) < CHI2_BAD_QUALITY_THRESHOLD)
