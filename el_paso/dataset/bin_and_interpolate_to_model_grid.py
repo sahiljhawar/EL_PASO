@@ -20,13 +20,12 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from numpy.typing import NDArray
-    from swvo.io.RBMDataSet import RBMDataSet
 
-# TODO(SJ or BH): fix the RBMDataSet  # noqa: FIX002, TD003
+    from el_paso.dataset import DataSet
 
 
 def bin_and_interpolate_to_model_grid(
-    self: RBMDataSet,
+    self: DataSet,
     sim_time: list[datetime],
     grid_R: NDArray[np.float64],
     grid_mu_V: NDArray[np.float64],
@@ -88,7 +87,9 @@ def bin_and_interpolate_to_model_grid(
 
         mu_or_V_arr = self.get_by_internal_name("InvMu") if mu_or_V == "Mu" else self.InvV
         if grid_mu_V.shape[2] > 1:
-            psd_interp = _interpolate_in_V_K(target_var_init, mu_or_V_arr, self.get_by_internal_name("InvK"), grid_mu_V, grid_K)
+            psd_interp = _interpolate_in_V_K(
+                target_var_init, mu_or_V_arr, self.get_by_internal_name("InvK"), grid_mu_V, grid_K
+            )
         else:
             psd_interp = target_var_init
 
@@ -105,9 +106,7 @@ def bin_and_interpolate_to_model_grid(
     # 2. Bin in space
 
     R_or_Lstar_arr = (
-        self.get_by_internal_name("R_Eq")
-        if grid_P is not None
-        else self.get_by_internal_name("L_star")[:, -1]
+        self.get_by_internal_name("R_Eq") if grid_P is not None else self.get_by_internal_name("L_star")[:, -1]
     )
 
     psd_binned_in_space = _bin_in_space(psd_interp, self.P, R_or_Lstar_arr, grid_R, grid_P)
@@ -449,7 +448,7 @@ class DebugPlotSettings:
 
 
 def plot_debug_figures_plasmasphere(  # noqa: D103
-    data_set: RBMDataSet,
+    data_set: DataSet,
     psd_binned: NDArray[np.float64],
     sim_time: NDArray[np.object_],
     grid_P: NDArray[np.float64] | None,
@@ -516,7 +515,7 @@ def plot_debug_figures_plasmasphere(  # noqa: D103
 
 
 def plot_debug_figures(  # noqa: D103
-    data_set: RBMDataSet,
+    data_set: DataSet,
     psd_binned: NDArray[np.float64],
     sim_time: NDArray[np.object_],
     grid_P: NDArray[np.float64] | None,
