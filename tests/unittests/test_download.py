@@ -3,10 +3,12 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import importlib
 import os
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from astropy import units as u
@@ -202,3 +204,56 @@ def test_skip_download_via_env_var(monkeypatch: pytest.MonkeyPatch, caplog: pyte
 
     assert not was_called
     assert "Skipping ep.download" in caplog.text
+
+
+@pytest.mark.basic
+def test_skip_existing_false_does_not_overwrite_files_outside_time_range(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When skip_existing=False, only files within [start_time, end_time) should be re-downloaded."""
+    for day in range(1, 6):
+        (tmp_path / f"data_2013010{day}_v01.cdf").write_bytes(b"original")
+
+    directory_listing = MagicMock()
+    directory_listing.text = "\n".join(f"data_2013010{d}_v01.cdf" for d in range(1, 6))
+
+    download_mod = importlib.import_module("el_paso.download")
+
+    download_mod._get_page_content.cache_clear()
+    monkeypatch.setattr(download_mod, "_get_page_content", lambda _url, _auth: directory_listing)
+
+    downloaded_urls: list[str] = []
+
+    def mock_get(url: str, **_kwargs: object) -> MagicMock:
+        downloaded_urls.append(url)
+        resp = MagicMock()
+        resp.status_code = 200
+        resp.iter_content.return_value = [b"new_content"]
+        return resp
+
+    monkeypatch.setattr(download_mod.requests, "get", mock_get)
+
+    ep.download(
+        start_time=datetime(2013, 1, 2, tzinfo=timezone.utc),
+        end_time=datetime(2013, 1, 4, tzinfo=timezone.utc),
+        save_path=tmp_path,
+        file_cadence="daily",
+        download_url="https://fake.server/data/",
+        file_name_stem=r"data_YYYYMMDD_v\d+\.cdf",
+        method="request",
+        skip_existing=False,
+    )
+
+    # Files outside the time range must not be touched
+    assert (tmp_path / "data_20130101_v01.cdf").read_bytes() == b"original"
+    assert (tmp_path / "data_20130104_v01.cdf").read_bytes() == b"original"
+    assert (tmp_path / "data_20130105_v01.cdf").read_bytes() == b"original"
+
+    # Files inside the time range should have been overwritten
+    assert (tmp_path / "data_20130102_v01.cdf").read_bytes() == b"new_content"
+    assert (tmp_path / "data_20130103_v01.cdf").read_bytes() == b"new_content"
+
+    # Only two download requests should have been made
+    assert len(downloaded_urls) == 2
+    assert any("data_20130102_v01.cdf" in url for url in downloaded_urls)
+    assert any("data_20130103_v01.cdf" in url for url in downloaded_urls)
