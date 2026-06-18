@@ -402,9 +402,9 @@ def load_cdf_data(file_path: Path) -> dict[StandardName, Any]:
         info = cdf_file.cdf_info()
         z_variables = getattr(info, "zVariables", None)
         if z_variables is None and isinstance(info, dict):
-            z_variables = info.get("zVariables", [])  # ty:ignore[no-matching-overload]
+            z_variables = info.get("zVariables", [])
 
-        for variable_name in z_variables or []:
+        for variable_name in z_variables or []:  # ty:ignore[not-iterable]
             try:
                 loaded_data[variable_name] = np.asarray(cdf_file.varget(variable_name))
             except ValueError as exc:

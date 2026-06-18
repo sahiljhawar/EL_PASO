@@ -311,7 +311,7 @@ if __name__ == "__main__":
         "--end_time",
         type=str,
         help="End time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2025, 5, 15, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
+        default=datetime(2025, 5, 9, tzinfo=timezone.utc).isoformat(),
         required=False,
     )
 
