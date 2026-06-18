@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import stat
 from typing import TYPE_CHECKING, Any, get_args
 
 import numpy as np
@@ -88,8 +89,13 @@ def save(
                 )
             else:
                 data_dict = _get_data_dict_to_save(target_variables)
+
+                if len(data_dict.keys()) == 1:
+                    logger.info("No data to save! Skipping...")
+                    continue
+
                 saving_strategy.save_single_file(file_path, data_dict, append=append)
-                file_path.chmod(0o660)
+                file_path.chmod(stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IWGRP)
 
 
 def _validate_variables_dict(variables_dict: dict[InternalName, Variable], data_standard: DataStandard | None) -> None:

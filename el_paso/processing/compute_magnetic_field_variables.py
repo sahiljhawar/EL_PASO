@@ -20,7 +20,7 @@ from joblib import Memory
 import el_paso as ep
 import el_paso.processing.magnetic_field_utils as mag_utils
 from el_paso import Variable
-from el_paso.cache import clear_cache, get_cache_dir
+from el_paso.cache import clear_cache_on_success, get_cache_dir
 from el_paso.typing import MagFieldVarTypes, MagneticFieldLiteral
 from el_paso.utils import make_dict_hashable, timed_function
 
@@ -58,7 +58,7 @@ def compute_magnetic_field_variables(
     particle_species: Literal["electron", "proton"] | None = None,
     *,
     irbem_lib_path: str | Path = Path(ep.__file__).parent / "libirbem.so",
-    cache_dir: str | Path | None = get_cache_dir(),
+    cache_dir: str | Path | None = "_default_",
     overwrite_cache: bool = False,
 ) -> dict[str, Variable]:
     """Computes various magnetic field-related variables using the IRBEM library.
@@ -125,28 +125,36 @@ def compute_magnetic_field_variables(
           within the function to avoid redundant IRBEM calls when multiple
           dependent variables are requested.
     """
+    if cache_dir == "_default_":
+        cache_dir = get_cache_dir()
+
     if cache_dir is not None:
         global _cleanup_registered
         if not _cleanup_registered:
-            atexit.register(clear_cache)
+            atexit.register(clear_cache_on_success)
             _cleanup_registered = True
 
         memory = Memory(cache_dir, verbose=0)
         cached_fn = memory.cache(_compute_core, ignore=["num_cores", "irbem_lib_path"])
 
-        if overwrite_cache:
-            result, _ = cached_fn.call(
-                time_var, xgeo_var, variables_to_compute, irbem_options,
-                num_cores, indices_solar_wind, pa_local_var, energy_var,
-                particle_species, irbem_lib_path=irbem_lib_path,
-            )
-            return result
-
-        return cached_fn(
+        call_args = (
             time_var, xgeo_var, variables_to_compute, irbem_options,
             num_cores, indices_solar_wind, pa_local_var, energy_var,
-            particle_species, irbem_lib_path=irbem_lib_path,
+            particle_species,
         )
+
+        if overwrite_cache:
+            logger.info("Overwriting cached magnetic field variables (overwrite_cache=True).")
+            result, _ = cached_fn.call(*call_args, irbem_lib_path=irbem_lib_path)
+            logger.info("Magnetic field variables computed and cached at %s.", cache_dir)
+            return result
+
+        if cached_fn.check_call_in_cache(*call_args, irbem_lib_path=irbem_lib_path):
+            logger.info("Loading magnetic field variables from cache at %s.", cache_dir)
+        else:
+            logger.info("No cache hit at %s — computing magnetic field variables.", cache_dir)
+
+        return cached_fn(*call_args, irbem_lib_path=irbem_lib_path)
 
     return _compute_core(
         time_var, xgeo_var, variables_to_compute, irbem_options,

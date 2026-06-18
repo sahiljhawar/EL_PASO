@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import os
 import shutil
+import sys
 import time
 from pathlib import Path
 
@@ -15,6 +16,18 @@ logger = logging.getLogger(__name__)
 
 _CACHE_SUBDIR = "joblib_cache"
 _MAX_AGE_DAYS = 7
+
+_exit_with_exception = False
+_original_excepthook = sys.excepthook
+
+
+def _excepthook_tracker(exc_type, exc_value, exc_tb) -> None:  # noqa: ANN001
+    global _exit_with_exception
+    _exit_with_exception = True
+    _original_excepthook(exc_type, exc_value, exc_tb)
+
+
+sys.excepthook = _excepthook_tracker
 
 
 def get_cache_dir() -> Path:
@@ -72,3 +85,15 @@ def clear_cache() -> None:
     if cache_dir.exists():
         shutil.rmtree(cache_dir)
         logger.debug("Cleared cache directory: %s", cache_dir)
+
+
+def clear_cache_on_success() -> None:
+    """Remove the cache directory only if the interpreter is exiting without an unhandled exception.
+
+    Intended as an ``atexit`` handler so the cache survives crashes but is
+    cleaned up after a successful run.
+    """
+    if _exit_with_exception:
+        logger.debug("Keeping cache — interpreter is exiting due to an exception.")
+        return
+    clear_cache()
