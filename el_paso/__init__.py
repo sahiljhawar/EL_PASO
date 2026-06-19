@@ -68,4 +68,4 @@ __all__ = [
 from el_paso.cache import cleanup_stale_cache as _cleanup_stale_cache
 _cleanup_stale_cache()
 
-__version__ = "2.0.0"
+__version__ = "2.1.0"
