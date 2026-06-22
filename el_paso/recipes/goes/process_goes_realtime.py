@@ -184,7 +184,7 @@ def process_goes_real_time(
         pa_local_var=variables["PA_local_FEDU"],
         particle_species="electron",
         variables_to_compute=variables_to_compute,
-        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(drift_shell_resolution=0, field_line_resolution=0),
+        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
     )
 

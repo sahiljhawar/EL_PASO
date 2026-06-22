@@ -153,7 +153,7 @@ def process_arase_xep_real_time(
         pa_local_var=variables_combined["PA_local_FEDU"],
         particle_species="electron",
         variables_to_compute=variables_to_compute,
-        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(field_line_resolution=0, drift_shell_resolution=0),
+        irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
     )
 
