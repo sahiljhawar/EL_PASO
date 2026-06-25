@@ -161,7 +161,7 @@ class DataSet:
     def __str__(self) -> str:
         return self.__repr__()
 
-    def __getattribute__(self, name:str) -> Any:  # noqa: ANN401
+    def __getattribute__(self, name: str) -> Any:  # noqa: ANN401
         value = super().__getattribute__(name)
 
         if isinstance(value, xr.Variable):

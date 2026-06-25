@@ -296,7 +296,6 @@ def process_ept_proton_fluxes(
 
 
 if __name__ == "__main__":
-
     ep.setup_logging()
 
     parser = argparse.ArgumentParser(description="Process EPT proton flux data.")

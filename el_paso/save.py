@@ -12,13 +12,13 @@ from typing import TYPE_CHECKING, Any, get_args
 
 import numpy as np
 
-from el_paso.data_standard import DataStandard
 from el_paso.typing import FixedDimensionName, InternalName, Variable
 from el_paso.utils import enforce_utc_timezone, timed_function
 
 if TYPE_CHECKING:
     from datetime import datetime
 
+    from el_paso.data_standard import DataStandard
     from el_paso.saving_strategy import SavingStrategy
     from el_paso.typing import SavedDataDict
 
@@ -132,8 +132,7 @@ def _validate_variables_dict(variables_dict: dict[InternalName, Variable], data_
         }
         if len(missing) > 0:
             missing_details = "; ".join(
-                f"'{dim}' (required by: {', '.join(required_by)})"
-                for dim, required_by in missing.items()
+                f"'{dim}' (required by: {', '.join(required_by)})" for dim, required_by in missing.items()
             )
             msg = f"Data for the following dimensions is not saved: {missing_details}"
             raise ValueError(msg)

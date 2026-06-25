@@ -138,8 +138,14 @@ def compute_magnetic_field_variables(
         cached_fn = memory.cache(_compute_core, ignore=["num_cores", "irbem_lib_path"])
 
         call_args = (
-            time_var, xgeo_var, variables_to_compute, irbem_options,
-            num_cores, indices_solar_wind, pa_local_var, energy_var,
+            time_var,
+            xgeo_var,
+            variables_to_compute,
+            irbem_options,
+            num_cores,
+            indices_solar_wind,
+            pa_local_var,
+            energy_var,
             particle_species,
         )
 
@@ -157,9 +163,16 @@ def compute_magnetic_field_variables(
         return cached_fn(*call_args, irbem_lib_path=irbem_lib_path)
 
     return _compute_core(
-        time_var, xgeo_var, variables_to_compute, irbem_options,
-        num_cores, indices_solar_wind, pa_local_var, energy_var,
-        particle_species, irbem_lib_path=irbem_lib_path,
+        time_var,
+        xgeo_var,
+        variables_to_compute,
+        irbem_options,
+        num_cores,
+        indices_solar_wind,
+        pa_local_var,
+        energy_var,
+        particle_species,
+        irbem_lib_path=irbem_lib_path,
     )
 
 
