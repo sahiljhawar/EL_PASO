@@ -1,0 +1,7 @@
+#!/bin/bash
+
+set -e 
+
+cd paper
+mkdir raw_data
+wget https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbspa/l3/ect/hope/pitchangle/rel04/2013/rbspa_rel04_ect-hope-pa-l3_20130317_v7.1.0.cdf -O raw_data/rbspa_rel04_ect-hope-pa-l3_20130317_v7.1.0.cdf
