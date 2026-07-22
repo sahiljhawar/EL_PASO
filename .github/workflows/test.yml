@@ -35,7 +35,19 @@ jobs:
           pip install .
           pip install coveralls coverage pytest-cov
 
+      - name: Get zenodo record ID
+        id: zenodo-record
+        run: echo "id=$(grep -oP 'RECORD_ID="\K[^"]+' download_data_for_tests.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache test data
+        id: cache-test-data
+        uses: actions/cache@v6
+        with:
+          path: tests/system
+          key: zenodo-test-data-${{ steps.zenodo-record.outputs.id }}
+
       - name: Download test data from zenodo
+        if: steps.cache-test-data.outputs.cache-hit != 'true'
         run: bash download_data_for_tests.sh
 
       - name: Run tests
