@@ -968,7 +968,7 @@ class MagFields:
             for i, key in enumerate(ordered_keys):
                 for dt in range(ntime):
                     if key in input_dict:
-                        maginput[dt][i] = input_dict[key][dt]  # ty:ignore[invalid-argument-type]
+                        maginput[dt][i] = input_dict[key][dt]
                     else:
                         maginput[dt][i] = ctypes.c_double(-9999)
 

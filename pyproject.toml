@@ -80,4 +80,4 @@ exclude = [
     "el_paso/saving_strategies/density_netcdf_strategy.py",
     "el_paso/dataset/scripts/create_RBSP_line_data.py",
 ]
-include = ["el_paso/**/*.py", "tests/**/*.py"]
+include = ["el_paso/**/*.py"]
