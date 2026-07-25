@@ -27,3 +27,10 @@ repos:
         types_or: [python, pyi]
       - id: ruff-format
         types_or: [python, pyi]
+
+
+  - repo: https://github.com/astral-sh/ty-pre-commit
+    rev: v0.0.62
+    hooks:
+      - id: ty
+        files: ^el_paso/
