@@ -85,6 +85,29 @@ You can validate your installation by running the minimal example located in *ex
 python examples/minimal_example.py
 ```
 
+## Citation
+
+If you use `EL-PASO` in your research, please cite the associated preprint:
+
+> Haas, B., Drozdov, A. Y., and Jhawar, S. 	EL-PASO: An Open-Source Python Library for Processing and Standardizing Particle Measurements Taken in Space. ESS Open Archive. https://essopenarchive.org/doi/full/10.22541/essoar.15002644/v1
+
+```bibtex
+@article{
+doi:10.22541/essoar.15002644/v1,
+author = {Bernhard Haas  and Alexander Y. Drozdov  and Sahil Jhawar },
+title = {EL-PASO: An Open-Source Python Library for Processing and Standardizing Particle Measurements Taken in Space},
+journal = {ESS Open Archive},
+volume = {2026},
+number = {0502},
+pages = {},
+year = {2026},
+doi = {10.22541/essoar.15002644/v1},
+URL = {https://essopenarchive.org/doi/abs/10.22541/essoar.15002644/v1},
+eprint = {https://essopenarchive.org/doi/pdf/10.22541/essoar.15002644/v1}}
+```
+
+Citation metadata is also available in [CITATION.cff](CITATION.cff).
+
 ## Acknowledgements
 
 This work has been funded by the German Research Foundation (NFDI4Earth, DFG project no. 460036893, https://www.nfdi4earth.de/).
