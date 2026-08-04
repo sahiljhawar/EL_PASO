@@ -50,11 +50,7 @@ Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest
     - HOPE (electrons) and ECT-combined
     - EMFISIS and EFW density
 
-## Installation Guide
-
-
-
-# Installation
+## Installation
 
 ### Step 1: Clone the Repository
 
@@ -84,6 +80,56 @@ You can validate your installation by running the minimal example located in *ex
 ```bash
 python examples/minimal_example.py
 ```
+
+## Testing
+
+### Step 1: Download the Test Data
+
+Most tests rely on reference/system test data hosted on [Zenodo](https://zenodo.org). Download it by running the following script from the repository root:
+
+```bash
+bash download_data_for_tests.sh
+```
+
+This fetches the dataset archive and extracts it into `tests/system/`. You only need to do this once (rerun it if the data changes upstream).
+
+`pytest` is installed as part of the regular dependencies (see [Installation](#installation)), so no separate test install step is needed.
+
+### Step 2: Run the Tests
+
+Run the full test suite with `pytest`:
+
+```bash
+pytest tests
+```
+
+Tests are grouped using pytest markers, defined in `pytest.ini`:
+
+- `basic`: quick tests suitable for fast, everyday verification of the code. This is what CI runs on every push/PR:
+
+  ```bash
+  pytest tests -m basic
+  ```
+
+- `visual`: tests that produce plots or other visual output which must be checked manually rather than being asserted automatically:
+
+  ```bash
+  pytest tests -m visual
+  ```
+
+You can combine or exclude markers using standard pytest marker expressions, e.g. to run everything except visual tests:
+
+```bash
+pytest tests -m "not visual"
+```
+
+Some system tests compare against previously stored reference solutions. Pass `--renew_solution` to regenerate and overwrite those reference solutions instead of comparing against them:
+
+```bash
+pytest tests --renew_solution=true
+```
+
+Use this only when you intend to intentionally update the stored reference outputs.
 
 ## Acknowledgements
 
