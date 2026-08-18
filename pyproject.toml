@@ -74,6 +74,7 @@ push = true
 [tool.bumpver.file_patterns]
 "pyproject.toml" = ['version = "{version}"']
 "el_paso/__init__.py" = ['__version__ = "{version}"']
+"el_paso.def" = ['    Version {version}']
 
 [tool.ty.src]
 exclude = [
