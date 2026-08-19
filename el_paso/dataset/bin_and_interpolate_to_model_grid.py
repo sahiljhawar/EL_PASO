@@ -593,13 +593,11 @@ def plot_debug_figures(  # noqa: D103
     for it, sim_time_curr in enumerate(tqdm(sim_time)):
         sat_time_idx = np.argwhere(np.abs(np.asarray(data_set.datetime) - sim_time_curr) <= dt / 2)
 
-        R_idx = np.argwhere(np.abs(grid_R[0, :, 0, 0] - R_or_Lstar_arr[sat_time_idx]))
-
         K_idx = np.argmin(
-            np.abs(grid_K[0, R_idx, 0, :] - debug_plot_settings.target_K)  # ty:ignore[unsupported-operator]
+            np.abs(grid_K[0, 0, 0, :] - debug_plot_settings.target_K)  # ty:ignore[unsupported-operator]
         )
         V_idx = np.argmin(
-            np.abs(grid_V[0, R_idx, :, K_idx] - debug_plot_settings.target_V)  # ty:ignore[unsupported-operator]
+            np.abs(grid_V[0, 0, :, K_idx] - debug_plot_settings.target_V)  # ty:ignore[unsupported-operator]
         )
 
         V_lim_min = np.log10(0.9 * np.min([np.nanmin(data_set_V_or_Mu), np.min(grid_V)]))
@@ -636,8 +634,8 @@ def plot_debug_figures(  # noqa: D103
             np.log10(np.max(grid_V)),
         )
         ax1.scatter(
-            np.log10(grid_V[0, R_idx, :, :]),
-            np.log10(grid_K[0, R_idx, :, :]),
+            np.log10(grid_V[0, 0, :, :]),
+            np.log10(grid_K[0, 0, :, :]),
             c="b",
             s=10,
         )
@@ -659,8 +657,8 @@ def plot_debug_figures(  # noqa: D103
         #                     c=np.log10(data_set.PSD[sat_time_idx,-1,:]), marker="D", vmin=-1, vmax=3, cmap="jet")
 
         ax1.scatter(
-            np.log10(grid_V[0, R_idx, V_idx, K_idx]),
-            np.log10(grid_K[0, R_idx, V_idx, K_idx]),
+            np.log10(grid_V[0, 0, V_idx, K_idx]),
+            np.log10(grid_K[0, 0, V_idx, K_idx]),
             c="r",
             s=15,
             marker="x",
@@ -673,7 +671,7 @@ def plot_debug_figures(  # noqa: D103
 
         fig.colorbar(sc, ax=ax1)
 
-        if grid_P:
+        if grid_P is not None:
             grid_X = grid_R[:, :, 0, 0] * np.cos(grid_P[:, :, 0, 0])
             grid_Y = grid_R[:, :, 0, 0] * np.sin(grid_P[:, :, 0, 0])
 
