@@ -557,7 +557,7 @@ class TestBinAndInterpolateEndToEnd:
 
         np.testing.assert_array_equal(np.nan_to_num(from_3d, nan=-1), np.nan_to_num(from_4d, nan=-1))
 
-    def test_mu_or_V_switch_selects_the_velocity_coordinate(self) -> None:
+    def test_mu_or_V_switch_selects_V_coordinate(self) -> None:
         """`mu_or_V='Mu'` must read InvMu, `'V'` must read InvV."""
         n_time = 2
         psd, V, K = exponential_psd(n_time)
