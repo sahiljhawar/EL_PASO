@@ -3,20 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 # ruff: noqa: D101, D107
-
-"""Characterization tests for `bin_and_interpolate_to_model_grid` and its helpers.
-
-These tests pin down *current* behaviour so that a refactor can be verified to be
-behaviour-preserving. They deliberately also pin a few quirks (see
-`TestKnownQuirks`) -- those tests are the ones you may consciously decide to
-change while refactoring; everything else should stay green untouched.
-
-Grid layout convention used throughout (as implied by the indexing in the code):
-    grid_* have shape (P, R, V, K); 3-D grids get a leading P axis of size 1.
-Data arrays:
-    PSD/density: (time, V, K), InvV/InvMu: (time, V, K), InvK: (time, K).
-"""
-
 from __future__ import annotations
 
 import os
@@ -27,8 +13,6 @@ import numpy as np
 import pytest
 
 import el_paso.dataset.bin_and_interpolate_to_model_grid as bai
-
-# -----------------------------------------------------------------------------------
 
 # Empty-slice means and 0/0 divisions are part of the current implementation.
 pytestmark = pytest.mark.filterwarnings("ignore::RuntimeWarning")
