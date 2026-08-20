@@ -116,6 +116,32 @@ def test_request(tmp_path: Path, skip_if_unreachable: Callable[..., None], monke
     assert len(list(data_path.glob("*"))) == 1
 
 
+@pytest.mark.basic
+def test_ftp(tmp_path: Path, skip_if_unreachable: Callable[..., None]):
+    skip_if_unreachable("ftp://ftp.gfz.de/pub/home/obs/Kp_ap_Ap_SN_F107/")
+
+    start_time = datetime(2024, 1, 3, tzinfo=timezone.utc)
+    end_time = datetime(2024, 1, 4, tzinfo=timezone.utc)
+
+    url = "ftp://ftp.gfz.de/pub/home/obs/Kp_ap_Ap_SN_F107/"
+    file_name_stem = "Kp_ap_Ap_SN_F107_YYYY.txt"
+
+    ep.download(
+        start_time,
+        end_time,
+        save_path=tmp_path,
+        download_url=url,
+        file_name_stem=file_name_stem,
+        file_cadence="daily",
+        method="ftp",
+        skip_existing=True,
+    )
+
+    files = list(tmp_path.glob("*"))
+    assert len(files) == 1
+    assert files[0].name == "Kp_ap_Ap_SN_F107_2024.txt"
+
+
 def test_exit_after_download(caplog: pytest.LogCaptureFixture):
 
     # test if the programs exits; it should not
