@@ -6,7 +6,9 @@
 
 from __future__ import annotations
 
+import ftplib
 import gzip
+import io
 import json
 import logging
 import os
@@ -14,6 +16,8 @@ import re
 import shutil
 import sys
 import typing
+import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from functools import cache, partial
 from pathlib import Path
@@ -60,6 +64,17 @@ def _download_single_step(
             )
         case "wget":
             _wget_download(curr_time, save_path, download_url, download_arguments_prefixes, download_arguments_suffixes)
+        case "ftp":
+            _ftp_download(
+                curr_time,
+                save_path,
+                download_url,
+                file_name_stem,
+                authentication_info,
+                rename_file_name_stem,
+                skip_existing=skip_existing,
+                sort_raw_files_by_time=sort_raw_files_by_time,
+            )
         case "esa_swe":
             _esa_swe_download(
                 authentication_info,
@@ -91,7 +106,7 @@ def download(
     file_name_stem: str,
     download_arguments_prefixes: str = "",
     download_arguments_suffixes: str = "",
-    method: Literal["request", "wget", "esa_swe"] = "request",
+    method: Literal["request", "wget", "ftp", "esa_swe"] = "request",
     authentication_info: tuple[str, str] = ("", ""),
     rename_file_name_stem: str | None = None,
     *,
@@ -117,13 +132,17 @@ def download(
                                                      (used with wget). Defaults to "".
         download_arguments_suffixes (str, optional): Additional arguments to suffix to the download command
                                                      (used with wget). Defaults to "".
-        method (Literal["request", "wget", "esa_swe"], optional): Download method to use. "request" uses the Python
-                                                       requests library, "wget" uses the system wget command, and
+        method (Literal["request", "wget", "ftp", "esa_swe"], optional): Download method to use. "request" uses the
+                                                       Python requests library, "wget" uses the system wget command,
+                                                       "ftp" uses Python's ftplib against an FTP server (the host is
+                                                       parsed out of `download_url`, and `file_name_stem` is the
+                                                       exact remote file name to download), and
                                                        "esa_swe" uses the ESA Space Weather Service API (requires
                                                        `authentication_info` and `rename_file_name_stem`).
                                                        Defaults to "request".
         authentication_info (tuple[str, str], optional): Tuple of (username, password) for authentication.
-                                                           Defaults to ("", "").
+                                                           For "ftp", an empty username falls back to anonymous
+                                                           login. Defaults to ("", "").
         rename_file_name_stem (str | None, optional): If provided, rename the downloaded file to this stem.
                                                       Defaults to None.
         skip_existing (bool, optional): If True, skip downloading files that already exist. Defaults to True.
@@ -309,6 +328,102 @@ def _wget_download(
         os.system(download_command)  # noqa: S605  # ty:ignore[deprecated]
     except Exception as e:  # noqa: BLE001
         logger.info(f"Error downloading file using command {download_command}: {e}")
+
+
+def _ftp_connect(
+    host: str,
+    authentication_info: tuple[str, str],
+    *,
+    port: int = 21,
+    timeout: float = 30.0,
+) -> ftplib.FTP:
+    if not host:
+        msg = "FTP download URL is missing a host"
+        raise ValueError(msg)
+
+    user, password = authentication_info
+    ftp = ftplib.FTP(timeout=timeout)  # noqa: S321
+    ftp.connect(host, port=port)
+    if user:
+        ftp.login(user, password)
+    else:
+        ftp.login()
+    ftp.set_pasv(True)
+    return ftp
+
+
+def _ftp_download(
+    current_time: datetime,
+    save_path: Path,
+    download_url: str,
+    file_name_stem: str,
+    authentication_info: tuple[str, str],
+    rename_file_name_stem: str | None,
+    *,
+    skip_existing: bool,
+    sort_raw_files_by_time: bool,
+) -> None:
+    """Download a file from an FTP server using ftplib.
+
+    `download_url` must be of the form "ftp://host/remote/dir" (may contain time placeholders).
+    `file_name_stem` is the exact remote file name (may contain time placeholders).
+    """
+    if sort_raw_files_by_time:
+        parent_folders = fill_str_template_with_time("YYYY/MM/", current_time)
+        save_path = save_path / parent_folders
+
+    save_path = Path(fill_str_template_with_time(str(save_path), current_time))
+    save_path.mkdir(exist_ok=True, parents=True)
+
+    url = fill_str_template_with_time(download_url, current_time)
+    remote_file_name = fill_str_template_with_time(file_name_stem, current_time)
+
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "ftp":
+        msg = f"FTP download URL must start with 'ftp://', got: {url}"
+        raise ValueError(msg)
+
+    remote_dir = parsed.path or "/"
+
+    try:
+        ftp = _ftp_connect(parsed.hostname or "", authentication_info)
+    except OSError as e:
+        logger.warning(f"Error connecting to FTP server for {url}: {e}")
+        return
+
+    try:
+        is_gzipped = remote_file_name.endswith(".gz")
+
+        if rename_file_name_stem is None:
+            save_file_name = remote_file_name[: -len(".gz")] if is_gzipped else remote_file_name
+        else:
+            save_file_name = fill_str_template_with_time(rename_file_name_stem, current_time)
+
+        if skip_existing and (save_path / save_file_name).exists():
+            logger.info(f"File already exists, skipping download: {save_path / save_file_name}")
+            return
+
+        remote_file_path = f"{remote_dir.rstrip('/')}/{remote_file_name}"
+
+        if is_gzipped:
+            buffer = io.BytesIO()
+            ftp.retrbinary(f"RETR {remote_file_path}", buffer.write)
+            buffer.seek(0)
+            with gzip.GzipFile(fileobj=buffer) as decompressed_stream, (save_path / save_file_name).open("wb") as file:
+                shutil.copyfileobj(decompressed_stream, file)
+        else:
+            with (save_path / save_file_name).open("wb") as file:
+                ftp.retrbinary(f"RETR {remote_file_path}", file.write)
+
+        logger.info(f"Downloaded successfully: {save_path / save_file_name}")
+
+    except ftplib.all_errors as e:
+        logger.warning(f"Error downloading file from {url}: {e}")
+    finally:
+        try:
+            ftp.quit()
+        except ftplib.all_errors:
+            ftp.close()
 
 
 def _esa_swe_download(
