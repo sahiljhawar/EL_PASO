@@ -32,7 +32,7 @@ Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest
 
 - **Arase**
     - MEPe
-    - XEP real-time
+    - XEP (archived and real-time)
     - PWE density
 - **GOES-R**
     - MPS-High real-time
@@ -45,7 +45,9 @@ Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest
 - **PROBA-V**
     - EPT (electrons and protons)
 - **Van Allen Probes**
-    - HOPE (electrons) and ECT-combined
+    - HOPE (electrons)
+    - MagEIS (electrons)
+    - ECT-combined
     - EMFISIS and EFW density
 
 ## Installation
