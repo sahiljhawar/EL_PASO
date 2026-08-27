@@ -215,6 +215,8 @@ def process_arase_xep(
             ("Alpha_Eq", mag_field),
             ("L_m", mag_field),
             ("L_star", mag_field),
+            ("InvK", mag_field),
+            ("InvMu", mag_field),
         ]
 
         magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
@@ -224,6 +226,8 @@ def process_arase_xep(
             irbem_options=irbem_options,
             num_cores=num_cores,
             pa_local_var=xep_variables["AlphaLocal"],
+            energy_var=xep_variables["Energy"],
+            particle_species="electron",
         )
 
         orb_variables["R0"] = magnetic_field_variables["R_Eq_" + mag_field]
@@ -231,6 +235,8 @@ def process_arase_xep(
         xep_variables["Alpha_eq"] = magnetic_field_variables["Alpha_Eq_" + mag_field]
         orb_variables["Lm"] = magnetic_field_variables["L_m_" + mag_field]
         orb_variables["Lstar"] = magnetic_field_variables["L_star_" + mag_field]
+        orb_variables["InvK"] = magnetic_field_variables["InvK_" + mag_field]
+        orb_variables["InvMu"] = magnetic_field_variables["InvMu_" + mag_field]
 
     xep_variables["FEDU"] = ep.processing.construct_pitch_angle_distribution(
         xep_variables["FEDO"],
@@ -244,6 +250,10 @@ def process_arase_xep(
         energy_var=xep_variables["Energy"],
     )
 
+    psd_var = ep.processing.compute_phase_space_density(
+        xep_variables["FEDU"], xep_variables["Energy"], particle_species="electron"
+    )
+
     variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
         "Epoch": binned_time_variable,
         "FEDU": xep_variables["FEDU"],
@@ -253,10 +263,11 @@ def process_arase_xep(
         "R_Eq": orb_variables["R0"],
         "MLT": orb_variables["MLT"],
         "L_m": orb_variables["Lm"],
+        "PSD": psd_var,
     }
 
     if not use_level_3_orbit_data: 
-        variables_to_save |= {"L_star": orb_variables["Lstar"]}
+        variables_to_save |= {"L_star": orb_variables["Lstar"], "InvK": orb_variables["InvK"], "InvMu": orb_variables["InvMu"]}
 
     saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
         processed_data_path,
