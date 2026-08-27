@@ -14,7 +14,6 @@ import numpy as np
 from icecream import ic
 from matplotlib import pyplot as plt
 from richpool import p_map, t_map
-from richpool._progress import make_progress
 from tqdm import tqdm
 
 if TYPE_CHECKING:
@@ -523,63 +522,56 @@ def plot_debug_figures_plasmasphere(  # noqa: D103
 
     R_or_Lstar_arr = data_set.R0
 
-    with make_progress() as progress:
-        task_id = progress.add_task("Plotting debug figures", total=len(sim_time))
+    for it, sim_time_curr in enumerate(tqdm(sim_time)):
+        sat_time_idx = np.argwhere(np.abs(np.asarray(data_set.datetime) - sim_time_curr) <= dt / 2)
 
-        for it, sim_time_curr in enumerate(sim_time):
-            sat_time_idx = np.argwhere(np.abs(np.asarray(data_set.datetime) - sim_time_curr) <= dt / 2)
+        ax0 = fig.add_subplot(121, projection="polar")
+        ax1 = fig.add_subplot(122)
 
-            ax0 = fig.add_subplot(121, projection="polar")
-            ax1 = fig.add_subplot(122)
+        # plot satellite trajectory on PxR grid
+        # [x_sat, y_sat] = pol2cart(self.P, self.R)  # noqa: ERA001
+        ax0.scatter(
+            data_set.P[sat_time_idx],
+            R_or_Lstar_arr[sat_time_idx],
+            c=np.log10(data_set.density[sat_time_idx]),
+            marker="D",
+            vmin=0,
+            vmax=4,
+            cmap="jet",
+        )
+        ax0.set_ylim(1, 6.6)
+        ax0.set_title("Orbit")
+        ax0.set_rlim([0, 6.6])  # ty:ignore[unresolved-attribute]
+        ax0.set_theta_offset(np.pi)  # ty:ignore[unresolved-attribute]
 
-            # plot satellite trajectory on PxR grid
-            # [x_sat, y_sat] = pol2cart(self.P, self.R)  # noqa: ERA001
-            ax0.scatter(
-                data_set.P[sat_time_idx],
-                R_or_Lstar_arr[sat_time_idx],
-                c=np.log10(data_set.density[sat_time_idx]),
-                marker="D",
-                vmin=0,
-                vmax=4,
-                cmap="jet",
-            )
-            ax0.set_ylim(1, 6.6)
-            ax0.set_title("Orbit")
-            ax0.set_rlim([0, 6.6])  # ty:ignore[unresolved-attribute]
-            ax0.set_theta_offset(np.pi)  # ty:ignore[unresolved-attribute]
+        grid_X = grid_R[:, :, 0, 0] * np.cos(grid_P[:, :, 0, 0])  # ty:ignore[not-subscriptable]
 
-            grid_X = grid_R[:, :, 0, 0] * np.cos(grid_P[:, :, 0, 0])  # ty:ignore[not-subscriptable]
+        grid_Y = grid_R[:, :, 0, 0] * np.sin(grid_P[:, :, 0, 0])  # ty:ignore[not-subscriptable]
 
-            grid_Y = grid_R[:, :, 0, 0] * np.sin(grid_P[:, :, 0, 0])  # ty:ignore[not-subscriptable]
+        pc = ax1.pcolormesh(
+            grid_X,
+            grid_Y,
+            np.squeeze(np.log10(psd_binned[it, :, :, :, :])),
+            vmin=0,
+            vmax=4,
+            cmap="jet",
+            edgecolors="k",
+            linewidth=0.1,
+        )
+        ax1.set_title("Assimilation input")
+        ax1.set_xlim(np.max(grid_R), -np.max(grid_R))
+        ax1.set_ylim(np.max(grid_R), -np.max(grid_R))
+        ax1.set_xlabel("X")
+        ax1.set_ylabel("Y")
 
-            pc = ax1.pcolormesh(
-                grid_X,
-                grid_Y,
-                np.squeeze(np.log10(psd_binned[it, :, :, :, :])),
-                vmin=0,
-                vmax=4,
-                cmap="jet",
-                edgecolors="k",
-                linewidth=0.1,
-            )
-            ax1.set_title("Assimilation input")
-            ax1.set_xlim(np.max(grid_R), -np.max(grid_R))
-            ax1.set_ylim(np.max(grid_R), -np.max(grid_R))
-            ax1.set_xlabel("X")
-            ax1.set_ylabel("Y")
+        fig.colorbar(pc, ax=ax1)
 
-            fig.colorbar(pc, ax=ax1)
+        fig.savefig(Path(debug_plot_settings.folder_path) / f"{debug_plot_settings.satellite_name}_{sim_time_curr}.png")
 
-            fig.savefig(
-                Path(debug_plot_settings.folder_path) / f"{debug_plot_settings.satellite_name}_{sim_time_curr}.png"
-            )
+        fig.clf()
 
-            fig.clf()
-
-            if np.any(data_set.P[sat_time_idx] < 0.1):
-                ic(psd_binned[it, 0, :, :, :])
-
-            progress.advance(task_id)
+        if np.any(data_set.P[sat_time_idx] < 0.1):
+            ic(psd_binned[it, 0, :, :, :])
 
 
 def plot_debug_figures(  # noqa: D103
@@ -602,135 +594,128 @@ def plot_debug_figures(  # noqa: D103
 
     R_or_Lstar_arr = data_set.R0 if grid_P is not None else data_set.Lstar[:, -1]
 
-    with make_progress() as progress:
-        task_id = progress.add_task("Plotting debug figures", total=len(sim_time))
+    for it, sim_time_curr in enumerate(tqdm(sim_time)):
+        sat_time_idx = np.argwhere(np.abs(np.asarray(data_set.datetime) - sim_time_curr) <= dt / 2)
 
-        for it, sim_time_curr in enumerate(sim_time):
-            sat_time_idx = np.argwhere(np.abs(np.asarray(data_set.datetime) - sim_time_curr) <= dt / 2)
+        K_idx = np.argmin(
+            np.abs(grid_K[0, 0, 0, :] - debug_plot_settings.target_K)  # ty:ignore[unsupported-operator]
+        )
+        V_idx = np.argmin(
+            np.abs(grid_V[0, 0, :, K_idx] - debug_plot_settings.target_V)  # ty:ignore[unsupported-operator]
+        )
 
-            K_idx = np.argmin(
-                np.abs(grid_K[0, 0, 0, :] - debug_plot_settings.target_K)  # ty:ignore[unsupported-operator]
-            )
-            V_idx = np.argmin(
-                np.abs(grid_V[0, 0, :, K_idx] - debug_plot_settings.target_V)  # ty:ignore[unsupported-operator]
-            )
+        V_lim_min = np.log10(0.9 * np.min([np.nanmin(data_set_V_or_Mu), np.min(grid_V)]))
+        V_lim_max = np.log10(1.1 * np.max([np.nanmax(data_set_V_or_Mu), np.max(grid_V)]))
 
-            V_lim_min = np.log10(0.9 * np.min([np.nanmin(data_set_V_or_Mu), np.min(grid_V)]))
-            V_lim_max = np.log10(1.1 * np.max([np.nanmax(data_set_V_or_Mu), np.max(grid_V)]))
+        K_lim_min = np.log10(0.9 * np.min([np.nanmin(data_set.InvK), np.min(grid_K)]))
+        K_lim_max = np.log10(1.1 * np.max([np.nanmax(data_set.InvK), np.max(grid_K)]))
 
-            K_lim_min = np.log10(0.9 * np.min([np.nanmin(data_set.InvK), np.min(grid_K)]))
-            K_lim_max = np.log10(1.1 * np.max([np.nanmax(data_set.InvK), np.max(grid_K)]))
+        ax0 = fig.add_subplot(131, projection="polar")
+        ax1 = fig.add_subplot(132)
+        ax2 = fig.add_subplot(133)
 
-            ax0 = fig.add_subplot(131, projection="polar")
-            ax1 = fig.add_subplot(132)
-            ax2 = fig.add_subplot(133)
+        # plot satellite trajectory on PxR grid
+        # [x_sat, y_sat] = pol2cart(self.P, self.R)  # noqa: ERA001
 
-            # plot satellite trajectory on PxR grid
-            # [x_sat, y_sat] = pol2cart(self.P, self.R)  # noqa: ERA001
+        ax0.scatter(
+            data_set.P[sat_time_idx],
+            R_or_Lstar_arr[sat_time_idx],
+            c="k",
+            marker="D",
+        )
+        ax0.set_ylim(1, 6.6)
+        ax0.set_title("Orbit")
+        ax0.set_theta_offset(np.pi)  # ty:ignore[unresolved-attribute]
 
-            ax0.scatter(
-                data_set.P[sat_time_idx],
-                R_or_Lstar_arr[sat_time_idx],
-                c="k",
+        ax1.vlines(
+            [np.log10(np.min(grid_V)), np.log10(np.max(grid_V))],
+            np.log10(np.min(grid_K)),
+            np.log10(np.max(grid_K)),
+        )
+        ax1.hlines(
+            [np.log10(np.min(grid_K)), np.log10(np.max(grid_K))],
+            np.log10(np.min(grid_V)),
+            np.log10(np.max(grid_V)),
+        )
+        ax1.scatter(
+            np.log10(grid_V[0, 0, :, :]),
+            np.log10(grid_K[0, 0, :, :]),
+            c="b",
+            s=10,
+        )
+
+        for iV in range(data_set_V_or_Mu.shape[1]):  # ty:ignore[index-out-of-bounds]
+            sc = ax1.scatter(
+                np.log10(data_set_V_or_Mu[sat_time_idx, iV, :]),
+                np.log10(data_set.InvK[sat_time_idx, :]),
+                c=np.log10(data_set.PSD[sat_time_idx, iV, :]),
                 marker="D",
-            )
-            ax0.set_ylim(1, 6.6)
-            ax0.set_title("Orbit")
-            ax0.set_theta_offset(np.pi)  # ty:ignore[unresolved-attribute]
-
-            ax1.vlines(
-                [np.log10(np.min(grid_V)), np.log10(np.max(grid_V))],
-                np.log10(np.min(grid_K)),
-                np.log10(np.max(grid_K)),
-            )
-            ax1.hlines(
-                [np.log10(np.min(grid_K)), np.log10(np.max(grid_K))],
-                np.log10(np.min(grid_V)),
-                np.log10(np.max(grid_V)),
-            )
-            ax1.scatter(
-                np.log10(grid_V[0, 0, :, :]),
-                np.log10(grid_K[0, 0, :, :]),
-                c="b",
-                s=10,
+                vmin=-1,
+                vmax=3,
+                cmap="jet",
             )
 
-            for iV in range(data_set_V_or_Mu.shape[1]):  # ty:ignore[index-out-of-bounds]
-                sc = ax1.scatter(
-                    np.log10(data_set_V_or_Mu[sat_time_idx, iV, :]),
-                    np.log10(data_set.InvK[sat_time_idx, :]),
-                    c=np.log10(data_set.PSD[sat_time_idx, iV, :]),
-                    marker="D",
-                    vmin=-1,
-                    vmax=3,
-                    cmap="jet",
-                )
+        # sc = ax1.scatter(np.log10(data_set_V_or_Mu[sat_time_idx,0,:]), np.log10(data_set.InvK[sat_time_idx,:]),
+        #                     c=np.log10(data_set.PSD[sat_time_idx,0,:]), marker="D", vmin=-1, vmax=3, cmap="jet")
+        # sc = ax1.scatter(np.log10(data_set_V_or_Mu[sat_time_idx,-1,:]), np.log10(data_set.InvK[sat_time_idx,:]),
+        #                     c=np.log10(data_set.PSD[sat_time_idx,-1,:]), marker="D", vmin=-1, vmax=3, cmap="jet")
 
-            # sc = ax1.scatter(np.log10(data_set_V_or_Mu[sat_time_idx,0,:]), np.log10(data_set.InvK[sat_time_idx,:]),
-            #                     c=np.log10(data_set.PSD[sat_time_idx,0,:]), marker="D", vmin=-1, vmax=3, cmap="jet")
-            # sc = ax1.scatter(np.log10(data_set_V_or_Mu[sat_time_idx,-1,:]), np.log10(data_set.InvK[sat_time_idx,:]),
-            #                     c=np.log10(data_set.PSD[sat_time_idx,-1,:]), marker="D", vmin=-1, vmax=3, cmap="jet")
+        ax1.scatter(
+            np.log10(grid_V[0, 0, V_idx, K_idx]),
+            np.log10(grid_K[0, 0, V_idx, K_idx]),
+            c="r",
+            s=15,
+            marker="x",
+        )
+        ax1.set_title("V-K of satellite and simulation grid")
+        ax1.set_xlim(V_lim_min, V_lim_max)
+        ax1.set_ylim(K_lim_min, K_lim_max)
+        ax1.set_xlabel("log10 V")
+        ax1.set_ylabel("log10 K")
 
-            ax1.scatter(
-                np.log10(grid_V[0, 0, V_idx, K_idx]),
-                np.log10(grid_K[0, 0, V_idx, K_idx]),
-                c="r",
-                s=15,
-                marker="x",
+        fig.colorbar(sc, ax=ax1)
+
+        if grid_P is not None:
+            grid_X = grid_R[:, :, 0, 0] * np.cos(grid_P[:, :, 0, 0])
+            grid_Y = grid_R[:, :, 0, 0] * np.sin(grid_P[:, :, 0, 0])
+
+            pc = ax2.pcolormesh(
+                grid_X,
+                grid_Y,
+                np.any(np.isfinite(psd_binned[it, :, :, :, :]), axis=(2, 3)),
+                vmin=-1,
+                vmax=5,
+                cmap="jet",
+                edgecolors="k",
+                linewidth=0.1,
             )
-            ax1.set_title("V-K of satellite and simulation grid")
-            ax1.set_xlim(V_lim_min, V_lim_max)
-            ax1.set_ylim(K_lim_min, K_lim_max)
-            ax1.set_xlabel("log10 V")
-            ax1.set_ylabel("log10 K")
+            ax2.set_title("Assimilation input")
+            ax2.set_xlim(np.max(grid_R), -np.max(grid_R))
+            ax2.set_ylim(np.max(grid_R), -np.max(grid_R))
+            ax2.set_xlabel("X")
+            ax2.set_ylabel("Y")
 
-            fig.colorbar(sc, ax=ax1)
-
-            if grid_P is not None:
-                grid_X = grid_R[:, :, 0, 0] * np.cos(grid_P[:, :, 0, 0])
-                grid_Y = grid_R[:, :, 0, 0] * np.sin(grid_P[:, :, 0, 0])
-
-                pc = ax2.pcolormesh(
-                    grid_X,
-                    grid_Y,
-                    np.any(np.isfinite(psd_binned[it, :, :, :, :]), axis=(2, 3)),
-                    vmin=-1,
-                    vmax=5,
-                    cmap="jet",
-                    edgecolors="k",
-                    linewidth=0.1,
-                )
-                ax2.set_title("Assimilation input")
-                ax2.set_xlim(np.max(grid_R), -np.max(grid_R))
-                ax2.set_ylim(np.max(grid_R), -np.max(grid_R))
-                ax2.set_xlabel("X")
-                ax2.set_ylabel("Y")
-
-                fig.colorbar(pc, ax=ax2)
-            else:
-                grid_X, grid_Y = np.meshgrid(sim_time, grid_R[0, :, 0, 0])
-                pc = ax2.pcolormesh(
-                    grid_X,
-                    grid_Y,
-                    np.log10(psd_binned[:, 0, :, V_idx, K_idx]).T,
-                    vmin=-1,
-                    vmax=5,
-                    cmap="jet",
-                    edgecolors=None,
-                    linewidth=0.1,
-                    shading="nearest",
-                )
-                ax2.set_title("Assimilation input")
-                ax2.set_ylim(0, np.max(grid_R))
-                ax2.set_xlabel("Time")
-                ax2.set_ylabel("Lstar")
-
-                fig.colorbar(pc, ax=ax2)
-
-            fig.savefig(
-                Path(debug_plot_settings.folder_path) / f"{debug_plot_settings.satellite_name}_{sim_time_curr}.png"
+            fig.colorbar(pc, ax=ax2)
+        else:
+            grid_X, grid_Y = np.meshgrid(sim_time, grid_R[0, :, 0, 0])
+            pc = ax2.pcolormesh(
+                grid_X,
+                grid_Y,
+                np.log10(psd_binned[:, 0, :, V_idx, K_idx]).T,
+                vmin=-1,
+                vmax=5,
+                cmap="jet",
+                edgecolors=None,
+                linewidth=0.1,
+                shading="nearest",
             )
+            ax2.set_title("Assimilation input")
+            ax2.set_ylim(0, np.max(grid_R))
+            ax2.set_xlabel("Time")
+            ax2.set_ylabel("Lstar")
 
-            fig.clf()
+            fig.colorbar(pc, ax=ax2)
 
-            progress.advance(task_id)
+        fig.savefig(Path(debug_plot_settings.folder_path) / f"{debug_plot_settings.satellite_name}_{sim_time_curr}.png")
+
+        fig.clf()
