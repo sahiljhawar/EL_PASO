@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import atexit
 import logging
+import os
 import typing
 from collections.abc import Sequence
 from pathlib import Path
@@ -127,6 +128,10 @@ def compute_magnetic_field_variables(
     """
     if cache_dir == "_default_":
         cache_dir = get_cache_dir()
+
+    if (env_cache_flag := os.environ.get("EL_PASO_USE_MAG_FIELD_CACHE")) is not None:
+        if env_cache_flag.strip().lower() in ("0", "false", "no", "off", ""):
+            cache_dir = None
 
     if cache_dir is not None:
         global _cleanup_registered

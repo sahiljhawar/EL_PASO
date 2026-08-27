@@ -4,6 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from __future__ import annotations
+import dateutil
+import argparse
 
 import logging
 import sys
@@ -70,8 +72,6 @@ def process_arase_xep(
                                                 orbit data and compute the magnetic field
                                                 quantities via IRBEM. Defaults to True.
     """
-    logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
-    logging.getLogger().setLevel(logging.INFO)
 
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
@@ -230,12 +230,13 @@ def process_arase_xep(
         orb_variables["MLT"] = magnetic_field_variables["MLT_" + mag_field]
         xep_variables["Alpha_eq"] = magnetic_field_variables["Alpha_Eq_" + mag_field]
         orb_variables["Lm"] = magnetic_field_variables["L_m_" + mag_field]
+        orb_variables["Lstar"] = magnetic_field_variables["L_star_" + mag_field]
 
     xep_variables["FEDU"] = ep.processing.construct_pitch_angle_distribution(
         xep_variables["FEDO"],
         xep_variables["AlphaLocal"],
         xep_variables["Alpha_eq"],
-        method="sin",
+        method="Smirnov2022",
         flux_type="omni",
         time_var=binned_time_variable,
         L_var=orb_variables["R0"],
@@ -254,6 +255,9 @@ def process_arase_xep(
         "L_m": orb_variables["Lm"],
     }
 
+    if not use_level_3_orbit_data: 
+        variables_to_save |= {"L_star": orb_variables["Lstar"]}
+
     saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
         processed_data_path,
         "Arase",
@@ -268,16 +272,39 @@ def process_arase_xep(
 
 
 if __name__ == "__main__":
-    start_time = datetime(2024, 5, 10, tzinfo=timezone.utc)
-    end_time = datetime(2024, 5, 15, 23, 59, tzinfo=timezone.utc)
 
-    with tempfile.TemporaryDirectory() as tmp_dir:
-        process_arase_xep(
-            start_time,
-            end_time,
-            "T89",
-            raw_data_path=tmp_dir,
-            processed_data_path="sin",
-            num_cores=32,
-            use_level_3_orbit_data=False,
-        )
+    ep.setup_logging()
+
+    parser = argparse.ArgumentParser(
+        description="Process flux flux data from ECT/MagEIS instrument on VanAllenProbes."
+    )
+    parser.add_argument(
+        "--start_time",
+        type=str,
+        help="Start time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
+        default=datetime(2017, 9, 6, tzinfo=timezone.utc).isoformat(),
+        required=False,
+    )
+    parser.add_argument(
+        "--end_time",
+        type=str,
+        help="End time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
+        default=datetime(2017, 9, 12, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
+        required=False,
+    )
+
+    args = parser.parse_args()
+
+    dt_start = dateutil.parser.parse(args.start_time)
+    dt_end = dateutil.parser.parse(args.end_time)
+
+    # with tempfile.TemporaryDirectory() as tmp_dir:
+    process_arase_xep(
+        dt_start,
+        dt_end,
+        "T89",
+        raw_data_path="/home/bhaas/el_paso_processing/raw/",
+        processed_data_path="/home/bhaas/el_paso_processing/data_processed/",
+        num_cores=64,
+        use_level_3_orbit_data=False,
+    )
