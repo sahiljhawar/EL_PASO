@@ -106,6 +106,7 @@ def extract_variables_from_files(
         extraction_infos (Iterable[ExtractionInfo]): Information about which variables to extract and how.
         pd_read_csv_kwargs (dict[str, Any], optional): Additional keyword arguments to pass to pandas.read_csv.
         custom_extractors (dict[str, Callable], optional): A dictionary mapping file suffixes to custom extractor functions.
+        data_modifier (Callable, optional): A callable to modify data of single files before data concatination.
 
     Returns:
         dict[str, Variable]: A dictionary mapping result keys to extracted Variable objects.

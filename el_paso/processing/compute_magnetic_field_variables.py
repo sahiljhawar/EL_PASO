@@ -72,6 +72,8 @@ def compute_magnetic_field_variables(
     Results are cached to disk by default so that a crash in downstream code
     does not force re-computation.  The cache is cleaned on graceful exit
     and stale entries (>7 days) are purged automatically at import time.
+    Caching can be disabled by setting the env var 'EL_PASO_USE_MAG_FIELD_CACHE'
+    to 'False'.
 
     Args:
         time_var (Variable): A Variable object containing time data. The data should be a 1D array of timestamps.
