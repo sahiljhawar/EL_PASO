@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Literal
 import numpy as np
 from icecream import ic
 from matplotlib import pyplot as plt
-from richpool import p_map, t_map
+from richpool import p_map
 from tqdm import tqdm
 
 if TYPE_CHECKING:
@@ -220,10 +220,8 @@ def _bin_in_time(
     data_timestamps = [t.timestamp() for t in data_time]
     time_indices = _get_time_indices(data_timestamps, _get_time_bins(sim_timestamps))
 
-    def _bin_single_time(i: int) -> NDArray[np.float64]:
-        return np.power(10, np.nanmean(np.log10(data_psd[time_indices == i, ...]), axis=0))
-
-    psd_binned[:, ...] = t_map(_bin_single_time, range(len(sim_time)), desc="Binning in time")
+    for i, _ in tqdm(enumerate(sim_time), desc="Binning in time"):
+        psd_binned[i, ...] = np.power(10, np.nanmean(np.log10(data_psd[time_indices == i, ...]), axis=0))
 
     return psd_binned
 
