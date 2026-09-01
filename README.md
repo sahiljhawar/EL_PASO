@@ -149,6 +149,10 @@ pytest tests --renew_solution=true
 
 Use this only when you intend to intentionally update the stored reference outputs.
 
+## Contributing
+
+Please read our comprehensive [contribution guide](CONTRIBUTING.md) before submitting a pull request.
+
 ## Citation
 
 If you use `EL-PASO` in your research, please cite the associated preprint:
