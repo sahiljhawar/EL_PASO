@@ -37,6 +37,7 @@ nav:
   - Getting started:
       - Installation: getting_started/installation.md
       - Basic Workflow: getting_started/basic_workflow.md
+      - Command Line Interface: getting_started/command_line.md
       - Tutorials: getting_started/tutorials.md
 
   - API Reference:
@@ -51,6 +52,7 @@ nav:
           - API_reference/download.md
           - API_reference/extract_variables_from_files.md
           - API_reference/save.md
+          - API_reference/cli.md
       - Processing Functions:
           - API_reference/processing/bin_by_time.md
           - API_reference/processing/calculate_geo_coords_from_omm.md
@@ -105,7 +107,7 @@ nav:
       - Time Binning: tutorials/4_time_binning.ipynb
       - Magnetic Field Processing: tutorials/5_magnetic_field_processing.ipynb
       - Datasets: tutorials/6_loading_processed_data_using_datasets.ipynb
-      - Custom File Cadence: tutorials/7_custom_file_cadence.ipynb
+      - Custom File Cadence: tutorials/7_advanced_custom_download_and_variable_extraction.ipynb
 
 markdown_extensions:
   - admonition
@@ -145,9 +147,8 @@ plugins:
       allow_errors: true # fail build if execution errors
       ignore_h1_titles: true
 
-# - to-pdf:
-#     output_path: docs/el_paso_documentation.pdf
-#     toc_level: 3
+extra_css:
+  - css/custom.css
 
 extra_javascript:
   # Use MathJax for rendering latex equations

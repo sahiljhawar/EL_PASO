@@ -26,11 +26,12 @@ BAD_CHANNELS = (13, 21, 22, 23, 24)
 def process_rbsp_mageis_electrons(
     start_time: datetime,
     end_time: datetime,
-    sat_str: Literal["a", "b"],
-    mag_field: Literal["T89", "T96", "TS04"],
+    satellite: Literal["a", "b"] = "a",
+    mag_field: Literal["T89", "T96", "TS04"] = "T89",
     raw_data_path: str | Path = ".",
     processed_data_path: str | Path = ".",
-    num_cores: int = 32,
+    bin_cadence: timedelta = timedelta(minutes=5),
+    num_cores: int = 16,
 ) -> None:
     """Process RBSP ECT/MagEIS electron flux data into the EL-PASO data standard.
 
@@ -38,7 +39,7 @@ def process_rbsp_mageis_electrons(
     satellite, extracts the energy/pitch-angle-resolved flux (FEDU) and position on their
     respective time grids, applies a lower bound threshold to the flux, filters out non-positive
     energy channels, truncates all variables to the requested time range, time-bins all variables
-    to a 5-minute cadence (FEDU and position are binned independently due to differing time grids),
+    to a common cadence (FEDU and position are binned independently due to differing time grids),
     folds the pitch angles and flux to the [0, 90] degree range, computes magnetic-field-related
     quantities (B field, equatorial pitch angle, L*, L_m, MLT, InvK, InvMu, etc.) using the position
     time grid to ensure consistent time/position pairing with IRBEM, computes the electron phase space
@@ -47,26 +48,27 @@ def process_rbsp_mageis_electrons(
     Args:
         start_time (datetime): Start of the time range to process.
         end_time (datetime): End of the time range to process.
-        sat_str (Literal["a", "b"]): RBSP satellite identifier ("a" or "b").
+        satellite (Literal["a", "b"]): RBSP satellite identifier ("a" or "b").
         mag_field (Literal["T89", "T96", "TS04"]): Magnetic field model used to compute the
             magnetic-field-related variables.
-        raw_data_path (str | Path, optional): Directory where raw CDF files are downloaded to and
+        raw_data_path (str | Path): Directory where raw CDF files are downloaded to and
             read from. Defaults to ".".
-        processed_data_path (str | Path, optional): Directory where the processed output files are
+        processed_data_path (str | Path): Directory where the processed output files are
             written to. Defaults to ".".
-        num_cores (int, optional): Number of CPU cores used for the magnetic field computations.
+        bin_cadence (timedelta): Time-binning cadence applied to all variables.
+        num_cores (int): Number of CPU cores used for the magnetic field computations.
             Defaults to 32.
     """
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
 
-    file_name_stem = "rbsp" + sat_str + "_rel04_ect-mageis-l3_YYYYMMDD_.{6}.cdf"
+    file_name_stem = "rbsp" + satellite + "_rel04_ect-mageis-l3_YYYYMMDD_.{6}.cdf"
 
     ep.download(
         start_time,
         end_time,
         save_path=raw_data_path,
-        download_url=f"https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{sat_str}/l3/ect/mageis/sectors/rel04/YYYY/",
+        download_url=f"https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l3/ect/mageis/sectors/rel04/YYYY/",
         file_name_stem=file_name_stem,
         file_cadence="daily",
         method="request",
@@ -137,7 +139,7 @@ def process_rbsp_mageis_electrons(
         variables["Epoch"],
         variables=variables,
         time_bin_method_dict=time_bin_methods,
-        time_binning_cadence=timedelta(minutes=5),
+        time_binning_cadence=bin_cadence,
     )
 
     variables["FEDU"].transpose_data([0, 2, 1])  # making it have dimensions (time, energy, pitch angle)
@@ -192,7 +194,7 @@ def process_rbsp_mageis_electrons(
     strategy = ep.saving_strategies.MonthlyRBStrategy(
         base_data_path=Path(processed_data_path),
         mission="RBSP",
-        satellite="rbsp" + sat_str,
+        satellite="rbsp" + satellite,
         instrument="mageis",
         mag_field=mag_field,
         file_format=".nc",
@@ -202,7 +204,8 @@ def process_rbsp_mageis_electrons(
 
 
 def _xgeo_data_modifier(
-    variable_data: dict[str | int, NDArray[np.generic]], extraction_infos: Iterable[ep.ExtractionInfo]  # noqa: ARG001
+    variable_data: dict[str | int, NDArray[np.generic]],
+    extraction_infos: Iterable[ep.ExtractionInfo],  # noqa: ARG001
 ) -> dict[str | int, NDArray[np.generic]]:
 
     xgeo_data = variable_data["Position"].astype(np.float64)
@@ -215,36 +218,4 @@ def _xgeo_data_modifier(
 
 
 if __name__ == "__main__":
-    ep.setup_logging()
-
-    parser = argparse.ArgumentParser(description="Process flux flux data from ECT/MagEIS instrument on VanAllenProbes.")
-    parser.add_argument(
-        "--start_time",
-        type=str,
-        help="Start time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2017, 10, 15, tzinfo=timezone.utc).isoformat(),
-        required=False,
-    )
-    parser.add_argument(
-        "--end_time",
-        type=str,
-        help="End time in valid dateparse format. Example: YYYY-MM-DDTHH:MM:SS.",
-        default=datetime(2017, 10, 15, 23, 59, 59, tzinfo=timezone.utc).isoformat(),
-        required=False,
-    )
-
-    args = parser.parse_args()
-
-    dt_start = dateutil.parser.parse(args.start_time)
-    dt_end = dateutil.parser.parse(args.end_time)
-
-    for sat_str in ["b"]:
-        process_rbsp_mageis_electrons(
-            dt_start,
-            dt_end,
-            sat_str,
-            "T89",
-            raw_data_path="/home/bhaas/el_paso_processing/raw/",
-            processed_data_path="/home/bhaas/el_paso_processing/data_processed/",
-            num_cores=64,
-        )
+    ep.run_recipe_cli(process_rbsp_mageis_electrons)

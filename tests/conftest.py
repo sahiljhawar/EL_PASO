@@ -53,7 +53,6 @@ def indices_sw_param_data_path(
     monkeypatch.setenv("EL_PASO_INDICES_SW_PARAM_DATA_PATH", str(path))
 
 
-
 _DEFAULT_PORTS_BY_SCHEME = {"https": 443, "http": 80, "ftp": 21}
 
 
