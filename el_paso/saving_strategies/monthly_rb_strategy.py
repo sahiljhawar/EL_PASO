@@ -89,13 +89,15 @@ class MonthlyRBStrategy(SavingStrategy):
             OutputFile("full", self._get_output_file_entries(), save_incomplete=True),
         ]
 
-    def _get_output_file_entries(self) -> list[InternalName]:
+    def _get_output_file_entries(self) -> list[InternalName | tuple[InternalName, ...]]:
         """Return the standard variable list plus user-defined custom variables."""
         return [
             "FEDU",
+            "FPDU",
             "Epoch",
             "Alpha_Eq",
             "Energy_FEDU",
+            "Energy_FPDU",
             "Alpha",
             "B_Calc",
             "B_Eq",

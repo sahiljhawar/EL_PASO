@@ -687,7 +687,8 @@ def _write_data_to_netcdf_file(file: nC.Dataset | nC.Group, data_dict: DataDict,
             else:
                 curr_hierarchy = curr_hierarchy.groups[group]
 
-        dimensions = data_standard.get_dependencies(internal_name)
+        available_keys = {key for key in data_dict if key != "metadata"}
+        dimensions = data_standard.resolve_dependencies(data_standard.get_dependencies(internal_name), available_keys)
         data_set = cast(
             "nC.Variable[Any]",
             curr_hierarchy.createVariable(
@@ -720,7 +721,7 @@ def _write_data_to_netcdf_file(file: nC.Dataset | nC.Group, data_dict: DataDict,
 
         coordinates = [
             data_standard.get_standard_name(int_name)  # ty:ignore[invalid-argument-type]
-            for int_name in data_standard.get_dependencies(internal_name)
+            for int_name in dimensions
             if int_name in valid_internal_names
         ]
 
@@ -781,7 +782,9 @@ def _calculate_dimensions(data_dict: DataDict, data_standard: DataStandard) -> d
     for internal_name in data_dict:
         if internal_name == "metadata":
             continue
-        dim_names = data_standard.get_dependencies(internal_name)
+
+        available_keys = {key for key in data_dict if key != "metadata"}
+        dim_names = data_standard.resolve_dependencies(data_standard.get_dependencies(internal_name), available_keys)
 
         for dim_name in dim_names:
             if dim_name not in unique_dims:
@@ -791,7 +794,9 @@ def _calculate_dimensions(data_dict: DataDict, data_standard: DataStandard) -> d
                 elif dim_name == "Position_components":
                     unique_dims[dim_name] = 3
                 elif dim_name in data_dict:
-                    dims_of_dim = data_standard.get_dependencies(dim_name)
+                    dims_of_dim = data_standard.resolve_dependencies(
+                        data_standard.get_dependencies(dim_name), available_keys
+                    )
 
                     target_idx = np.where(dim_name == np.asarray(dims_of_dim))[0][0]  # ty:ignore[no-matching-overload]
 

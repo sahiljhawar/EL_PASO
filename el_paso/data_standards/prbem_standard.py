@@ -93,7 +93,7 @@ class PRBEMStandard(DataStandard[PRBEMName]):
                 dependencies=["Epoch", "Alpha"],
             ),
             "InvMu": VariableInfo[PRBEMName](
-                "InvMu", "Calculated first adiabatic invariant.", u.MeV / u.G, ["Epoch", "Energy_FEDU", "Alpha"]
+                "InvMu", "Calculated first adiabatic invariant.", u.MeV / u.G, ["Epoch", ("Energy_FEDU", "Energy_FPDU"), "Alpha"]
             ),
             "InvK": VariableInfo[PRBEMName](
                 "InvK", "Calculated modified second adiabatic invariant.", ep.units.RE * u.G**0.5, ["Epoch", "Alpha"]
@@ -104,8 +104,8 @@ class PRBEMStandard(DataStandard[PRBEMName]):
             "PSD": VariableInfo[PRBEMName](
                 "PSD",
                 "Calculated phase space density of particles.",
-                (u.m * u.kg * u.m / u.s) ** (-3),
-                ["Epoch", "Energy_FEDU", "Alpha"],
+                ep.units.psd_natural_unit,
+                ["Epoch", ("Energy_FEDU", "Energy_FPDU"), "Alpha"],
             ),
             "MLT": VariableInfo[PRBEMName]("MLT", "Magnetic local time at the satellite location.", u.hour, ["Epoch"]),
         }

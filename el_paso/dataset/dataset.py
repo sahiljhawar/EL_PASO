@@ -175,7 +175,6 @@ class DataSet:
         if isinstance(value, xr.Variable):
             value = value.values
         elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], xr.Variable):
-
             non_empty = [v for v in value if v.shape[0] > 0]
 
             if not non_empty:
@@ -445,9 +444,11 @@ class DataSet:
 
         # assign all vars, which are not present in the saved file, as empty
         for internal_name in output_file.names_to_save:
-            standard_name = self.saving_strategy.data_standard.get_standard_name(internal_name)
-            if standard_name not in var_names_stored:
-                setattr(self, standard_name, np.asarray([]))
+            alt_names = internal_name if isinstance(internal_name, tuple) else (internal_name,)
+            for alt in alt_names:
+                standard_name = self.saving_strategy.data_standard.get_standard_name(alt)
+                if standard_name not in var_names_stored:
+                    setattr(self, standard_name, np.asarray([]))
 
     def get_loaded_variables(self) -> list[str]:
         """Get a list of currently loaded variable names.
