@@ -130,6 +130,7 @@ app = typer.Typer(
     help="Download, process and save satellite particle observation data.",
     no_args_is_help=True,
     pretty_exceptions_show_locals=False,
+    context_settings={"help_option_names": ["-h", "--help"]},
 )
 
 _mission_apps: dict[str, typer.Typer] = {}
@@ -141,7 +142,9 @@ for _entry in RECIPES:
         app.add_typer(mission_app)
 
     _func, _defaults = load_recipe(_entry)
-    _mission_apps[_entry.mission].command(name=_entry.command)(build_recipe_command(_func, defaults=_defaults))
+    _mission_apps[_entry.mission].command(name=_entry.command, no_args_is_help=True)(
+        build_recipe_command(_func, defaults=_defaults)
+    )
 
 
 app.command("omm")(build_recipe_command(ep.download_omm))
