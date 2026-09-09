@@ -29,6 +29,7 @@ from el_paso.save import save
 from el_paso.processing import TimeBinMethod
 from el_paso.dataset import DataSet
 from el_paso.download import download
+from el_paso.download_omm import download_omm
 from el_paso.extract_variables_from_files import extract_variables_from_files, ExtractionInfo
 from el_paso.load_indices_solar_wind_parameters import load_indices_solar_wind_parameters
 from el_paso.logger import setup_logging
@@ -55,6 +56,7 @@ __all__ = [
     "cli",
     "data_standards",
     "download",
+    "download_omm",
     "extract_variables_from_files",
     "get_release_msg",
     "is_in_release_mode",

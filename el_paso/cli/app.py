@@ -27,6 +27,7 @@ import typer
 from rich.console import Console
 from rich.table import Table
 
+import el_paso as ep
 from el_paso.cli.recipe_cli import build_recipe_command, parse_docstring
 
 if TYPE_CHECKING:
@@ -141,6 +142,9 @@ for _entry in RECIPES:
 
     _func, _defaults = load_recipe(_entry)
     _mission_apps[_entry.mission].command(name=_entry.command)(build_recipe_command(_func, defaults=_defaults))
+
+
+app.command("omm")(build_recipe_command(ep.download_omm))
 
 
 @app.command("list")
