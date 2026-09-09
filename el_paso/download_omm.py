@@ -8,9 +8,11 @@ from __future__ import annotations
 import csv
 import logging
 import os
+import re
 import time
 import xml.etree.ElementTree as ET
-from datetime import datetime, timezone
+from collections import defaultdict
+from datetime import datetime, timedelta, timezone
 from functools import cache
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -21,7 +23,7 @@ from el_paso.download import _get_next_time
 from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, timed_function
 
 if TYPE_CHECKING:
-    from el_paso.typing import FileCadence
+    from collections.abc import Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -33,9 +35,12 @@ _SPACETRACK_RATE_LIMIT_STATUS = 429
 _SPACETRACK_DEFAULT_RETRY_AFTER_SECONDS = 60.0
 _SPACETRACK_MAX_RETRIES = 3
 
-_LESS_THAN = "%3C"
-
 _QUERY_DATETIME_FORMAT = "%Y-%m-%d"
+
+# How far back to look for the nearest preceding elset in "individual instant" mode. Satellites
+# are typically re-tracked well within this window; one with no elset at all in it is likely
+# decayed, lost, or otherwise no longer actively tracked.
+_INSTANT_LOOKBACK_DAYS = 30
 
 _OMM_CSV_FIELDS = (
     "OBJECT_NAME",
@@ -57,6 +62,17 @@ _OMM_CSV_FIELDS = (
     "MEAN_MOTION_DDOT",
 )
 
+_BRACKETED_SUFFIX_RE = re.compile(r"\s*\([^)]*\)")
+
+
+def _sanitize_object_name(object_name: str) -> str:
+    """Turn an OMM OBJECT_NAME into a filesystem-safe per-satellite directory name.
+
+    Strips any parenthesized suffix (e.g. "ISS (ZARYA)" becomes "ISS") and replaces remaining
+    spaces with underscores (e.g. "GALILEO 24" becomes "GALILEO_24").
+    """
+    return _BRACKETED_SUFFIX_RE.sub("", object_name).strip().replace(" ", "_")
+
 
 def _spacetrack_credentials(username: str | None, password: str | None) -> tuple[str, str]:
     if username is None:
@@ -73,6 +89,16 @@ def _spacetrack_credentials(username: str | None, password: str | None) -> tuple
         raise ValueError(msg)
 
     return username, password
+
+
+def _parse_norad_ids(norad_ids: str) -> list[int]:
+    parsed = sorted({int(norad_id.strip()) for norad_id in norad_ids.split(",") if norad_id.strip()})
+
+    if not parsed:
+        msg = "'norad_ids' must contain at least one NORAD catalog ID."
+        raise ValueError(msg)
+
+    return parsed
 
 
 @cache
@@ -112,8 +138,14 @@ def _get_with_retry(session: requests.Session, url: str) -> requests.Response:
     return response
 
 
-def _build_gp_history_url(norad_id: int, query_suffix: str) -> str:
-    return f"{_SPACETRACK_QUERY_URL}/class/gp_history/NORAD_CAT_ID/{norad_id}/{query_suffix}"
+def _build_gp_history_url(norad_ids: Sequence[int], query_suffix: str) -> str:
+    """Build one combined query for every requested NORAD ID.
+
+    Space-Track's own docs ask that queries be built this way (a comma-delimited list of
+    NORAD_CAT_IDs in one request) rather than issuing one query per satellite.
+    """
+    ids_str = ",".join(str(norad_id) for norad_id in norad_ids)
+    return f"{_SPACETRACK_QUERY_URL}/class/gp_history/NORAD_CAT_ID/{ids_str}/{query_suffix}"
 
 
 def _parse_omm_xml(xml_content: str) -> list[dict[str, str]]:
@@ -176,66 +208,71 @@ def _write_omm_csv(records: list[dict[str, str]], file_path: Path) -> None:
             writer.writerow({field: record.get(field, "") for field in _OMM_CSV_FIELDS})
 
 
-def _group_consecutive(indices: list[int]) -> list[list[int]]:
-    groups: list[list[int]] = [[indices[0]]]
+def _target_path(
+    save_path: Path, object_dir: str, file_name_stem: str, time: datetime, *, sort_raw_files_by_time: bool
+) -> Path:
+    """Resolve one satellite/chunk's output path."""
+    base = save_path / object_dir
 
-    for idx in indices[1:]:
-        if idx == groups[-1][-1] + 1:
-            groups[-1].append(idx)
-        else:
-            groups.append([idx])
-
-    return groups
-
-
-def _target_path(save_path: Path, file_name_stem: str, time: datetime, *, sort_raw_files_by_time: bool) -> Path:
-    """Resolve one chunk's output path, matching `el_paso.download`'s own file layout.
-
-    Only `file_name_stem` (and the generated 'YYYY/MM/' suffix) is time-templated, never
-    `save_path` itself: `fill_str_template_with_time` does a plain substring replace, so
-    templating the whole path would corrupt any literal 'MM'/'YYYY'/etc. in a user-chosen
-    `save_path` (e.g. a directory literally named "OMM").
-    """
     if sort_raw_files_by_time:
-        save_path = save_path / fill_str_template_with_time("YYYY/MM/", time)
+        base = base / fill_str_template_with_time("YYYY/MM/", time)
 
-    return save_path / fill_str_template_with_time(file_name_stem, time)
+    return base / fill_str_template_with_time(file_name_stem, time)
 
 
 def _download_omm_instant(
-    norad_id: int,
+    norad_ids: list[int],
     target_time: datetime,
-    target_path: Path,
+    save_path: Path,
+    file_name_stem: str,
     username: str,
     password: str,
     *,
+    sort_raw_files_by_time: bool,
     skip_existing: bool,
 ) -> None:
-    if skip_existing and target_path.exists():
-        logger.info(f"File already exists, skipping download: {target_path}")
-        return
-
     session = _login_spacetrack(username, password)
 
-    epoch_predicate = f"{_LESS_THAN}{target_time.strftime(_QUERY_DATETIME_FORMAT)}"
-    url = _build_gp_history_url(norad_id, f"EPOCH/{epoch_predicate}/orderby/EPOCH desc/format/xml/limit/1")
+    # Bound the query to a lookback window else ISS can exhaust the whole limit
+    # before a less frequently updated one's rows are ever reached.
+    lower_bound = target_time - timedelta(days=_INSTANT_LOOKBACK_DAYS)
+    epoch_predicate = f"{lower_bound.strftime(_QUERY_DATETIME_FORMAT)}--{target_time.strftime(_QUERY_DATETIME_FORMAT)}"
+    url = _build_gp_history_url(norad_ids, f"EPOCH/{epoch_predicate}/orderby/NORAD_CAT_ID,EPOCH desc/format/xml")
 
     response = _get_with_retry(session, url)
     response.raise_for_status()
     records = _parse_omm_xml(response.text)
 
-    if not records:
-        logger.warning(f"No OMM elset found at or before {target_time.isoformat()} for NORAD ID {norad_id}.")
-        return
+    # Grouped by NORAD_CAT_ID ascending, EPOCH descending, so the first record seen for each ID
+    # is its most recent elset before `target_time`.
+    found_norad_ids: set[str] = set()
+    for record in records:
+        norad_id = record.get("NORAD_CAT_ID")
+        if not norad_id or norad_id in found_norad_ids:
+            continue
+        found_norad_ids.add(norad_id)
 
-    target_path.parent.mkdir(parents=True, exist_ok=True)
-    _write_omm_csv(records, target_path)
-    logger.info(f"Downloaded successfully: {target_path}")
+        object_dir = _sanitize_object_name(record.get("OBJECT_NAME", norad_id))
+        target_path = _target_path(
+            save_path, object_dir, file_name_stem, target_time, sort_raw_files_by_time=sort_raw_files_by_time
+        )
+
+        if skip_existing and target_path.exists():
+            logger.info(f"File already exists, skipping write: {target_path}")
+            continue
+
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        _write_omm_csv([record], target_path)
+        logger.info(f"Downloaded successfully: {target_path}")
+
+    for norad_id in norad_ids:
+        if str(norad_id) not in found_norad_ids:
+            logger.warning(f"No OMM elset found at or before {target_time.isoformat()} for NORAD ID {norad_id}.")
 
 
 @timed_function("download_omm")
 def download_omm(
-    norad_id: int,
+    norad_ids: str,
     start_time: datetime | None = None,
     end_time: datetime | None = None,
     save_path: str | Path = "./OMM",
@@ -246,35 +283,47 @@ def download_omm(
     sort_raw_files_by_time: bool = False,
     skip_existing: bool = True,
 ) -> None:
-    """Download Orbit Mean-Elements Message (OMM) data from Space-Track for one NORAD ID.
+    """Download Orbit Mean-Elements Message (OMM) data from Space-Track for one or more NORAD IDs.
+
+    Every requested NORAD ID is queried together in a single combined request per call, as
+    Space-Track's own documentation asks (querying satellites individually is discouraged and
+    counts harder against its 30/min, 300/hr rate limit). Each satellite's parsed element set(s)
+    are written under their own subdirectory, named from the OMM's OBJECT_NAME field with any
+    parenthesized suffix removed and spaces replaced by underscores (e.g. "ISS (ZARYA)" becomes
+    the directory "ISS"), so `save_path` ends up holding one subdirectory per satellite.
 
     Args:
-        norad_id (int): The NORAD catalog ID to download OMM data for.
+        norad_ids (str): Comma-separated NORAD catalog ID(s) to download OMM data for, e.g.
+            "25544" or "25544,41859".
         start_time (datetime | None, optional): Start of the time range to download. If `end_time` is None, this is
             instead treated as the single instant to fetch the nearest preceding element set for. If not given,
             today's date at 00:00:00 UTC is used.
         end_time (datetime | None, optional): End of the time range to download. If None,
             `start_time` is treated as an individual instant: the most recent element set with an
             EPOCH strictly before `start_time` is downloaded. Defaults to None.
-        save_path (str | Path, optional): Base directory the parsed CSV files are written under.
-            Defaults to "./OMM".
+        save_path (str | Path, optional): Base directory the per-satellite subdirectories and
+            parsed CSV files are written under. Defaults to "./OMM".
         file_name_stem (str, optional): Time-templated file name (see `fill_str_template_with_time`)
-            for each chunk's output file, joined onto `save_path`. Defaults to "omm_YYYYMMDD.csv".
+            for each chunk's output file, joined onto `save_path`/<satellite>. Defaults to
+            "omm_YYYYMMDD.csv".
         username (str | None, optional): Space-Track username. If None, read from the
             `SPACETRACK_USER` environment variable. Defaults to None.
         password (str | None, optional): Space-Track password. If None, read from the
             `SPACETRACK_PASS` environment variable. Defaults to None.
         sort_raw_files_by_time (bool, optional): If True, creates subdirectories for each year and
-            month under `save_path` (e.g. 'YYYY/MM/'). If not given, files are written directly under `save_path`.
-        skip_existing (bool, optional): If True, skip downloading (and querying Space-Track for)
-            chunks whose output file already exists. Defaults to True.
+            month under each satellite's directory (e.g. 'YYYY/MM/'). If not given, files are
+            written directly under it.
+        skip_existing (bool, optional): If True, skip writing (but not querying, since every
+            requested satellite is fetched together in one request either way) a satellite/chunk's
+            output file if it already exists. Defaults to True.
 
     Raises:
-        ValueError: If `username`/`password` is not provided and not available via the
-            `SPACETRACK_USER`/`SPACETRACK_PASS` environment variables, if Space-Track login fails,
-            or if `end_time` is not None and not after `start_time`.
+        ValueError: If `norad_ids` is empty, if `username`/`password` is not provided and not
+            available via the `SPACETRACK_USER`/`SPACETRACK_PASS` environment variables, if
+            Space-Track login fails, or if `end_time` is not None and not after `start_time`.
     """
     username, password = _spacetrack_credentials(username, password)
+    norad_id_list = _parse_norad_ids(norad_ids)
 
     if not start_time:
         start_time = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
@@ -283,8 +332,16 @@ def download_omm(
     save_path = Path(save_path)
 
     if end_time is None:
-        target_path = _target_path(save_path, file_name_stem, start_time, sort_raw_files_by_time=sort_raw_files_by_time)
-        _download_omm_instant(norad_id, start_time, target_path, username, password, skip_existing=skip_existing)
+        _download_omm_instant(
+            norad_id_list,
+            start_time,
+            save_path,
+            file_name_stem,
+            username,
+            password,
+            sort_raw_files_by_time=sort_raw_files_by_time,
+            skip_existing=skip_existing,
+        )
         return
 
     end_time = enforce_utc_timezone(end_time)
@@ -301,46 +358,53 @@ def download_omm(
         chunks.append((curr_time, next_time))
         curr_time = next_time
 
-    target_paths = [
-        _target_path(save_path, file_name_stem, chunk_start, sort_raw_files_by_time=sort_raw_files_by_time)
-        for chunk_start, _ in chunks
-    ]
-
-    missing_indices = [i for i, path in enumerate(target_paths) if not (skip_existing and path.exists())]
-
-    if not missing_indices:
-        logger.info("All OMM files already exist, skipping Space-Track query.")
-        return
-
     session = _login_spacetrack(username, password)
 
-    for group in _group_consecutive(missing_indices):
-        group_start = chunks[group[0]][0]
-        group_end = chunks[group[-1]][1]
+    start_str = start_time.strftime(_QUERY_DATETIME_FORMAT)
+    end_str = end_time.strftime(_QUERY_DATETIME_FORMAT)
+    query_suffix = f"EPOCH/{start_str}--{end_str}/orderby/NORAD_CAT_ID,EPOCH asc/format/xml"
+    url = _build_gp_history_url(norad_id_list, query_suffix)
 
-        start_str = group_start.strftime(_QUERY_DATETIME_FORMAT)
-        end_str = group_end.strftime(_QUERY_DATETIME_FORMAT)
-        url = _build_gp_history_url(norad_id, f"EPOCH/{start_str}--{end_str}/orderby/EPOCH asc/format/xml")
+    response = _get_with_retry(session, url)
+    response.raise_for_status()
+    records = _parse_omm_xml(response.text)
 
-        response = _get_with_retry(session, url)
-        response.raise_for_status()
-        records = _parse_omm_xml(response.text)
+    records_by_norad_id: dict[str, list[dict[str, str]]] = defaultdict(list)
+    for record in records:
+        norad_id = record.get("NORAD_CAT_ID")
+        if norad_id:
+            records_by_norad_id[norad_id].append(record)
 
-        for idx in group:
-            chunk_start, chunk_end = chunks[idx]
+    for norad_id in norad_id_list:
+        satellite_records = records_by_norad_id.get(str(norad_id), [])
+
+        if not satellite_records:
+            logger.warning(
+                f"No OMM records found between {start_time.isoformat()} and {end_time.isoformat()} "
+                f"for NORAD ID {norad_id}."
+            )
+            continue
+
+        object_dir = _sanitize_object_name(satellite_records[0].get("OBJECT_NAME", str(norad_id)))
+
+        for chunk_start, chunk_end in chunks:
             chunk_records = [
                 record
-                for record in records
+                for record in satellite_records
                 if "EPOCH" in record and chunk_start <= _parse_epoch(record["EPOCH"]) < chunk_end
             ]
 
             if not chunk_records:
-                logger.warning(
-                    f"No OMM records found between {chunk_start.isoformat()} and {chunk_end.isoformat()} "
-                    f"for NORAD ID {norad_id}."
-                )
                 continue
 
-            target_paths[idx].parent.mkdir(parents=True, exist_ok=True)
-            _write_omm_csv(chunk_records, target_paths[idx])
-            logger.info(f"Downloaded successfully: {target_paths[idx]}")
+            target_path = _target_path(
+                save_path, object_dir, file_name_stem, chunk_start, sort_raw_files_by_time=sort_raw_files_by_time
+            )
+
+            if skip_existing and target_path.exists():
+                logger.info(f"File already exists, skipping write: {target_path}")
+                continue
+
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            _write_omm_csv(chunk_records, target_path)
+            logger.info(f"Downloaded successfully: {target_path}")
