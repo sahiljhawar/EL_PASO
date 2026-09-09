@@ -2,13 +2,10 @@
 # SPDX-FileContributor: Alwin Roy
 #
 # SPDX-License-Identifier: Apache-2.0
-import argparse
-import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
-import dateutil
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import numpy as np
@@ -17,7 +14,6 @@ from astropy.constants import e, m_e  # ty:ignore[unresolved-import]
 
 import el_paso as ep
 from el_paso.recipes.strategies import rbsp_emfisis_waves_strategy
-from el_paso.units import RE
 from el_paso.variable import Variable
 
 if TYPE_CHECKING:

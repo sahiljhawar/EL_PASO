@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 import typing
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path  # noqa: TC003 (el_paso.cli calls get_type_hints() on the recipe entry point below)
 from typing import TYPE_CHECKING, Literal
 

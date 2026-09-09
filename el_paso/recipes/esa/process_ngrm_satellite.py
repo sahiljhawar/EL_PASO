@@ -2,16 +2,13 @@
 # SPDX-FileContributor: Bernhard Haas
 #
 # SPDX-License-Identifier: Apache-2.0
-import argparse
 import logging
 import os
-import sys
 import typing
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-import dateutil
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import GCRS, ITRS, CartesianRepresentation
@@ -246,8 +243,8 @@ def process_ngrm_electron_fluxes(
     ]
 
     if calculate_Lstar:
-        variables_to_compute.append(("L_star", mag_field))  # ty:ignore[invalid-argument-type]
-        variables_to_compute.append(("L_m", mag_field))  # ty:ignore[invalid-argument-type]
+        variables_to_compute.append(("L_star", mag_field))
+        variables_to_compute.append(("L_m", mag_field))
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
