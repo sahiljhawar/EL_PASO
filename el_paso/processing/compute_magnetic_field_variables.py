@@ -131,7 +131,7 @@ def compute_magnetic_field_variables(
     if cache_dir == "_default_":
         cache_dir = get_cache_dir()
 
-    if (env_cache_flag := os.environ.get("EL_PASO_USE_MAG_FIELD_CACHE")) is not None:
+    if (env_cache_flag := os.environ.get("EL_PASO_USE_MAG_FIELD_CACHE")) is not None:  # noqa: SIM102
         if env_cache_flag.strip().lower() in ("0", "false", "no", "off", ""):
             cache_dir = None
 

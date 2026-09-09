@@ -16,6 +16,7 @@ from astropy import units as u
 from astropy.constants import e, m_e  # ty:ignore[unresolved-import]
 
 import el_paso as ep
+from el_paso.recipes.strategies import rbsp_emfisis_waves_strategy
 from el_paso.units import RE
 from el_paso.variable import Variable
 
@@ -73,9 +74,7 @@ def process_rbsp_emfisis_waves(
         "Wave_ellipticity": wna_vars["ellipticity"],
     }
 
-    saving_strat = ep.saving_strategies.DailyWaveStrategy(
-        processed_data_path, "RBSP", f"rbsp{satellite}", "EMFISIS", ep.data_standards.GFZStandard()
-    )
+    saving_strat = rbsp_emfisis_waves_strategy(processed_data_path, satellite)
 
     ep.save(vars_to_save, saving_strat, start_time, end_time)
 

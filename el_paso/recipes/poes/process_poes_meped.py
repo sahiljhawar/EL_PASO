@@ -11,6 +11,7 @@ from astropy import units as u
 
 import el_paso as ep
 from el_paso.recipes.poes import poes_satellite_literal
+from el_paso.recipes.strategies import poes_meped_strategy
 
 
 def process_poes_meped_electron(
@@ -187,14 +188,7 @@ def process_poes_meped_electron(
         "Position": variables["xGEO"],
     }
 
-    saving_strategy = ep.saving_strategies.DailyLEORBStrategy(
-        base_data_path=Path(processed_data_path),
-        mission="POES",
-        satellite=satellite,
-        instrument="MEPED",
-        mag_field=mag_field,
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = poes_meped_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)  # ty:ignore[invalid-argument-type]
 

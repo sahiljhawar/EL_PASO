@@ -13,6 +13,7 @@ from astropy import units as u
 from numpy.typing import NDArray
 
 import el_paso as ep
+from el_paso.recipes.strategies import goes_realtime_gfz_strategy, goes_realtime_netcdf_strategy
 from el_paso.utils import timed_function
 
 logging.captureWarnings(capture=True)
@@ -218,25 +219,10 @@ def process_goes_real_time(
     }
 
     if save_strategy in ("gfz", "both"):
-        strategy = ep.saving_strategies.GFZStrategy(
-            processed_data_path,
-            mission="GOES",
-            satellite="goes_" + satellite,
-            instrument="mps-high",
-            mag_field=mag_field,
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = goes_realtime_gfz_strategy(processed_data_path, mag_field, satellite)
 
     if save_strategy in ("netcdf", "both"):
-        strategy = ep.saving_strategies.MonthlyRBStrategy(
-            base_data_path=Path(processed_data_path),
-            mission="GOES",
-            satellite="goes_" + satellite,
-            instrument="mps-high",
-            mag_field=mag_field,
-            file_format=".nc",
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = goes_realtime_netcdf_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True)
 

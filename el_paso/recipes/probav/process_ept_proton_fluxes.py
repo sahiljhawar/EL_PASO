@@ -16,6 +16,7 @@ from astropy import units as u
 from dotenv import load_dotenv
 
 import el_paso as ep
+from el_paso.recipes.strategies import probav_ept_proton_gfz_strategy, probav_ept_proton_netcdf_strategy
 from el_paso.utils import timed_function
 
 CHI2_BAD_QUALITY_THRESHOLD = 2
@@ -273,25 +274,10 @@ def process_ept_proton_fluxes(
     }
 
     if save_strategy in ("gfz", "both"):
-        strategy = ep.saving_strategies.GFZStrategy(
-            processed_data_path,
-            mission="PROBAV",
-            satellite="probav",
-            instrument="EPT-proton",
-            mag_field=mag_field,
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = probav_ept_proton_gfz_strategy(processed_data_path, mag_field)
 
     if save_strategy in ("netcdf", "both"):
-        strategy = ep.saving_strategies.DailyLEORBStrategy(
-            base_data_path=Path(processed_data_path),
-            mission="PROBAV",
-            satellite="probav",
-            instrument="EPT-proton",
-            mag_field=mag_field,
-            file_format=".nc",
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = probav_ept_proton_netcdf_strategy(processed_data_path, mag_field)
     ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True)
 
 

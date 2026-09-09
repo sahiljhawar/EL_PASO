@@ -13,6 +13,7 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
+from el_paso.recipes.strategies import goes_r_mps_high_gfz_strategy, goes_r_mps_high_netcdf_strategy
 
 if TYPE_CHECKING:
     from el_paso.typing import InternalName
@@ -196,24 +197,9 @@ def process_goes_r_mps_high(
     }
 
     if save_strategy in ("gfz", "both"):
-        saving_strategy = ep.saving_strategies.GFZStrategy(
-            Path(processed_data_path),
-            mission="GOES",
-            satellite=satellite,
-            instrument="MAGED",
-            mag_field=mag_field,
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        saving_strategy = goes_r_mps_high_gfz_strategy(processed_data_path, mag_field, satellite)
     if save_strategy in ("netcdf", "both"):
-        saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
-            Path(processed_data_path),
-            mission="GOES",
-            satellite=satellite,
-            instrument="MAGED",
-            mag_field=mag_field,
-            file_format="nc",
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        saving_strategy = goes_r_mps_high_netcdf_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True)
 

@@ -16,6 +16,7 @@ from astropy import units as u
 
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils import InternalFieldModel, IrbemOptions, LstarQuantity
+from el_paso.recipes.strategies import rbsp_hope_proton_gfz_strategy, rbsp_hope_proton_netcdf_strategy
 
 
 def process_rbsp_hope_protons(
@@ -181,26 +182,11 @@ def process_rbsp_hope_protons(
     }
 
     if save_strategy in ("gfz", "both"):
-        strategy = ep.saving_strategies.GFZStrategy(
-            processed_data_path,
-            mission="RBSP",
-            satellite="rbsp" + satellite,
-            instrument="hope",
-            mag_field=mag_field,
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = rbsp_hope_proton_gfz_strategy(processed_data_path, mag_field, satellite)
         ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=True)
 
     if save_strategy in ("netcdf", "both"):
-        strategy = ep.saving_strategies.MonthlyRBStrategy(
-            base_data_path=Path(processed_data_path),
-            mission="RBSP",
-            satellite="rbsp" + satellite,
-            instrument="hope",
-            mag_field=mag_field,
-            file_format=".nc",
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = rbsp_hope_proton_netcdf_strategy(processed_data_path, mag_field, satellite)
         ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=True)
 
 

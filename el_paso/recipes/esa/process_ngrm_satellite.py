@@ -17,6 +17,7 @@ from astropy import units as u
 from astropy.coordinates import GCRS, ITRS, CartesianRepresentation
 
 import el_paso as ep
+from el_paso.recipes.strategies import esa_ngrm_strategy
 from el_paso.utils import timed_function
 
 logger = logging.getLogger(__name__)
@@ -295,21 +296,7 @@ def process_ngrm_electron_fluxes(
         variables_to_save["L_m"] = magnetic_field_variables[f"L_m_{mag_field}"]
 
     if saving_strategy is None:
-        save_srat_class = (
-            ep.saving_strategies.DailyLEORBStrategy
-            if satellite.startswith("S6")
-            else ep.saving_strategies.MonthlyRBStrategy
-        )
-
-        saving_strategy = save_srat_class(
-            base_data_path=Path(processed_data_path),
-            mission="ESA",
-            satellite=f"{satellite.lower()}",
-            instrument="ngrm",
-            mag_field=mag_field,
-            file_format=".nc",
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        saving_strategy = esa_ngrm_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True)
 

@@ -11,6 +11,7 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
+from el_paso.recipes.strategies import gps_cxd_strategy
 
 LANL_SAT = Literal[
     "ns41",
@@ -329,14 +330,7 @@ def process_gps_data(
         "InvK": magnetic_field_variables["InvK_T89"],
     }
 
-    saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
-        base_data_path=Path(processed_data_path),
-        mission="GPS",
-        satellite=satellite,
-        instrument="cxd",
-        mag_field="T89",
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = gps_cxd_strategy(processed_data_path, "T89", satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)  # ty:ignore[invalid-argument-type]
 

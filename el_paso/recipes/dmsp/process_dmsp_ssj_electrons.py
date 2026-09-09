@@ -13,6 +13,7 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
+from el_paso.recipes.strategies import dmsp_ssj_electron_strategy
 
 logging.captureWarnings(capture=True)
 logger = logging.getLogger(__name__)
@@ -179,14 +180,7 @@ def process_dmsp_ssj_electrons(
         "Alpha_LC_Eq": magnetic_field_variables[f"Alpha_LC_Eq_{mag_field}"],
     }
 
-    saving_strategy = ep.saving_strategies.DailyLEORBStrategy(
-        base_data_path=Path(processed_data_path),
-        mission="DMSP",
-        satellite=satellite,
-        instrument="SSJ",
-        mag_field=mag_field,
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = dmsp_ssj_electron_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)
 

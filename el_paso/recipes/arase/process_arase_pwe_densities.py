@@ -17,6 +17,7 @@ from astropy import units as u
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils.irbem import Coords
 from el_paso.recipes.arase.get_arase_orbit_variables import get_arase_orbit_level_2_variables
+from el_paso.recipes.strategies import arase_pwe_densities_strategy
 
 
 def process_arase_pwe_density(
@@ -153,13 +154,7 @@ def process_arase_pwe_density(
         pwe_variables["Density"], pos_geo_var, magnetic_field_variables["xGEO_eq_" + mag_field], method="Denton_average"
     )
 
-    saving_strategy = ep.saving_strategies.DensityNetCDFStrategy(
-        base_data_path=processed_data_path,
-        mission="Arase",
-        satellite="Other",
-        instrument="PWE",
-        mag_field=mag_field,
-    )
+    saving_strategy = arase_pwe_densities_strategy(processed_data_path, mag_field)
 
     variables_to_save = {
         "time": binned_time_variable,

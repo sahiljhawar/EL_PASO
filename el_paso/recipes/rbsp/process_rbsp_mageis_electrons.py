@@ -19,6 +19,7 @@ from numpy.typing import NDArray
 
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils import InternalFieldModel, IrbemOptions, LstarQuantity
+from el_paso.recipes.strategies import rbsp_mageis_electron_strategy
 
 BAD_CHANNELS = (13, 21, 22, 23, 24)
 
@@ -191,15 +192,7 @@ def process_rbsp_mageis_electrons(
         "PSD": psd_var,
     }
 
-    strategy = ep.saving_strategies.MonthlyRBStrategy(
-        base_data_path=Path(processed_data_path),
-        mission="RBSP",
-        satellite="rbsp" + satellite,
-        instrument="mageis",
-        mag_field=mag_field,
-        file_format=".nc",
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    strategy = rbsp_mageis_electron_strategy(processed_data_path, mag_field, satellite)
     ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=False)
 
 

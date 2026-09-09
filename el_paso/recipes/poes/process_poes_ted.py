@@ -11,6 +11,7 @@ from astropy import units as u
 
 import el_paso as ep
 from el_paso.recipes.poes import poes_satellite_literal
+from el_paso.recipes.strategies import poes_ted_strategy
 
 
 def process_poes_ted_electron(
@@ -208,14 +209,7 @@ def process_poes_ted_electron(
             "L_star": magnetic_field_variables[f"L_star_{mag_field}"],
         }
 
-    saving_strategy = ep.saving_strategies.DailyLEORBStrategy(
-        base_data_path=Path(processed_data_path),
-        mission="POES",
-        satellite=satellite,
-        instrument="TED",
-        mag_field=mag_field,
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = poes_ted_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)  # ty:ignore[invalid-argument-type]
 
