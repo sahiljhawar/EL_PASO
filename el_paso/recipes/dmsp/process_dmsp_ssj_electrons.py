@@ -12,13 +12,32 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
-from el_paso.recipes.strategies import dmsp_ssj_electron_strategy
 
 logging.captureWarnings(capture=True)
 logger = logging.getLogger(__name__)
 
 TELE_ALPHA_ANGLES = np.array([0.0, 0.0])
 TELE_BETA_ANGLES = np.array([-180.0, 90.0])
+
+
+def dmsp_ssj_electron_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Daily LEO/RB saving strategy for DMSP SSJ electrons."""
+    return ep.saving_strategies.DailyLEORBStrategy(
+        Path(base_data_path),
+        "DMSP",
+        satellite,
+        "SSJ",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
 
 DMSPSatellites = Literal["f17"]
 

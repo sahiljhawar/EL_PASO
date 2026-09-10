@@ -11,7 +11,7 @@ import os
 import sys
 import typing
 from datetime import datetime, timedelta
-from pathlib import Path  # noqa: TC003 (el_paso.cli calls get_type_hints() on the recipe entry point below)
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
@@ -23,7 +23,29 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 import el_paso as ep
-from el_paso.recipes.strategies import arase_xep_gfz_strategy, arase_xep_strategy
+
+
+def arase_xep_gfz_strategy(base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for Arase XEP."""
+    return ep.saving_strategies.GFZStrategy(Path(base_data_path), "Arase", "Arase", "XEP", mag_field)
+
+
+def arase_xep_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly saving strategy for Arase XEP."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "Arase",
+        "arase",
+        "xep",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
 
 
 @timed_function("process_arase_xep_real_time")

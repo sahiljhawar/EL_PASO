@@ -56,8 +56,6 @@ from el_paso.utils import enforce_utc_timezone
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
-    from el_paso.typing import Recipe
-
 logger = logging.getLogger("el_paso.cli")
 
 _LOG_FILE_FORMAT = "[%(levelname)-8s] %(asctime)s - %(name)s:%(lineno)d - %(message)s"
@@ -220,7 +218,7 @@ def parse_docstring(docstring: str | None) -> tuple[str, dict[str, str]]:
     return summary, {name: _DEFAULTS_RE.sub("", " ".join(text.split())).strip() for name, text in arg_help.items()}
 
 
-def _func_name(func: Recipe) -> str:
+def _func_name(func: Callable[..., None]) -> str:
     """Return a readable name for a recipe function."""
     return getattr(func, "__name__", repr(func))
 
@@ -350,7 +348,7 @@ def _build_parameter_spec(  # noqa: PLR0911
 
 
 def build_recipe_command(
-    func: Recipe,
+    func: Callable[..., None],
     *,
     defaults: dict[str, Any] | None = None,
     loop_over: Sequence[str] | None = None,
@@ -366,7 +364,7 @@ def build_recipe_command(
     prebuilt `SavingStrategy`) are omitted from the command and keep their default.
 
     Args:
-        func (Recipe): The recipe function to expose.
+        func (Callable[..., None]): The recipe function to expose.
         defaults (dict[str, Any] | None): Overrides for the defaults taken from the
             signature. Use it for values that have no sensible library default, most
             notably the processing time range.
@@ -432,7 +430,7 @@ def build_recipe_command(
 
 
 def _make_command(
-    func: Recipe,
+    func: Callable[..., None],
     specs: list[_ParameterSpec],
     skipped: dict[str, Any],
     summary: str,
@@ -594,7 +592,7 @@ def _version_callback(value: bool) -> None:  # noqa: FBT001
         raise typer.Exit
 
 
-def _mission_name(func: Recipe) -> str:
+def _mission_name(func: Callable[..., None]) -> str:
     """Derive a recipe's mission name from its module path (`el_paso.recipes.<mission>.*`)."""
     parts = func.__module__.split(".")
     if parts[:2] == ["el_paso", "recipes"] and len(parts) > 2:
@@ -603,7 +601,7 @@ def _mission_name(func: Recipe) -> str:
     return "misc"
 
 
-def _resolve_log_file(logs_path: Path, func: Recipe, satellite: str | None) -> Path:
+def _resolve_log_file(logs_path: Path, func: Callable[..., None], satellite: str | None) -> Path:
     """Resolve `--logs` into the concrete log file a recipe call should write to.
 
     A `logs_path` with a suffix (e.g. ``log.log``) is used as-is, as an explicit log file.
@@ -629,7 +627,7 @@ def _configure_logging(
     verbose: int,
     quiet: bool,
     logs_path: Path,
-    func: Recipe,
+    func: Callable[..., None],
     satellite: str | None,
     configure_console: bool,
 ) -> None:
@@ -695,7 +693,7 @@ def _format_value(name: str, value: Any) -> str:  # noqa: ANN401
 
 
 def _report_call(
-    func: Recipe,
+    func: Callable[..., None],
     call_kwargs: dict[str, Any],
     *,
     title_suffix: str = "",
@@ -719,7 +717,7 @@ def _report_call(
 
 
 def run_recipe_cli(
-    func: Recipe,
+    func: Callable[..., None],
     *,
     defaults: dict[str, Any] | None = None,
     loop_over: Sequence[str] | None = None,
@@ -733,7 +731,7 @@ def run_recipe_cli(
     :func:`build_recipe_command`.
 
     Args:
-        func (Recipe): The recipe function to run.
+        func (Callable[..., None]): The recipe function to run.
         defaults (dict[str, Any] | None): Overrides for the defaults taken from the
             signature, typically the processing time range.
         loop_over (Sequence[str] | None): Parameters that accept several values, causing

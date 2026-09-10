@@ -11,7 +11,6 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
-from el_paso.recipes.strategies import gps_cxd_strategy
 
 LANL_SAT = Literal[
     "ns41",
@@ -138,6 +137,25 @@ def extract_data_from_lanl_gps_ascii(file_path, extraction_infos):  # noqa: ANN0
             )
 
     return data
+
+
+def gps_cxd_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly NetCDF saving strategy for LANL GPS CXD."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "GPS",
+        satellite,
+        "cxd",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
 
 
 def process_gps_data(

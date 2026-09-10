@@ -12,7 +12,25 @@ from astropy import units as u
 
 import el_paso as ep
 from el_paso.recipes.poes import poes_satellite_literal
-from el_paso.recipes.strategies import poes_ted_strategy
+
+
+def poes_ted_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Daily LEO/RB saving strategy for POES TED."""
+    return ep.saving_strategies.DailyLEORBStrategy(
+        Path(base_data_path),
+        "POES",
+        satellite,
+        "TED",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
 
 
 def process_poes_ted_electron(

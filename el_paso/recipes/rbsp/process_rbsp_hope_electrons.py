@@ -10,7 +10,32 @@ from typing import Literal
 from astropy import units as u
 
 import el_paso as ep
-from el_paso.recipes.strategies import rbsp_hope_electron_gfz_strategy, rbsp_hope_electron_netcdf_strategy
+
+
+def rbsp_hope_electron_gfz_strategy(
+    base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral, satellite: str
+) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for RBSP HOPE electrons."""
+    return ep.saving_strategies.GFZStrategy(Path(base_data_path), "RBSP", "rbsp" + satellite, "hope", mag_field)
+
+
+def rbsp_hope_electron_netcdf_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly NetCDF saving strategy for RBSP HOPE electrons."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "RBSP",
+        "rbsp" + satellite,
+        "hope",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
 
 
 def process_rbsp_hope_electrons(

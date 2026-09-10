@@ -20,11 +20,51 @@ from el_paso.recipes.arase import (
     get_arase_orbit_level_2_variables,
     get_arase_orbit_level_3_variables,
 )
-from el_paso.recipes.strategies import (
-    arase_mepe_gfz_strategy,
-    arase_mepe_h5_strategy,
-    arase_mepe_netcdf_strategy,
-)
+
+
+def arase_mepe_gfz_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for Arase MEP-e."""
+    return ep.saving_strategies.GFZStrategy(
+        Path(base_data_path), "ARASE", "arase", "mepe", mag_field, data_standard=data_standard
+    )
+
+
+def arase_mepe_h5_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+) -> ep.SavingStrategy:
+    """Monthly HDF5 saving strategy for Arase MEP-e."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "Arase",
+        "arase",
+        "mepe",
+        mag_field,
+        data_standard=data_standard or ep.data_standards.GFZStandard(),
+        file_format="h5",
+    )
+
+
+def arase_mepe_netcdf_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+) -> ep.SavingStrategy:
+    """Monthly NetCDF saving strategy for Arase MEP-e."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "Arase",
+        "arase",
+        "mepe",
+        mag_field,
+        data_standard=data_standard or ep.data_standards.GFZStandard(),
+        file_format="nc",
+    )
 
 
 def process_arase_mepe(

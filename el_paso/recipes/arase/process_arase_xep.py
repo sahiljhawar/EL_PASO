@@ -18,7 +18,36 @@ from el_paso.recipes.arase import (
     get_arase_orbit_level_2_variables,
     get_arase_orbit_level_3_variables,
 )
-from el_paso.recipes.strategies import arase_xep_gfz_strategy, arase_xep_strategy
+
+
+def arase_xep_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly saving strategy for Arase XEP."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "Arase",
+        "arase",
+        "xep",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
+
+def arase_xep_gfz_strategy(base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for Arase XEP."""
+    return ep.saving_strategies.GFZStrategy(
+        Path(base_data_path),
+        "Arase",
+        "Arase",
+        "XEP",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+    )
 
 
 def process_arase_xep(

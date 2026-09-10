@@ -13,7 +13,6 @@ from astropy import units as u
 from dotenv import load_dotenv
 
 import el_paso as ep
-from el_paso.recipes.strategies import probav_ept_electron_gfz_strategy, probav_ept_electron_netcdf_strategy
 from el_paso.utils import timed_function
 
 CHI2_BAD_QUALITY_THRESHOLD = 2
@@ -21,6 +20,28 @@ EPT_ENERGY_LIMITS = [0.5, 0.6, 0.7, 0.8, 1.0, 2.4, 8.0]
 EPT_ELECTRON_CORRECTION_FACTORS = [2, 5, 3, 4, 10, 10]
 
 logger = logging.getLogger(__name__)
+
+
+def probav_ept_electron_gfz_strategy(
+    base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral
+) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for PROBA-V EPT electrons."""
+    return ep.saving_strategies.GFZStrategy(Path(base_data_path), "PROBAV", "probav", "ept", mag_field)
+
+
+def probav_ept_electron_netcdf_strategy(
+    base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral, *, file_format: ep.typing.MFSFormats = ".nc"
+) -> ep.SavingStrategy:
+    """Daily LEO/RB NetCDF saving strategy for PROBA-V EPT electrons."""
+    return ep.saving_strategies.DailyLEORBStrategy(
+        Path(base_data_path),
+        "PROBAV",
+        "probav",
+        "ept",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
 
 
 load_dotenv()

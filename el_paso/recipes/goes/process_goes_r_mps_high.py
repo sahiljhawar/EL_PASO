@@ -12,13 +12,39 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
-from el_paso.recipes.strategies import goes_r_mps_high_gfz_strategy, goes_r_mps_high_netcdf_strategy
 
 if TYPE_CHECKING:
     from el_paso.typing import InternalName
 
 logging.captureWarnings(capture=True)
 logger = logging.getLogger(__name__)
+
+
+def goes_r_mps_high_gfz_strategy(
+    base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral, satellite: str
+) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for GOES-R MPS-HI/MAGED."""
+    return ep.saving_strategies.GFZStrategy(Path(base_data_path), "GOES", satellite, "MAGED", mag_field)
+
+
+def goes_r_mps_high_netcdf_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly NetCDF saving strategy for GOES-R MPS-HI/MAGED."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "GOES",
+        satellite,
+        "MAGED",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
 
 TELE_ALPHA_ANGLES = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
 TELE_BETA_ANGLES = np.array([-35.0, 35.0, -70.0, 0, 70.0])
