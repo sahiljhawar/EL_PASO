@@ -31,7 +31,7 @@ import el_paso as ep
 from el_paso.cli.recipe_cli import build_recipe_command, parse_docstring
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from el_paso.typing import Recipe
 
 
 class RecipeEntry(NamedTuple):
@@ -101,14 +101,14 @@ RECIPES: tuple[RecipeEntry, ...] = (
 )
 
 
-def load_recipe(entry: RecipeEntry) -> tuple[Callable[..., None], dict[str, object]]:
+def load_recipe(entry: RecipeEntry) -> tuple[Recipe, dict[str, object]]:
     """Import a recipe and return its function together with its CLI defaults.
 
     Args:
         entry (RecipeEntry): The registry entry to load.
 
     Returns:
-        tuple[Callable[..., None], dict[str, object]]: The recipe function and the
+        tuple[Recipe, dict[str, object]]: The recipe function and the
         ``CLI_DEFAULTS`` declared in its module (an empty dict if it declares none).
     """
     module = importlib.import_module(entry.module)

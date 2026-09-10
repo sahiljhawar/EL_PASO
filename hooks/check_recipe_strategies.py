@@ -31,7 +31,7 @@ RECIPES_DIR = REPO_ROOT / "el_paso" / "recipes"
 
 ALLOWED_VIOLATIONS: dict[Path, set[int]] = {
     RECIPES_DIR / "rbsp" / "process_rbsp_efw_emfisis_density_combined.py": {
-        181
+        196
     },  # https://github.com/GFZ/EL_PASO/issues/139
 }
 

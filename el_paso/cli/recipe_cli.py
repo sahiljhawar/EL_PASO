@@ -218,7 +218,7 @@ def parse_docstring(docstring: str | None) -> tuple[str, dict[str, str]]:
     return summary, {name: _DEFAULTS_RE.sub("", " ".join(text.split())).strip() for name, text in arg_help.items()}
 
 
-def _func_name(func: Callable[..., Any]) -> str:
+def _func_name(func: Callable[..., None]) -> str:
     """Return a readable name for a recipe function."""
     return getattr(func, "__name__", repr(func))
 
@@ -592,7 +592,7 @@ def _version_callback(value: bool) -> None:  # noqa: FBT001
         raise typer.Exit
 
 
-def _mission_name(func: Callable[..., Any]) -> str:
+def _mission_name(func: Callable[..., None]) -> str:
     """Derive a recipe's mission name from its module path (`el_paso.recipes.<mission>.*`)."""
     parts = func.__module__.split(".")
     if parts[:2] == ["el_paso", "recipes"] and len(parts) > 2:
