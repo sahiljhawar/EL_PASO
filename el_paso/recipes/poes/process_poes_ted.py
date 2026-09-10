@@ -5,6 +5,7 @@
 
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from typing import Literal
 
 import numpy as np
 from astropy import units as u
@@ -41,8 +42,10 @@ def process_poes_ted_electron(
     processed_data_path: str | Path = ".",
     bin_cadence: timedelta = timedelta(minutes=5),
     num_cores: int = 16,
+    save_strategy: Literal["netcdf"] = "netcdf",
     *,
     calculate_Lm_Lstar: bool = False,
+    skip_existing: bool = True,
 ) -> None:
     """Process POES/MetOp TED electron flux data into magnetic-field-resolved data products.
 
@@ -66,7 +69,14 @@ def process_poes_ted_electron(
         num_cores (int): Number of CPU cores used for the magnetic field computations.
         calculate_Lm_Lstar (bool): If True, additionally compute and save the L_m and
             L_star magnetic field quantities.
+        save_strategy (Literal["netcdf"]): The saving strategy used to write the processed
+                                                    data. POES TED data only supports a single
+                                                    netCDF-based strategy.
+        skip_existing (bool): If True, skip downloading files that already exist locally.
+                                            Defaults to True.
     """
+    del save_strategy
+
     data_path_stem = f"{raw_data_path}/POES/{satellite}/YYYY/MM/"
     url = f"https://spdf.gsfc.nasa.gov/pub/data/noaa/{satellite}/sem2_fluxes-2sec/YYYY/"
     file_name_stem = satellite + "_poes-sem2_fluxes-2sec_YYYYMMDD_.{3}.cdf"
@@ -78,6 +88,7 @@ def process_poes_ted_electron(
         file_cadence="daily",
         download_url=url,
         file_name_stem=file_name_stem,
+        skip_existing=skip_existing,
     )
 
     extraction_infos = [

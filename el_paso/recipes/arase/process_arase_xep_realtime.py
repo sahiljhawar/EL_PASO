@@ -52,6 +52,7 @@ def arase_xep_strategy(
 def process_arase_xep_real_time(
     start_time: datetime,
     end_time: datetime,
+    satellite: Literal["arase"] = "arase",
     mag_field: ep.typing.MagneticFieldLiteral = "T89",
     raw_data_path: str | Path = ".",
     processed_data_path: str | Path = ".",
@@ -79,6 +80,8 @@ def process_arase_xep_real_time(
     Args:
         start_time (datetime): Start of the time range to process.
         end_time (datetime): End of the time range to process.
+        satellite (Literal["arase"]): Identifier of the satellite to process. Arase is a
+                                                    single-satellite mission, so this has only one value.
         mag_field (MagneticFieldLiteral): Magnetic field model used for the derived quantities.
         raw_data_path (str | Path): Base directory where downloaded raw data files are stored.
         processed_data_path (str | Path): Base directory where the processed output data is saved.
@@ -100,6 +103,8 @@ def process_arase_xep_real_time(
                 not set, or if `erg_password` is not provided and the ``ERG_PASSWORD``
                 environment variable is not set.
     """
+    del satellite
+
     logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
     if erg_user is None:
