@@ -16,7 +16,7 @@ wherever makes sense in their own file.
 Flags any call shaped like `<...>.saving_strategies.<ClassName>(...)`, and any
 `from el_paso.saving_strategies import ...`, found directly inside a top-level `process_*`
 function (not inside a helper function it calls). Run directly as a script (also wired up as
-a pre-commit hook), or import `find_violations` from a test.
+a pre-commit hook).
 """
 
 from __future__ import annotations
