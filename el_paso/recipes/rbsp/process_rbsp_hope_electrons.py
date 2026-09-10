@@ -12,6 +12,32 @@ from astropy import units as u
 import el_paso as ep
 
 
+def rbsp_hope_electron_gfz_strategy(
+    base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral, satellite: str
+) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for RBSP HOPE electrons."""
+    return ep.saving_strategies.GFZStrategy(Path(base_data_path), "RBSP", "rbsp" + satellite, "hope", mag_field)
+
+
+def rbsp_hope_electron_netcdf_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly NetCDF saving strategy for RBSP HOPE electrons."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "RBSP",
+        "rbsp" + satellite,
+        "hope",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
+
 def process_rbsp_hope_electrons(
     start_time: datetime,
     end_time: datetime,
@@ -180,25 +206,10 @@ def process_rbsp_hope_electrons(
     }
 
     if save_strategy in ("gfz", "both"):
-        strategy = ep.saving_strategies.GFZStrategy(
-            processed_data_path,
-            mission="RBSP",
-            satellite="rbsp" + satellite,
-            instrument="hope",
-            mag_field=mag_field,
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = rbsp_hope_electron_gfz_strategy(processed_data_path, mag_field, satellite)
 
     if save_strategy in ("netcdf", "both"):
-        strategy = ep.saving_strategies.MonthlyRBStrategy(
-            base_data_path=Path(processed_data_path),
-            mission="RBSP",
-            satellite="rbsp" + satellite,
-            instrument="hope",
-            mag_field=mag_field,
-            file_format=".nc",
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = rbsp_hope_electron_netcdf_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=True)
 

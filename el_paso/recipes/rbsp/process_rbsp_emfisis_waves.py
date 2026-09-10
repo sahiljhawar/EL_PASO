@@ -19,6 +19,21 @@ if TYPE_CHECKING:
     from el_paso.processing.interpolate_in_time import InterpolationMethod
 
 
+def rbsp_emfisis_waves_strategy(
+    base_data_path: str | Path,
+    satellite: str,
+    data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+) -> ep.SavingStrategy:
+    """Daily NetCDF wave saving strategy for RBSP EMFISIS."""
+    return ep.saving_strategies.DailyWaveStrategy(
+        Path(base_data_path),
+        "RBSP",
+        "rbsp" + satellite,
+        "EMFISIS",
+        data_standard or ep.data_standards.GFZStandard(),
+    )
+
+
 def process_rbsp_emfisis_waves(
     start_time: datetime,
     end_time: datetime,
@@ -69,9 +84,7 @@ def process_rbsp_emfisis_waves(
         "Wave_ellipticity": wna_vars["ellipticity"],
     }
 
-    saving_strat = ep.saving_strategies.DailyWaveStrategy(
-        processed_data_path, "RBSP", f"rbsp{satellite}", "EMFISIS", ep.data_standards.GFZStandard()
-    )
+    saving_strat = rbsp_emfisis_waves_strategy(processed_data_path, satellite)
 
     ep.save(vars_to_save, saving_strat, start_time, end_time)
 

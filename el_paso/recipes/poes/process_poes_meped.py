@@ -13,6 +13,25 @@ import el_paso as ep
 from el_paso.recipes.poes import poes_satellite_literal
 
 
+def poes_meped_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Daily LEO/RB saving strategy for POES MEPED."""
+    return ep.saving_strategies.DailyLEORBStrategy(
+        Path(base_data_path),
+        "POES",
+        satellite,
+        "MEPED",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
+
 def process_poes_meped_electron(
     start_time: datetime,
     end_time: datetime,
@@ -187,14 +206,7 @@ def process_poes_meped_electron(
         "Position": variables["xGEO"],
     }
 
-    saving_strategy = ep.saving_strategies.DailyLEORBStrategy(
-        base_data_path=Path(processed_data_path),
-        mission="POES",
-        satellite=satellite,
-        instrument="MEPED",
-        mag_field=mag_field,
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = poes_meped_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)  # ty:ignore[invalid-argument-type]
 

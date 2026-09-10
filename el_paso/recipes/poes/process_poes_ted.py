@@ -13,6 +13,25 @@ import el_paso as ep
 from el_paso.recipes.poes import poes_satellite_literal
 
 
+def poes_ted_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Daily LEO/RB saving strategy for POES TED."""
+    return ep.saving_strategies.DailyLEORBStrategy(
+        Path(base_data_path),
+        "POES",
+        satellite,
+        "TED",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
+
 def process_poes_ted_electron(
     start_time: datetime,
     end_time: datetime,
@@ -208,14 +227,7 @@ def process_poes_ted_electron(
             "L_star": magnetic_field_variables[f"L_star_{mag_field}"],
         }
 
-    saving_strategy = ep.saving_strategies.DailyLEORBStrategy(
-        base_data_path=Path(processed_data_path),
-        mission="POES",
-        satellite=satellite,
-        instrument="TED",
-        mag_field=mag_field,
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = poes_ted_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)  # ty:ignore[invalid-argument-type]
 

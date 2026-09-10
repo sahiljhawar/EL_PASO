@@ -22,6 +22,51 @@ from el_paso.recipes.arase import (
 )
 
 
+def arase_mepe_gfz_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for Arase MEP-e."""
+    return ep.saving_strategies.GFZStrategy(
+        Path(base_data_path), "ARASE", "arase", "mepe", mag_field, data_standard=data_standard
+    )
+
+
+def arase_mepe_h5_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+) -> ep.SavingStrategy:
+    """Monthly HDF5 saving strategy for Arase MEP-e."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "Arase",
+        "arase",
+        "mepe",
+        mag_field,
+        data_standard=data_standard or ep.data_standards.GFZStandard(),
+        file_format="h5",
+    )
+
+
+def arase_mepe_netcdf_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+) -> ep.SavingStrategy:
+    """Monthly NetCDF saving strategy for Arase MEP-e."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "Arase",
+        "arase",
+        "mepe",
+        mag_field,
+        data_standard=data_standard or ep.data_standards.GFZStandard(),
+        file_format="nc",
+    )
+
+
 def process_arase_mepe(
     start_time: datetime,
     end_time: datetime,
@@ -259,36 +304,13 @@ def process_arase_mepe(
 
     match save_strategy:
         case "gfz":
-            saving_strategy = ep.saving_strategies.GFZStrategy(
-                processed_data_path,
-                "ARASE",
-                "arase",
-                "mepe",
-                mag_field_save,
-                data_standard_instance,
-            )
+            saving_strategy = arase_mepe_gfz_strategy(processed_data_path, mag_field_save, data_standard_instance)
 
         case "h5":
-            saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
-                processed_data_path,
-                "Arase",
-                "arase",
-                "mepe",
-                mag_field=mag_field,
-                file_format="h5",
-                data_standard=data_standard_instance,
-            )
+            saving_strategy = arase_mepe_h5_strategy(processed_data_path, mag_field, data_standard_instance)
 
         case "netcdf":
-            saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
-                processed_data_path,
-                "Arase",
-                "arase",
-                "mepe",
-                mag_field=mag_field,
-                file_format="nc",
-                data_standard=data_standard_instance,
-            )
+            saving_strategy = arase_mepe_netcdf_strategy(processed_data_path, mag_field, data_standard_instance)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
 

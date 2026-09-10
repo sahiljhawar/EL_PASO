@@ -20,6 +20,24 @@ from el_paso.recipes.arase import (
 )
 
 
+def arase_xep_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly saving strategy for Arase XEP."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "Arase",
+        "arase",
+        "xep",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
+
 def process_arase_xep(
     start_time: datetime,
     end_time: datetime,
@@ -266,15 +284,7 @@ def process_arase_xep(
             "InvMu": orb_variables["InvMu"],
         }
 
-    saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
-        processed_data_path,
-        "Arase",
-        "arase",
-        "xep",
-        mag_field=mag_field,
-        file_format="nc",
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = arase_xep_strategy(processed_data_path, mag_field)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
 
