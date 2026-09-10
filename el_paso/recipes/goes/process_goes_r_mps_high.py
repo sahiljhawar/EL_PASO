@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -19,6 +18,33 @@ if TYPE_CHECKING:
 
 logging.captureWarnings(capture=True)
 logger = logging.getLogger(__name__)
+
+
+def goes_r_mps_high_gfz_strategy(
+    base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral, satellite: str
+) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for GOES-R MPS-HI/MAGED."""
+    return ep.saving_strategies.GFZStrategy(Path(base_data_path), "GOES", satellite, "MAGED", mag_field)
+
+
+def goes_r_mps_high_netcdf_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly NetCDF saving strategy for GOES-R MPS-HI/MAGED."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "GOES",
+        satellite,
+        "MAGED",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
 
 TELE_ALPHA_ANGLES = np.array([0.0, 0.0, 0.0, 0.0, 0.0])
 TELE_BETA_ANGLES = np.array([-35.0, 35.0, -70.0, 0, 70.0])
@@ -196,24 +222,9 @@ def process_goes_r_mps_high(
     }
 
     if save_strategy in ("gfz", "both"):
-        saving_strategy = ep.saving_strategies.GFZStrategy(
-            Path(processed_data_path),
-            mission="GOES",
-            satellite=satellite,
-            instrument="MAGED",
-            mag_field=mag_field,
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        saving_strategy = goes_r_mps_high_gfz_strategy(processed_data_path, mag_field, satellite)
     if save_strategy in ("netcdf", "both"):
-        saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
-            Path(processed_data_path),
-            mission="GOES",
-            satellite=satellite,
-            instrument="MAGED",
-            mag_field=mag_field,
-            file_format="nc",
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        saving_strategy = goes_r_mps_high_netcdf_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True)
 

@@ -2,16 +2,13 @@
 # SPDX-FileContributor: Bernhard Haas
 #
 # SPDX-License-Identifier: Apache-2.0
-import argparse
 import logging
 import os
-import sys
 import typing
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
-import dateutil
 import numpy as np
 from astropy import units as u
 from astropy.coordinates import GCRS, ITRS, CartesianRepresentation
@@ -20,6 +17,31 @@ import el_paso as ep
 from el_paso.utils import timed_function
 
 logger = logging.getLogger(__name__)
+
+
+def esa_ngrm_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = ".nc",
+) -> ep.SavingStrategy:
+    """NetCDF saving strategy for ESA NGRM, daily for S6 satellites and monthly otherwise."""
+    strategy_cls = (
+        ep.saving_strategies.DailyLEORBStrategy
+        if satellite.startswith("S6")
+        else ep.saving_strategies.MonthlyRBStrategy
+    )
+    return strategy_cls(
+        Path(base_data_path),
+        "ESA",
+        satellite.lower(),
+        "ngrm",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
 
 CHI2_BAD_QUALITY_THRESHOLD = 2
 EPT_ENERGY_LIMITS = [0.5, 0.6, 0.7, 0.8, 1.0, 2.4, 8.0]
@@ -245,8 +267,8 @@ def process_ngrm_electron_fluxes(
     ]
 
     if calculate_Lstar:
-        variables_to_compute.append(("L_star", mag_field))  # ty:ignore[invalid-argument-type]
-        variables_to_compute.append(("L_m", mag_field))  # ty:ignore[invalid-argument-type]
+        variables_to_compute.append(("L_star", mag_field))
+        variables_to_compute.append(("L_m", mag_field))
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
@@ -295,21 +317,7 @@ def process_ngrm_electron_fluxes(
         variables_to_save["L_m"] = magnetic_field_variables[f"L_m_{mag_field}"]
 
     if saving_strategy is None:
-        save_srat_class = (
-            ep.saving_strategies.DailyLEORBStrategy
-            if satellite.startswith("S6")
-            else ep.saving_strategies.MonthlyRBStrategy
-        )
-
-        saving_strategy = save_srat_class(
-            base_data_path=Path(processed_data_path),
-            mission="ESA",
-            satellite=f"{satellite.lower()}",
-            instrument="ngrm",
-            mag_field=mag_field,
-            file_format=".nc",
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        saving_strategy = esa_ngrm_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True)
 

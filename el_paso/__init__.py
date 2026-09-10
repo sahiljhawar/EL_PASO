@@ -27,7 +27,6 @@ from el_paso.saving_strategy import SavingStrategy
 from el_paso import physics, processing, saving_strategies, units, data_standards, utils, typing
 from el_paso.save import save
 from el_paso.processing import TimeBinMethod
-from el_paso.dataset import DataSet
 from el_paso.download import download
 from el_paso.download_omm import download_omm
 from el_paso.extract_variables_from_files import extract_variables_from_files, ExtractionInfo
@@ -35,7 +34,6 @@ from el_paso.load_indices_solar_wind_parameters import load_indices_solar_wind_p
 from el_paso.logger import setup_logging
 from el_paso.cli.recipe_cli import build_recipe_command, run_recipe_cli
 from el_paso import cli
-from el_paso import dataset
 from el_paso import recipes
 
 __all__ = [

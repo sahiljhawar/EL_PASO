@@ -139,6 +139,25 @@ def extract_data_from_lanl_gps_ascii(file_path, extraction_infos):  # noqa: ANN0
     return data
 
 
+def gps_cxd_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly NetCDF saving strategy for LANL GPS CXD."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "GPS",
+        satellite,
+        "cxd",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
+
 def process_gps_data(
     start_time: datetime,
     end_time: datetime,
@@ -329,14 +348,7 @@ def process_gps_data(
         "InvK": magnetic_field_variables["InvK_T89"],
     }
 
-    saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
-        base_data_path=Path(processed_data_path),
-        mission="GPS",
-        satellite=satellite,
-        instrument="cxd",
-        mag_field="T89",
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = gps_cxd_strategy(processed_data_path, "T89", satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)  # ty:ignore[invalid-argument-type]
 

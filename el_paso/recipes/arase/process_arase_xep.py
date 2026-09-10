@@ -5,15 +5,10 @@
 
 from __future__ import annotations
 
-import argparse
-import logging
-import sys
-import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
 
-import dateutil
 import numpy as np
 from astropy import units as u
 
@@ -23,6 +18,24 @@ from el_paso.recipes.arase import (
     get_arase_orbit_level_2_variables,
     get_arase_orbit_level_3_variables,
 )
+
+
+def arase_xep_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly saving strategy for Arase XEP."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "Arase",
+        "arase",
+        "xep",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
 
 
 def process_arase_xep(
@@ -271,15 +284,7 @@ def process_arase_xep(
             "InvMu": orb_variables["InvMu"],
         }
 
-    saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
-        processed_data_path,
-        "Arase",
-        "arase",
-        "xep",
-        mag_field=mag_field,
-        file_format="nc",
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = arase_xep_strategy(processed_data_path, mag_field)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
 

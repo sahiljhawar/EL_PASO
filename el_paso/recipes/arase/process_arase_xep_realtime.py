@@ -10,7 +10,7 @@ import logging
 import os
 import sys
 import typing
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -23,6 +23,29 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
 import el_paso as ep
+
+
+def arase_xep_gfz_strategy(base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for Arase XEP."""
+    return ep.saving_strategies.GFZStrategy(Path(base_data_path), "Arase", "Arase", "XEP", mag_field)
+
+
+def arase_xep_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Monthly saving strategy for Arase XEP."""
+    return ep.saving_strategies.MonthlyRBStrategy(
+        Path(base_data_path),
+        "Arase",
+        "arase",
+        "xep",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
 
 
 @timed_function("process_arase_xep_real_time")
@@ -200,13 +223,7 @@ def process_arase_xep_real_time(
     }
 
     if save_strategy in ("gfz", "both"):
-        saving_strategy = ep.saving_strategies.GFZStrategy(
-            processed_data_path,
-            mission="Arase",
-            satellite="Arase",
-            instrument="XEP",
-            mag_field=mag_field,
-        )
+        saving_strategy = arase_xep_gfz_strategy(processed_data_path, mag_field)
 
         ep.save(
             variables_to_save,
@@ -218,14 +235,7 @@ def process_arase_xep_real_time(
         )
 
     if save_strategy in ("netcdf", "both"):
-        saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
-            base_data_path=Path(processed_data_path),
-            mission="Arase",
-            satellite="arase",
-            instrument="xep",
-            mag_field=mag_field,
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        saving_strategy = arase_xep_strategy(processed_data_path, mag_field)
 
         ep.save(
             variables_to_save,

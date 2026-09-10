@@ -2,15 +2,12 @@
 # SPDX-FileContributor: Bernhard Haas
 #
 # SPDX-License-Identifier: Apache-2.0
-import argparse
 import logging
 import os
-import sys
 import typing
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-import dateutil
 import numpy as np
 from astropy import units as u
 from dotenv import load_dotenv
@@ -22,6 +19,28 @@ CHI2_BAD_QUALITY_THRESHOLD = 2
 EPT_ENERGY_LIMITS = [9.5, 13.0, 29.0, 61.0, 92.0, 126.0, 155.0, 182.0, 205.0, 227.0, 248.0]
 
 logger = logging.getLogger(__name__)
+
+
+def probav_ept_proton_gfz_strategy(
+    base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral
+) -> ep.SavingStrategy:
+    """Legacy GFZ .mat saving strategy for PROBA-V EPT protons."""
+    return ep.saving_strategies.GFZStrategy(Path(base_data_path), "PROBAV", "probav", "EPT-proton", mag_field)
+
+
+def probav_ept_proton_netcdf_strategy(
+    base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral, *, file_format: ep.typing.MFSFormats = ".nc"
+) -> ep.SavingStrategy:
+    """Daily LEO/RB NetCDF saving strategy for PROBA-V EPT protons."""
+    return ep.saving_strategies.DailyLEORBStrategy(
+        Path(base_data_path),
+        "PROBAV",
+        "probav",
+        "EPT-proton",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
 
 
 load_dotenv()
@@ -273,25 +292,10 @@ def process_ept_proton_fluxes(
     }
 
     if save_strategy in ("gfz", "both"):
-        strategy = ep.saving_strategies.GFZStrategy(
-            processed_data_path,
-            mission="PROBAV",
-            satellite="probav",
-            instrument="EPT-proton",
-            mag_field=mag_field,
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = probav_ept_proton_gfz_strategy(processed_data_path, mag_field)
 
     if save_strategy in ("netcdf", "both"):
-        strategy = ep.saving_strategies.DailyLEORBStrategy(
-            base_data_path=Path(processed_data_path),
-            mission="PROBAV",
-            satellite="probav",
-            instrument="EPT-proton",
-            mag_field=mag_field,
-            file_format=".nc",
-            data_standard=ep.data_standards.GFZStandard(),
-        )
+        strategy = probav_ept_proton_netcdf_strategy(processed_data_path, mag_field)
     ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True)
 
 

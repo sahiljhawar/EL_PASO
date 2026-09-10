@@ -4,7 +4,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Literal
@@ -19,6 +18,26 @@ logger = logging.getLogger(__name__)
 
 TELE_ALPHA_ANGLES = np.array([0.0, 0.0])
 TELE_BETA_ANGLES = np.array([-180.0, 90.0])
+
+
+def dmsp_ssj_electron_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
+) -> ep.SavingStrategy:
+    """Daily LEO/RB saving strategy for DMSP SSJ electrons."""
+    return ep.saving_strategies.DailyLEORBStrategy(
+        Path(base_data_path),
+        "DMSP",
+        satellite,
+        "SSJ",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
 
 DMSPSatellites = Literal["f17"]
 
@@ -179,14 +198,7 @@ def process_dmsp_ssj_electrons(
         "Alpha_LC_Eq": magnetic_field_variables[f"Alpha_LC_Eq_{mag_field}"],
     }
 
-    saving_strategy = ep.saving_strategies.DailyLEORBStrategy(
-        base_data_path=Path(processed_data_path),
-        mission="DMSP",
-        satellite=satellite,
-        instrument="SSJ",
-        mag_field=mag_field,
-        data_standard=ep.data_standards.GFZStandard(),
-    )
+    saving_strategy = dmsp_ssj_electron_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)
 
