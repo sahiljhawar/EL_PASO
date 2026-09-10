@@ -13,11 +13,25 @@ from astropy import units as u
 from astropy.constants import e, m_e  # ty:ignore[unresolved-import]
 
 import el_paso as ep
-from el_paso.recipes.strategies import rbsp_emfisis_waves_strategy
 from el_paso.variable import Variable
 
 if TYPE_CHECKING:
     from el_paso.processing.interpolate_in_time import InterpolationMethod
+
+
+def rbsp_emfisis_waves_strategy(
+    base_data_path: str | Path,
+    satellite: str,
+    data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+) -> ep.SavingStrategy:
+    """Daily NetCDF wave saving strategy for RBSP EMFISIS."""
+    return ep.saving_strategies.DailyWaveStrategy(
+        Path(base_data_path),
+        "RBSP",
+        "rbsp" + satellite,
+        "EMFISIS",
+        data_standard or ep.data_standards.GFZStandard(),
+    )
 
 
 def process_rbsp_emfisis_waves(

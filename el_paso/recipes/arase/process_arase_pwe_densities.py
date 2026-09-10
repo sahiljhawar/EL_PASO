@@ -17,7 +17,19 @@ from astropy import units as u
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils.irbem import Coords
 from el_paso.recipes.arase.get_arase_orbit_variables import get_arase_orbit_level_2_variables
-from el_paso.recipes.strategies import arase_pwe_densities_strategy
+
+
+def arase_pwe_densities_strategy(
+    base_data_path: str | Path, mag_field: ep.typing.MagneticFieldLiteral
+) -> ep.SavingStrategy:
+    """Monthly NetCDF density saving strategy for Arase PWE."""
+    return ep.saving_strategies.DensityNetCDFStrategy(
+        base_data_path=base_data_path,
+        mission="Arase",
+        satellite="Other",
+        instrument="PWE",
+        mag_field=mag_field,
+    )
 
 
 def process_arase_pwe_density(

@@ -14,10 +14,34 @@ from astropy import units as u
 from astropy.coordinates import GCRS, ITRS, CartesianRepresentation
 
 import el_paso as ep
-from el_paso.recipes.strategies import esa_ngrm_strategy
 from el_paso.utils import timed_function
 
 logger = logging.getLogger(__name__)
+
+
+def esa_ngrm_strategy(
+    base_data_path: str | Path,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    satellite: str,
+    *,
+    file_format: ep.typing.MFSFormats = ".nc",
+) -> ep.SavingStrategy:
+    """NetCDF saving strategy for ESA NGRM, daily for S6 satellites and monthly otherwise."""
+    strategy_cls = (
+        ep.saving_strategies.DailyLEORBStrategy
+        if satellite.startswith("S6")
+        else ep.saving_strategies.MonthlyRBStrategy
+    )
+    return strategy_cls(
+        Path(base_data_path),
+        "ESA",
+        satellite.lower(),
+        "ngrm",
+        mag_field,
+        data_standard=ep.data_standards.GFZStandard(),
+        file_format=file_format,
+    )
+
 
 CHI2_BAD_QUALITY_THRESHOLD = 2
 EPT_ENERGY_LIMITS = [0.5, 0.6, 0.7, 0.8, 1.0, 2.4, 8.0]
