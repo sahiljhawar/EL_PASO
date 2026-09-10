@@ -20,6 +20,7 @@ From: astral/uv:python3.12-bookworm-slim
     hatch_build.py /opt/el_paso
     README.md /opt/el_paso
     hooks /opt/el_paso
+    tests/unittests/test_recipes_strategies.py /opt/el_paso/tests/unittests/
 
 %environment
     export UV_PROJECT_ENVIRONMENT=/opt/el_paso/.venv
