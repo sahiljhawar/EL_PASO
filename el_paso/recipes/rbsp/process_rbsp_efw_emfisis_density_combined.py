@@ -26,7 +26,9 @@ def process_rbsp_efw_emfisis_density_combined(
     processed_data_path: str | Path = ".",
     bin_cadence: timedelta = timedelta(minutes=1),
     num_cores: int = 16,
+    save_strategy: Literal["netcdf"] = "netcdf",
     *,
+    skip_existing: bool = True,
     add_hiss_derived_densitites: bool = True,
     hiss_derived_densities_data_path: str | Path = ".",
 ) -> None:
@@ -51,6 +53,9 @@ def process_rbsp_efw_emfisis_density_combined(
             would be written to.
         bin_cadence (timedelta): Time-binning cadence applied to the density and position variables.
         num_cores (int): Number of CPU cores used for the magnetic field computations.
+        save_strategy (Literal["netcdf"]): The saving strategy used to write the processed
+            data. This recipe only supports a single netCDF-based strategy.
+        skip_existing (bool): If True, skip downloading files that already exist locally.
         add_hiss_derived_densitites (bool): If True, also load, time-bin, and map to the
             equator the hiss-derived density data.
         hiss_derived_densities_data_path (str | Path): Directory containing the
@@ -60,6 +65,8 @@ def process_rbsp_efw_emfisis_density_combined(
         NotImplementedError: Always raised before the processed variables are saved; saving via
             `DensityNetCDFStrategy` is not yet implemented.
     """
+    del save_strategy
+
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
 
@@ -67,10 +74,18 @@ def process_rbsp_efw_emfisis_density_combined(
     processed_data_path = Path(processed_data_path)
 
     efw_variables = _get_efw_variables(
-        start_time - timedelta(minutes=10), end_time + timedelta(minutes=10), satellite, raw_data_path
+        start_time - timedelta(minutes=10),
+        end_time + timedelta(minutes=10),
+        satellite,
+        raw_data_path,
+        skip_existing=skip_existing,
     )
     emfisis_variables = _get_emfisis_variables(
-        start_time - timedelta(minutes=10), end_time + timedelta(minutes=10), satellite, raw_data_path
+        start_time - timedelta(minutes=10),
+        end_time + timedelta(minutes=10),
+        satellite,
+        raw_data_path,
+        skip_existing=skip_existing,
     )
 
     efw_time_bin_methods = {
@@ -189,7 +204,12 @@ def process_rbsp_efw_emfisis_density_combined(
 
 
 def _get_efw_variables(
-    start_time: datetime, end_time: datetime, satellite: Literal["a", "b"], raw_data_path: Path
+    start_time: datetime,
+    end_time: datetime,
+    satellite: Literal["a", "b"],
+    raw_data_path: Path,
+    *,
+    skip_existing: bool = True,
 ) -> dict[str, ep.Variable]:
     file_name_stem = "rbsp" + satellite + "_efw-l3_YYYYMMDD_.{3}.cdf"
 
@@ -201,7 +221,7 @@ def _get_efw_variables(
         file_name_stem=file_name_stem,
         file_cadence="daily",
         method="request",
-        skip_existing=True,
+        skip_existing=skip_existing,
     )
 
     extraction_infos = [
@@ -239,7 +259,12 @@ def _get_efw_variables(
 
 
 def _get_emfisis_variables(
-    start_time: datetime, end_time: datetime, satellite: Literal["a", "b"], raw_data_path: Path
+    start_time: datetime,
+    end_time: datetime,
+    satellite: Literal["a", "b"],
+    raw_data_path: Path,
+    *,
+    skip_existing: bool = True,
 ) -> dict[str, ep.Variable]:
     file_name_stem = "rbsp-" + satellite + "_density_emfisis-l4_YYYYMMDD_.{6,7}.cdf"
 
@@ -251,7 +276,7 @@ def _get_emfisis_variables(
         file_name_stem=file_name_stem,
         file_cadence="daily",
         method="request",
-        skip_existing=True,
+        skip_existing=skip_existing,
     )
 
     extraction_infos = [

@@ -25,6 +25,7 @@ def process_rbsp_ect_combined(
     bin_cadence: timedelta = timedelta(minutes=5),
     num_cores: int = 16,
     save_strategy: Literal["gfz", "netcdf", "both"] = "netcdf",
+    skip_existing: bool = True,  # noqa: FBT001, FBT002,
 ) -> None:
     """Process combined RBSP ECT (REPT/MagEIS) electron flux data into the EL-PASO data standard.
 
@@ -51,6 +52,7 @@ def process_rbsp_ect_combined(
             to use for writing the processed output. Defaults to "netcdf".
         num_cores (int): Number of CPU cores used for the magnetic field computations.
             Defaults to 4.
+        skip_existing (bool): If True, skip downloading files that already exist on disk.
     """
     logging.getLogger().addHandler(logging.StreamHandler(sys.stdout))
     logging.getLogger().setLevel(logging.INFO)
@@ -68,7 +70,7 @@ def process_rbsp_ect_combined(
         file_name_stem=file_name_stem,
         file_cadence="daily",
         method="request",
-        skip_existing=True,
+        skip_existing=skip_existing,
     )
 
     extraction_infos = [

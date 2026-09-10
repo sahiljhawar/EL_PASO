@@ -29,6 +29,8 @@ def process_rbsp_mageis_electrons(
     processed_data_path: str | Path = ".",
     bin_cadence: timedelta = timedelta(minutes=5),
     num_cores: int = 16,
+    skip_existing: bool = True,  # noqa: FBT001, FBT002,
+    save_strategy: Literal["netcdf"] = "netcdf",
 ) -> None:
     """Process RBSP ECT/MagEIS electron flux data into the EL-PASO data standard.
 
@@ -55,7 +57,12 @@ def process_rbsp_mageis_electrons(
         bin_cadence (timedelta): Time-binning cadence applied to all variables.
         num_cores (int): Number of CPU cores used for the magnetic field computations.
             Defaults to 32.
+        skip_existing (bool): If True, skip downloading files that already exist in
+            raw_data_path. Defaults to True.
+        save_strategy (Literal["netcdf"]): Saving strategy used for the output files.
+            Only "netcdf" is currently supported for this recipe. Defaults to "netcdf".
     """
+    del save_strategy
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
 
@@ -69,7 +76,7 @@ def process_rbsp_mageis_electrons(
         file_name_stem=file_name_stem,
         file_cadence="daily",
         method="request",
-        skip_existing=True,
+        skip_existing=skip_existing,
     )
 
     extraction_infos = [

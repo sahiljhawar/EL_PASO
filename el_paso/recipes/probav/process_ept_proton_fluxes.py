@@ -29,6 +29,7 @@ load_dotenv()
 def process_ept_proton_fluxes(
     start_time: datetime,
     end_time: datetime,
+    satellite: typing.Literal["probav"] = "probav",
     mag_field: ep.typing.MagneticFieldLiteral = "T89",
     raw_data_path: str | Path = ".",
     processed_data_path: str | Path = ".",
@@ -55,6 +56,8 @@ def process_ept_proton_fluxes(
     Args:
         start_time (datetime): Start of the time range to process.
         end_time (datetime): End of the time range to process.
+        satellite (Literal["probav"]): Identifier of the satellite/platform to process.
+            PROBA-V is a single-platform mission, so this has only one value.
         mag_field (MagneticFieldLiteral): Magnetic field model used for the derived quantities.
         raw_data_path (str | Path): Base directory used for downloading and locating the raw EPT data files.
         processed_data_path (str | Path): Base directory in which the processed output files are saved.
@@ -72,6 +75,8 @@ def process_ept_proton_fluxes(
         ValueError: If `client_id` or `client_secret` is not provided and not available via the
             `CLIENT_ID`/`CLIENT_SECRET` environment variables.
     """
+    del satellite
+
     if client_id is None:
         client_id = os.environ.get("CLIENT_ID")
     if client_secret is None:

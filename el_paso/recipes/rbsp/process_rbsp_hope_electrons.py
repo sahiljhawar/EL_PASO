@@ -25,6 +25,7 @@ def process_rbsp_hope_electrons(
     save_strategy: Literal["gfz", "netcdf", "both"] = "netcdf",
     *,
     calculate_Lstar: bool = True,
+    skip_existing: bool = True,
 ) -> None:
     """Process RBSP ECT/HOPE electron flux data into the EL-PASO data standard.
 
@@ -52,6 +53,7 @@ def process_rbsp_hope_electrons(
         save_strategy (Literal["gfz", "netcdf", "both"]): Which saving strategy/strategies
             to use for writing the processed output. Defaults to "netcdf".
         calculate_Lstar (bool): Whether Lstar should be calculated or not. Defaults to True.
+        skip_existing (bool): If True, skip downloading files that already exist on disk.
     """
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
@@ -66,7 +68,7 @@ def process_rbsp_hope_electrons(
         file_name_stem=file_name_stem,
         file_cadence="daily",
         method="request",
-        skip_existing=True,
+        skip_existing=skip_existing,
     )
 
     extraction_infos = [
