@@ -147,7 +147,7 @@ for _entry in RECIPES:
     )
 
 
-app.command("omm")(build_recipe_command(ep.download_omm))
+app.command("omm")(build_recipe_command(ep.download_omm))  # ty: ignore[invalid-argument-type]
 
 
 @app.command("list")
