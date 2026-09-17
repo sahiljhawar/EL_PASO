@@ -266,11 +266,11 @@ def process_ngrm_electron_fluxes(
         ("B_Eq", mag_field),
         ("R_Eq", mag_field),
         ("Alpha_Eq", mag_field),
+        ("L_m", mag_field),
     ]
 
     if calculate_Lstar:
         variables_to_compute.append(("L_star", mag_field))
-        variables_to_compute.append(("L_m", mag_field))
 
     magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
@@ -312,11 +312,11 @@ def process_ngrm_electron_fluxes(
         "B_Eq": magnetic_field_variables[f"B_Eq_{mag_field}"],
         "Position": variables["xGEO"],
         "PSD": psd_var,
+        "L_m": magnetic_field_variables[f"L_m_{mag_field}"],
     }
 
     if calculate_Lstar:
         variables_to_save["L_star"] = magnetic_field_variables[f"L_star_{mag_field}"]
-        variables_to_save["L_m"] = magnetic_field_variables[f"L_m_{mag_field}"]
 
     saving_strategy = esa_ngrm_strategy(processed_data_path, mag_field, satellite)
 
