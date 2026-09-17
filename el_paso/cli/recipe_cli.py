@@ -618,7 +618,7 @@ def _resolve_log_file(logs_path: Path, func: Recipe, satellite: str | None) -> P
         log_dir = logs_path / f"{today:%Y}" / f"{today:%m}" / f"{today:%d}" / _mission_name(func)
         if satellite is not None:
             log_dir /= str(satellite)
-        log_file = log_dir / f"{_func_name(func)}.log"
+        log_file = log_dir / f"{_func_name(func)}_{today:%H00}.log"
 
     log_file.parent.mkdir(parents=True, exist_ok=True)
     return log_file
