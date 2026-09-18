@@ -451,7 +451,7 @@ def _get_mirror_point_parallel(
     bmin_output = np.empty_like(pa_local[it, :])
 
     for i, pa in enumerate(pa_local[it, :]):
-        bmin_output[i] = model.find_mirror_point(datetimes[it], x_dict_single, maginput, pa).bmin
+        bmin_output[i] = model.find_mirror_point(datetimes[it], x_dict_single, maginput, float(pa)).bmin
 
     return bmin_output.astype(np.float64)
 

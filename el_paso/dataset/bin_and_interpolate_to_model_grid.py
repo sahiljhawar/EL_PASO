@@ -438,6 +438,7 @@ def _parallel_func_VK(
         return psd_interp
 
     for iK, K_val in enumerate(grid_K_1d):
+        K_val = float(K_val)
         K_bracket = _bracket_indices(K_data_it, K_val, max_relative_distance)
         if K_bracket is None:
             continue
@@ -447,6 +448,7 @@ def _parallel_func_VK(
         V_right = V_data[it, :, K_idx_right]
 
         for iV, V_val in enumerate(grid_V[0, 0, :, iK]):
+            V_val = float(V_val)
             V_bracket_left = _bracket_indices(V_left, V_val, max_relative_distance)
             V_bracket_right = _bracket_indices(V_right, V_val, max_relative_distance)
 
