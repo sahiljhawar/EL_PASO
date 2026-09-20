@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Optional
 
 import el_paso as ep
 from el_paso.data_standards import GFZStandard
+from el_paso.processing.magnetic_field_utils.construct_maginput import get_saveable_sw_indices
 from el_paso.saving_strategy import OutputFile, SavingStrategy
 
 if TYPE_CHECKING:
@@ -54,6 +55,8 @@ class GFZStrategy(SavingStrategy):
         instrument: str,
         mag_field: ep.typing.MagneticFieldLiteral,
         data_standard: Optional[DataStandard[StandardName]] = None,
+        *,
+        include_solar_wind_indices: bool = True,
     ) -> None:
         """Initializes the data organization strategy.
 
@@ -65,6 +68,15 @@ class GFZStrategy(SavingStrategy):
             mag_field (str): The model extension type. "TS04" is remapped to "T04s".
             data_standard (DataStandard | None, optional): An optional `DataStandard` instance to use for
                 standardizing variables. If `None`, `ep.data_standards.GFZStandard` is used by default.
+            include_solar_wind_indices (bool): If ``True`` (the default), add a
+                "solar_wind_indices" output file containing whichever of `Kp`, `Dst`, `Pdyn`,
+                `ByIMF`, `BzIMF`, `Vsw`, `Nsw`, `G1`, `G2`, `G3`, `W_params` the `mag_field` model
+                actually requires and the given `data_standard` registers, so the raw SWVO
+                product data used to compute the
+                magnetic-field output is saved alongside it for full traceability. Each index is
+                saved independently (``save_incomplete=True`` on that output file), so one index
+                failing to load does not prevent the others from being saved. Pass ``False`` to
+                opt out and keep only the original set of output files.
         """
         self.base_data_path = Path(base_data_path)
         self.mission = mission
@@ -89,6 +101,13 @@ class GFZStrategy(SavingStrategy):
             OutputFile("bfield", ["Epoch", "B_Eq", "B_Calc"]),
             OutputFile("R0", ["Epoch", "R_Eq"]),
         ]
+
+        if include_solar_wind_indices:
+            required_sw_indices = get_saveable_sw_indices(self.mag_field, self.data_standard)
+            if required_sw_indices:
+                self.output_files.append(
+                    OutputFile("solar_wind_indices", ["Epoch", *required_sw_indices], save_incomplete=True)
+                )
 
         self._loader = ep.utils.load_mat_data
 
@@ -149,7 +168,16 @@ class GFZStrategy(SavingStrategy):
 
         file_name = self.get_file_name_stem() + f"_{start_year_month_day}to{end_year_month_day}_{output_file.name}"
 
-        if output_file.name in ["alpha_and_energy", "lstar", "lm", "invmu_and_invk", "mlt", "bfield", "R0"]:
+        if output_file.name in [
+            "alpha_and_energy",
+            "lstar",
+            "lm",
+            "invmu_and_invk",
+            "mlt",
+            "bfield",
+            "R0",
+            "solar_wind_indices",
+        ]:
             file_name += f"_n4_4_{self.mag_field}"
 
         file_name += "_ver4.mat"
