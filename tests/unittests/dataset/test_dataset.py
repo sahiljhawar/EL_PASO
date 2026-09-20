@@ -308,9 +308,21 @@ class TestDataSet:  # noqa: D101
         np.testing.assert_array_equal(mock_dataset.Flux, replacement_flux)
 
     def test_all_variables_in_dir(self, mock_dataset: DataSet):
-        mock_dataset._load_variable("time")
+        # Loading one variable eagerly loads every variable that shares its output file, but a
+        # strategy may split its variables across multiple output files (e.g. MonthlyRBStrategy's
+        # "solar_wind_indices" group), so load one representative variable per output file.
+        strategy = mock_dataset.saving_strategy
+        for output_file in strategy.output_files:
+            # Pick a name unique to this output file: shared names (e.g. "Epoch") resolve back
+            # to whichever output file lists them first, not necessarily this one.
+            for name in output_file.names_to_save:
+                internal_name = name[0] if isinstance(name, tuple) else name
+                standard_name = strategy.data_standard.get_standard_name(internal_name)
+                if strategy.get_output_file(standard_name=standard_name) is output_file:
+                    mock_dataset._load_variable(standard_name)
+                    break
 
-        for standard_name in mock_dataset.saving_strategy.get_all_standard_names():
+        for standard_name in strategy.get_all_standard_names():
             assert standard_name in mock_dataset.__dir__()
 
     def test_accessing_second_variable_does_not_reload_file(
