@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import el_paso as ep
+from el_paso.processing.magnetic_field_utils.construct_maginput import get_saveable_sw_indices
 from el_paso.saving_strategy import OutputFile, SavingStrategy
 
 if TYPE_CHECKING:
@@ -49,6 +50,8 @@ class MonthlyRBStrategy(SavingStrategy):
         mag_field: MagneticFieldLiteral,
         data_standard: DataStandard[StandardName],
         file_format: MFSFormats = "nc",
+        *,
+        include_solar_wind_indices: bool = True,
     ) -> None:
         """Initialize a monthly file saving strategy.
 
@@ -61,6 +64,17 @@ class MonthlyRBStrategy(SavingStrategy):
             file_format (MFSFormats): One of ``"nc"``, ``"cdf"``, ``"h5"``, or ``"mat"``.
                 A leading dot is also accepted.
             data_standard (DataStandard): Instance of the data standard implementation.
+            include_solar_wind_indices (bool): If ``True`` (the default), add a second
+                "solar_wind_indices" output file containing whichever of `Kp`, `Dst`, `Pdyn`,
+                `ByIMF`, `BzIMF`, `Vsw`, `Nsw`, `G1`, `G2`, `G3`, `W_params` the `mag_field` model
+                actually requires (per `MAGINPUT_REQUIRED_INPUTS`) and the given `data_standard`
+                registers, so the raw
+                SWVO product data used to compute the magnetic-field output is saved alongside it
+                for full traceability. Each index is saved independently (``save_incomplete=True``
+                on that output file), so one index failing to load does not prevent the others
+                from being saved. Pass ``False`` to opt out and keep only the single "full" output
+                file (e.g. to keep two differently-configured strategies producing an identical
+                variable set).
 
         Attributes:
             output_files: List of output file configurations, with variable names
@@ -79,6 +93,13 @@ class MonthlyRBStrategy(SavingStrategy):
         self.output_files = [
             OutputFile("full", self._get_output_file_entries(), save_incomplete=True),
         ]
+
+        if include_solar_wind_indices:
+            required_sw_indices = get_saveable_sw_indices(mag_field, self.data_standard)
+            if required_sw_indices:
+                self.output_files.append(
+                    OutputFile("solar_wind_indices", ["Epoch", *required_sw_indices], save_incomplete=True)
+                )
 
     def _get_output_file_entries(self) -> list[InternalName | tuple[InternalName, ...]]:
         """Return the standard variable list plus user-defined custom variables."""
@@ -147,13 +168,20 @@ class MonthlyRBStrategy(SavingStrategy):
         """
         return self.satellite.lower() + "_" + self.instrument.lower()
 
-    def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:  # noqa: ARG002
-        """Generate the monthly file path for the configured format."""
+    def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:
+        """Generate the monthly file path for the configured format.
+
+        The default "full" output file keeps its historical, unsuffixed name for backwards
+        compatibility. Any additional output file (e.g. a "solar_wind_indices" group) gets
+        `output_file.name` appended to disambiguate it from "full" and from other extra groups.
+        """
         start_year_month_day = interval_start.strftime("%Y%m%d")
         end_year_month_day = interval_end.strftime("%Y%m%d")
-        file_name = (
-            f"{self.get_file_name_stem()}_{start_year_month_day}to{end_year_month_day}_"
-            f"{self.mag_field}{self.file_format}"
-        )
+        file_name = f"{self.get_file_name_stem()}_{start_year_month_day}to{end_year_month_day}_{self.mag_field}"
+
+        if output_file.name != "full":
+            file_name += f"_{output_file.name}"
+
+        file_name += self.file_format
 
         return self.get_file_path_stem() / file_name

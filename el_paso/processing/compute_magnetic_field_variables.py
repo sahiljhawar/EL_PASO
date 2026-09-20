@@ -11,7 +11,7 @@ import logging
 import os
 import typing
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple, overload
 
 import numpy as np
 from astropy import units as u
@@ -24,6 +24,9 @@ from el_paso.cache import clear_cache_on_success, get_cache_dir
 from el_paso.processing.compute_electron_gyrofrequency import compute_electron_gyrofrequency
 from el_paso.typing import MagFieldVarTypes, MagneticFieldLiteral
 from el_paso.utils import make_dict_hashable, timed_function
+
+if TYPE_CHECKING:
+    from el_paso.typing import VariablesDict
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +50,44 @@ class MagFieldVar(NamedTuple):
 _cleanup_registered = False
 
 
+@overload
+def compute_magnetic_field_variables(
+    time_var: Variable,
+    xgeo_var: Variable,
+    variables_to_compute: VariableRequest,
+    irbem_options: mag_utils.IrbemOptions,
+    num_cores: int,
+    indices_solar_wind: dict[str, Variable] | None = None,
+    pa_local_var: Variable | None = None,
+    energy_var: Variable | None = None,
+    particle_species: Literal["electron", "proton"] | None = None,
+    *,
+    irbem_lib_path: str | Path = ...,
+    cache_dir: str | Path | None = "_default_",
+    overwrite_cache: bool = False,
+    return_indices_solar_wind: Literal[False] = False,
+) -> dict[str, Variable]: ...
+
+
+@overload
+def compute_magnetic_field_variables(
+    time_var: Variable,
+    xgeo_var: Variable,
+    variables_to_compute: VariableRequest,
+    irbem_options: mag_utils.IrbemOptions,
+    num_cores: int,
+    indices_solar_wind: dict[str, Variable] | None = None,
+    pa_local_var: Variable | None = None,
+    energy_var: Variable | None = None,
+    particle_species: Literal["electron", "proton"] | None = None,
+    *,
+    irbem_lib_path: str | Path = ...,
+    cache_dir: str | Path | None = "_default_",
+    overwrite_cache: bool = False,
+    return_indices_solar_wind: Literal[True],
+) -> tuple[dict[str, Variable], VariablesDict]: ...
+
+
 def compute_magnetic_field_variables(
     time_var: Variable,
     xgeo_var: Variable,
@@ -61,7 +102,8 @@ def compute_magnetic_field_variables(
     irbem_lib_path: str | Path = Path(ep.__file__).parent / "libirbem.so",
     cache_dir: str | Path | None = "_default_",
     overwrite_cache: bool = False,
-) -> dict[str, Variable]:
+    return_indices_solar_wind: bool = False,
+) -> dict[str, Variable] | tuple[dict[str, Variable], VariablesDict]:
     """Computes various magnetic field-related variables using the IRBEM library.
 
     This function serves as a wrapper to calculate a suite of magnetic field
@@ -106,11 +148,19 @@ def compute_magnetic_field_variables(
         overwrite_cache (bool): If ``True``, recompute and overwrite the cached
             result even when a cache hit exists.  The fresh result is still
             written to cache.  Defaults to ``False``.
+        return_indices_solar_wind (bool): If ``True``, also return the actual
+            `Variable`s (e.g. Kp, Dst) used to build the IRBEM `maginput` for the
+            requested magnetic field model(s), so callers can save the underlying
+            solar wind/geomagnetic index data alongside the computed output for
+            full traceability. Defaults to ``False``.
 
     Returns:
         dict[str, Variable]: A dictionary where keys are the computed variable
         names and values are their corresponding `Variable` objects containing
-        the calculated data and metadata.
+        the calculated data and metadata. If `return_indices_solar_wind` is
+        ``True``, a tuple of this dictionary and a `VariablesDict` of
+        the solar wind/geomagnetic index variables actually used is returned
+        instead.
 
     Raises:
         FileNotFoundError: If no IRBEM library object is found at the provided `irbem_lib_path`.
@@ -155,19 +205,20 @@ def compute_magnetic_field_variables(
             energy_var,
             particle_species,
         )
+        call_kwargs = {"irbem_lib_path": irbem_lib_path, "return_indices_solar_wind": return_indices_solar_wind}
 
         if overwrite_cache:
             logger.info("Overwriting cached magnetic field variables (overwrite_cache=True).")
-            result, _ = cached_fn.call(*call_args, irbem_lib_path=irbem_lib_path)
+            result, _ = cached_fn.call(*call_args, **call_kwargs)
             logger.info("Magnetic field variables computed and cached at %s.", cache_dir)
             return result
 
-        if cached_fn.check_call_in_cache(*call_args, irbem_lib_path=irbem_lib_path):
+        if cached_fn.check_call_in_cache(*call_args, **call_kwargs):
             logger.info("Loading magnetic field variables from cache at %s.", cache_dir)
         else:
             logger.info("No cache hit at %s — computing magnetic field variables.", cache_dir)
 
-        return cached_fn(*call_args, irbem_lib_path=irbem_lib_path)
+        return cached_fn(*call_args, **call_kwargs)
 
     return _compute_core(
         time_var,
@@ -180,6 +231,7 @@ def compute_magnetic_field_variables(
         energy_var,
         particle_species,
         irbem_lib_path=irbem_lib_path,
+        return_indices_solar_wind=return_indices_solar_wind,
     )
 
 
@@ -195,7 +247,8 @@ def _compute_core(
     particle_species: Literal["electron", "proton"] | None = None,
     *,
     irbem_lib_path: str | Path = Path(ep.__file__).parent / "libirbem.so",
-) -> dict[str, Variable]:
+    return_indices_solar_wind: bool = False,
+) -> dict[str, Variable] | tuple[dict[str, Variable], VariablesDict]:
     if not Path(irbem_lib_path).is_file():
         msg = f"No library object found under the provided irbem_lib_path: {irbem_lib_path}"
         logger.warning(
@@ -227,6 +280,7 @@ def _compute_core(
     # collect magnetic_field results in this dictionary
     computed_variables: dict[str, Variable] = {}
     var_names_to_compute: list[str] = []
+    all_indices_solar_wind: VariablesDict = {}
 
     for mag_field_var in mag_variables_to_compute:
         var_type = mag_field_var.type
@@ -244,11 +298,12 @@ def _compute_core(
 
         indices_solar_wind_hashable = make_dict_hashable(indices_solar_wind)
 
-        maginput = mag_utils.construct_maginput(time_var, mag_field, indices_solar_wind_hashable)
+        maginput_result = mag_utils.construct_maginput(time_var, mag_field, indices_solar_wind_hashable)
+        all_indices_solar_wind |= maginput_result.indices_solar_wind
 
         irbem_input = mag_utils.IrbemInput(
             magnetic_field=mag_field,
-            maginput=maginput,
+            maginput=maginput_result.maginput,
             irbem_options=irbem_options,
             num_cores=num_cores,
             irbem_lib_path=irbem_lib_path,
@@ -262,6 +317,9 @@ def _compute_core(
     computed_variables = {
         var_name: computed_variables[var_name] for var_name in computed_variables if var_name in var_names_to_compute
     }
+
+    if return_indices_solar_wind:
+        return computed_variables, all_indices_solar_wind
 
     return computed_variables
 

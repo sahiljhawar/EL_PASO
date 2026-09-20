@@ -31,6 +31,7 @@ if TYPE_CHECKING:
         SavedDataDict,
         StandardName,
         TimeInterval,
+        VariablesDict,
     )
 
 
@@ -368,11 +369,11 @@ class SavingStrategy(ABC):
     def get_target_variables(
         self,
         output_file: OutputFile,
-        variables_dict: dict[InternalName, ep.Variable],
+        variables_dict: VariablesDict,
         time_var: ep.Variable | None,
         start_time: datetime | None,
         end_time: datetime | None,
-    ) -> dict[InternalName, ep.Variable] | None:
+    ) -> VariablesDict | None:
         """Retrieves and processes target variables for saving based on the specified output file.
 
         Args:
@@ -393,7 +394,7 @@ class SavingStrategy(ABC):
             - Each variable is standardized using the `standardize_variable` method.
             - If a requested variable name is not found, a warning is issued and None is returned.
         """
-        target_variables: dict[InternalName, ep.Variable] = {}
+        target_variables: VariablesDict = {}
         first_call_of_interval = True
         available_keys = set(variables_dict.keys())
 
