@@ -177,7 +177,7 @@ def process_rbsp_hope_electrons(
         ("InvMu", mag_field),
     ]
 
-    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_variable,
         xgeo_var=variables["xGEO"],
         variables_to_compute=vars_to_compute,
@@ -186,11 +186,12 @@ def process_rbsp_hope_electrons(
         pa_local_var=variables["Pitch_angle"],
         energy_var=variables["Energy"],
         particle_species="electron",
+        return_indices_solar_wind=True,
     )
 
     psd_var = ep.processing.compute_phase_space_density(variables["FEDU"], variables["Energy"], "electron")
 
-    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    variables_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_variable,
         "FEDU": variables["FEDU"],
         "Position": variables["xGEO"],
@@ -207,6 +208,8 @@ def process_rbsp_hope_electrons(
         "B_Calc": magnetic_field_variables["B_Calc_" + mag_field],
         "PSD": psd_var,
     }
+
+    variables_to_save.update(indices_solar_wind)
 
     if save_strategy in ("gfz", "both"):
         strategy = rbsp_hope_electron_gfz_strategy(processed_data_path, mag_field, satellite)

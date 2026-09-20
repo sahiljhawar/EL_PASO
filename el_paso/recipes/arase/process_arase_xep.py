@@ -257,7 +257,7 @@ def process_arase_xep(
             ("InvMu", mag_field),
         ]
 
-        magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+        magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
             time_var=binned_time_variable,
             xgeo_var=pos_geo_var,
             variables_to_compute=variables_to_compute,
@@ -266,6 +266,7 @@ def process_arase_xep(
             pa_local_var=xep_variables["AlphaLocal"],
             energy_var=xep_variables["Energy"],
             particle_species="electron",
+            return_indices_solar_wind=True,
         )
 
         orb_variables["R0"] = magnetic_field_variables["R_Eq_" + mag_field]
@@ -292,7 +293,7 @@ def process_arase_xep(
         xep_variables["FEDU"], xep_variables["Energy"], particle_species="electron"
     )
 
-    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    variables_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_variable,
         "FEDU": xep_variables["FEDU"],
         "Energy_FEDU": xep_variables["Energy"],
@@ -310,6 +311,7 @@ def process_arase_xep(
             "InvK": orb_variables["InvK"],
             "InvMu": orb_variables["InvMu"],
         }
+        variables_to_save.update(indices_solar_wind)
 
     match save_strategy:
         case "gfz":

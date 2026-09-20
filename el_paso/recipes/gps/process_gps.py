@@ -289,7 +289,7 @@ def process_gps_data(
         ("InvK", mag_field),
     ]
 
-    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=variables["xGEO"],
         energy_var=variables["Energy_FEDO"],
@@ -298,6 +298,7 @@ def process_gps_data(
         variables_to_compute=variables_to_compute,
         irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
+        return_indices_solar_wind=True,
     )
 
     FEDU_var = ep.processing.construct_pitch_angle_distribution(
@@ -310,7 +311,7 @@ def process_gps_data(
 
     psd_var = ep.processing.compute_phase_space_density(FEDU_var, variables["Energy_FEDO"], particle_species="electron")
 
-    variables_to_save = {
+    variables_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_var,
         "FEDU": FEDU_var,
         "Energy_FEDU": variables["Energy_FEDO"],
@@ -328,9 +329,11 @@ def process_gps_data(
         "InvK": magnetic_field_variables[f"InvK_{mag_field}"],
     }
 
+    variables_to_save.update(indices_solar_wind)
+
     saving_strategy = gps_cxd_strategy(processed_data_path, mag_field, satellite)
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)  # ty:ignore[invalid-argument-type]
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)
 
 
 if __name__ == "__main__":

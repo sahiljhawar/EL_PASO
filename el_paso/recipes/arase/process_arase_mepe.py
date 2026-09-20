@@ -272,13 +272,14 @@ def process_arase_mepe(
             ("L_m", mag_field),
         ]
 
-        magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+        magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
             time_var=binned_time_variable,
             xgeo_var=pos_geo_var,
             variables_to_compute=variables_to_compute,
             irbem_options=irbem_options,
             num_cores=num_cores,
             pa_local_var=mepe_variables["Pitch_angle"],
+            return_indices_solar_wind=True,
         )
 
         orb_variables["R0"] = magnetic_field_variables["R_Eq_" + mag_field]
@@ -298,7 +299,7 @@ def process_arase_mepe(
         ep.data_standards.GFZStandard() if data_standard == "gfz" else ep.data_standards.PRBEMStandard()
     )
 
-    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    variables_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_variable,
         "FEDU": mepe_variables["FEDU"],
         "Energy_FEDU": mepe_variables["Energy"],
@@ -308,6 +309,9 @@ def process_arase_mepe(
         "MLT": orb_variables["MLT"],
         "L_m": orb_variables["Lm"],
     }
+
+    if not use_level_3_orbit_data:
+        variables_to_save.update(indices_solar_wind)
 
     match save_strategy:
         case "gfz":

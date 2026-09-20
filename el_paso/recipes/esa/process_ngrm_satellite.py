@@ -272,7 +272,7 @@ def process_ngrm_electron_fluxes(
     if calculate_Lstar:
         variables_to_compute.append(("L_star", mag_field))
 
-    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=variables["xGEO"],
         energy_var=variables["Energy"],
@@ -285,6 +285,7 @@ def process_ngrm_electron_fluxes(
             else ep.processing.magnetic_field_utils.LstarQuantity.NONE,
         ),
         num_cores=num_cores,
+        return_indices_solar_wind=True,
     )
 
     variables |= magnetic_field_variables
@@ -299,7 +300,7 @@ def process_ngrm_electron_fluxes(
 
     psd_var = ep.processing.compute_phase_space_density(FEDU_var, variables["Energy"], particle_species="electron")
 
-    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    variables_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_var,
         "FEDU": FEDU_var,
         # "FEDO": variables["FEDO"], disabled for now, since Alpha_range is missing
@@ -317,6 +318,8 @@ def process_ngrm_electron_fluxes(
 
     if calculate_Lstar:
         variables_to_save["L_star"] = magnetic_field_variables[f"L_star_{mag_field}"]
+
+    variables_to_save.update(indices_solar_wind)
 
     saving_strategy = esa_ngrm_strategy(processed_data_path, mag_field, satellite)
 

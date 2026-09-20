@@ -272,7 +272,7 @@ def process_ept_electron_fluxes(
         ("L_m", mag_field),
     ]
 
-    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=variables["xGEO"],
         energy_var=variables["Energy_FEDU"],
@@ -283,11 +283,12 @@ def process_ept_electron_fluxes(
             lstar_quantity=ep.processing.magnetic_field_utils.LstarQuantity.NONE,
         ),
         num_cores=num_cores,
+        return_indices_solar_wind=True,
     )
 
     variables |= magnetic_field_variables
 
-    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    variables_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_var,
         "FEDU": variables["FEDU"],
         "Energy_FEDU": variables["Energy_FEDU"],
@@ -300,6 +301,8 @@ def process_ept_electron_fluxes(
         "B_Eq": magnetic_field_variables[f"B_Eq_{mag_field}"],
         "Position": variables["xGEO"],
     }
+
+    variables_to_save.update(indices_solar_wind)
 
     if save_strategy in ("gfz", "both"):
         strategy = probav_ept_electron_gfz_strategy(processed_data_path, mag_field)

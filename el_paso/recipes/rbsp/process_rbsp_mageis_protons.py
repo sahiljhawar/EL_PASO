@@ -215,7 +215,7 @@ def process_rbsp_mageis_protons(
         ("InvMu", mag_field),
     ]
 
-    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_variable_xGEO,
         xgeo_var=variables["xGEO"],
         variables_to_compute=vars_to_compute,
@@ -224,11 +224,12 @@ def process_rbsp_mageis_protons(
         pa_local_var=variables["Pitch_angle"],
         energy_var=variables["Energy"],
         particle_species="proton",
+        return_indices_solar_wind=True,
     )
 
     psd_var = ep.processing.compute_phase_space_density(variables["FPDU"], variables["Energy"], "proton")
 
-    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    variables_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_variable,
         "FPDU": variables["FPDU"],
         "Position": variables["xGEO"],
@@ -245,6 +246,8 @@ def process_rbsp_mageis_protons(
         "B_Calc": magnetic_field_variables["B_Calc_" + mag_field],
         "PSD": psd_var,
     }
+
+    variables_to_save.update(indices_solar_wind)
 
     if save_strategy in ("gfz", "both"):
         strategy = rbsp_mageis_proton_gfz_strategy(processed_data_path, mag_field, satellite)
