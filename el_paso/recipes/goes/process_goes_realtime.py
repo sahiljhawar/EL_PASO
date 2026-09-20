@@ -206,7 +206,7 @@ def process_goes_real_time(
         ("InvK", mag_field),
     ]
 
-    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=variables["xGEO"],
         energy_var=variables["Energy"],
@@ -215,6 +215,7 @@ def process_goes_real_time(
         variables_to_compute=variables_to_compute,
         irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
+        return_indices_solar_wind=True,
     )
 
     FEDU_var = ep.processing.construct_pitch_angle_distribution(
@@ -227,7 +228,7 @@ def process_goes_real_time(
 
     psd_var = ep.processing.compute_phase_space_density(FEDU_var, variables["Energy"], particle_species="electron")
 
-    vars_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    vars_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_var,
         "FEDU": FEDU_var,
         "Position": variables["xGEO"],
@@ -243,6 +244,8 @@ def process_goes_real_time(
         "InvMu": magnetic_field_variables[f"InvMu_{mag_field}"],
         "InvK": magnetic_field_variables[f"InvK_{mag_field}"],
     }
+
+    vars_to_save.update(indices_solar_wind)
 
     if save_strategy in ("gfz", "both"):
         strategy = goes_realtime_gfz_strategy(processed_data_path, mag_field, satellite)

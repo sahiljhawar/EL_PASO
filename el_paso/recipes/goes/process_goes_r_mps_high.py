@@ -15,7 +15,7 @@ import el_paso as ep
 from el_paso.recipes.goes import GOESRSatellite
 
 if TYPE_CHECKING:
-    from el_paso.typing import InternalName
+    from el_paso.typing import VariablesDict
 
 logging.captureWarnings(capture=True)
 logger = logging.getLogger(__name__)
@@ -192,7 +192,7 @@ def process_goes_r_mps_high(
         ("InvK", mag_field),
     ]
 
-    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=xgeo_var,
         energy_var=mps_vars["diff_energy"],
@@ -201,13 +201,14 @@ def process_goes_r_mps_high(
         variables_to_compute=variables_to_compute,
         irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
+        return_indices_solar_wind=True,
     )
 
     psd_var = ep.processing.compute_phase_space_density(
         mps_vars["diff_flux"], mps_vars["diff_energy"], particle_species="electron"
     )
 
-    variables_to_save: dict[InternalName, ep.Variable] = {
+    variables_to_save: VariablesDict = {
         "Epoch": binned_time_var,
         "FEDU": mps_vars["diff_flux"],
         "Position": xgeo_var,
@@ -223,6 +224,8 @@ def process_goes_r_mps_high(
         "InvMu": magnetic_field_variables[f"InvMu_{mag_field}"],
         "InvK": magnetic_field_variables[f"InvK_{mag_field}"],
     }
+
+    variables_to_save.update(indices_solar_wind)
 
     if save_strategy in ("gfz", "both"):
         saving_strategy = goes_r_mps_high_gfz_strategy(processed_data_path, mag_field, satellite)
