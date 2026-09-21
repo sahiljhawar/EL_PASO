@@ -143,7 +143,7 @@ def construct_maginput(
     Args:
         time_var (ep.Variable): Array of new time points for interpolation.
         magnetic_field (MagneticField): The magnetic field model used to determine the required inputs.
-        indices_solar_wind (dict[str, ep.Variable] | None, optional): A dictionary of pre-loaded solar
+        indices_solar_wind (dict[SW_Index, ep.Variable] | None, optional): A dictionary of pre-loaded solar
                                                                     wind variables. Defaults to None.
 
     Returns:

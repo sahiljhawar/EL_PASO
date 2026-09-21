@@ -43,7 +43,7 @@ def save(
     and includes a check for missing data.
 
     Args:
-        variables_dict (dict[str, Variable]): A dictionary mapping variable names to their
+        variables_dict (VariablesDict): A dictionary mapping variable names to their
             `Variable` objects to be saved.
         saving_strategy (SavingStrategy): The strategy object that defines how to
             organize, standardize, and save the data (e.g., file paths, formats).
@@ -184,7 +184,7 @@ def _get_data_dict_to_save(
     persistence. It also sanitizes the metadata to handle `None` values.
 
     Args:
-        target_variables (dict[str, Variable]): A dictionary of variables to be prepared
+        target_variables (VariablesDict): A dictionary of variables to be prepared
             for saving.
 
     Returns:
