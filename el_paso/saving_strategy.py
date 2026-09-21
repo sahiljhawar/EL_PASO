@@ -377,13 +377,13 @@ class SavingStrategy(ABC):
 
         Args:
             output_file (OutputFile): The output file configuration containing variable names to save.
-            variables_dict (dict[str, Variable]): Dictionary mapping variable names to Variable objects.
+            variables_dict (VariablesDict): Dictionary mapping variable names to Variable objects.
             time_var (Variable | None): The time variable used for truncation, if applicable.
             start_time (datetime | None): The start time for truncating variables, if specified.
             end_time (datetime | None): The end time for truncating variables, if specified.
 
         Returns:
-            dict[str, Variable] | None:
+            VariablesDict | None:
                 - A dictionary of processed Variable objects keyed by their names,
                     or None if any specified variable name is not found in variables_dict.
 
