@@ -57,7 +57,7 @@ def compute_magnetic_field_variables(
     variables_to_compute: VariableRequest,
     irbem_options: mag_utils.IrbemOptions,
     num_cores: int,
-    indices_solar_wind: dict[str, Variable] | None = None,
+    indices_solar_wind: VariablesDict | None = None,
     pa_local_var: Variable | None = None,
     energy_var: Variable | None = None,
     particle_species: Literal["electron", "proton"] | None = None,
@@ -76,7 +76,7 @@ def compute_magnetic_field_variables(
     variables_to_compute: VariableRequest,
     irbem_options: mag_utils.IrbemOptions,
     num_cores: int,
-    indices_solar_wind: dict[str, Variable] | None = None,
+    indices_solar_wind: VariablesDict | None = None,
     pa_local_var: Variable | None = None,
     energy_var: Variable | None = None,
     particle_species: Literal["electron", "proton"] | None = None,
@@ -94,7 +94,7 @@ def compute_magnetic_field_variables(
     variables_to_compute: VariableRequest,
     irbem_options: mag_utils.IrbemOptions,
     num_cores: int,
-    indices_solar_wind: dict[str, Variable] | None = None,
+    indices_solar_wind: VariablesDict | None = None,
     pa_local_var: Variable | None = None,
     energy_var: Variable | None = None,
     particle_species: Literal["electron", "proton"] | None = None,
@@ -129,7 +129,7 @@ def compute_magnetic_field_variables(
             library calls, controlling aspects like model selection, bounce tracing, etc.
         num_cores (int): The number of CPU cores to use for parallel processing
             within IRBEM calls.
-        indices_solar_wind (dict[str, Variable] | None): Optional. A dictionary
+        indices_solar_wind (VariablesDict | None): Optional. A dictionary
             containing solar wind indices (e.g., "Kp", "Dst") as `Variable` objects.
             Defaults to None.
         pa_local_var (Variable | None): Optional. A Variable object containing
@@ -241,7 +241,7 @@ def _compute_core(
     variables_to_compute: VariableRequest,
     irbem_options: mag_utils.IrbemOptions,
     num_cores: int,
-    indices_solar_wind: dict[str, Variable] | None = None,
+    indices_solar_wind: VariablesDict | None = None,
     pa_local_var: Variable | None = None,
     energy_var: Variable | None = None,
     particle_species: Literal["electron", "proton"] | None = None,
