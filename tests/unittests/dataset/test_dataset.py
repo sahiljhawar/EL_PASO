@@ -229,6 +229,18 @@ class TestDataSet:  # noqa: D101
         expected = ((mock_dataset.MLT + 12) / 12 * np.pi) % (2 * np.pi)
         np.testing.assert_array_equal(mock_dataset.P, expected)
 
+    def test_loading_variable_from_skipped_output_file_does_not_clobber_shared_time(self, mock_dataset: DataSet):
+        """A variable from a skipped output file must not clobber "time"."""
+        mock_dataset._load_variable("time")
+        loaded_time = np.array(mock_dataset.time, copy=True)
+        assert loaded_time.size > 0
+
+        # "Kp" belongs to the "solar_wind_indices" output file, which was never written because
+        # _mock_monthly_variables() does not include any solar wind index variables.
+        mock_dataset._load_variable("Kp")
+
+        np.testing.assert_array_equal(mock_dataset.time, loaded_time)
+
     def test_load_variable_real_file(self, mock_dataset: DataSet):
         mock_dataset._load_variable("alpha_local")
 
