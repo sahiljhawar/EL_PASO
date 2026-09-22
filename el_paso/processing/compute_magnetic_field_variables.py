@@ -205,22 +205,25 @@ def compute_magnetic_field_variables(
             energy_var,
             particle_species,
         )
-        call_kwargs = {"irbem_lib_path": irbem_lib_path, "return_indices_solar_wind": return_indices_solar_wind}
+        call_kwargs = {"irbem_lib_path": irbem_lib_path}
 
         if overwrite_cache:
             logger.info("Overwriting cached magnetic field variables (overwrite_cache=True).")
-            result, _ = cached_fn.call(*call_args, **call_kwargs)
+            (computed_variables, indices_solar_wind_used), _ = cached_fn.call(*call_args, **call_kwargs)
             logger.info("Magnetic field variables computed and cached at %s.", cache_dir)
-            return result
-
-        if cached_fn.check_call_in_cache(*call_args, **call_kwargs):
-            logger.info("Loading magnetic field variables from cache at %s.", cache_dir)
         else:
-            logger.info("No cache hit at %s — computing magnetic field variables.", cache_dir)
+            if cached_fn.check_call_in_cache(*call_args, **call_kwargs):
+                logger.info("Loading magnetic field variables from cache at %s.", cache_dir)
+            else:
+                logger.info("No cache hit at %s — computing magnetic field variables.", cache_dir)
 
-        return cached_fn(*call_args, **call_kwargs)
+            computed_variables, indices_solar_wind_used = cached_fn(*call_args, **call_kwargs)
 
-    return _compute_core(
+        if return_indices_solar_wind:
+            return computed_variables, indices_solar_wind_used
+        return computed_variables
+
+    computed_variables, indices_solar_wind_used = _compute_core(
         time_var,
         xgeo_var,
         variables_to_compute,
@@ -231,8 +234,11 @@ def compute_magnetic_field_variables(
         energy_var,
         particle_species,
         irbem_lib_path=irbem_lib_path,
-        return_indices_solar_wind=return_indices_solar_wind,
     )
+
+    if return_indices_solar_wind:
+        return computed_variables, indices_solar_wind_used
+    return computed_variables
 
 
 def _compute_core(
@@ -247,8 +253,7 @@ def _compute_core(
     particle_species: Literal["electron", "proton"] | None = None,
     *,
     irbem_lib_path: str | Path = Path(ep.__file__).parent / "libirbem.so",
-    return_indices_solar_wind: bool = False,
-) -> dict[str, Variable] | tuple[dict[str, Variable], VariablesDict]:
+) -> tuple[dict[str, Variable], VariablesDict]:
     if not Path(irbem_lib_path).is_file():
         msg = f"No library object found under the provided irbem_lib_path: {irbem_lib_path}"
         logger.warning(
@@ -318,10 +323,7 @@ def _compute_core(
         var_name: computed_variables[var_name] for var_name in computed_variables if var_name in var_names_to_compute
     }
 
-    if return_indices_solar_wind:
-        return computed_variables, all_indices_solar_wind
-
-    return computed_variables
+    return computed_variables, all_indices_solar_wind
 
 
 def _get_result(
