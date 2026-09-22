@@ -55,8 +55,6 @@ class GFZStrategy(SavingStrategy):
         instrument: str,
         mag_field: ep.typing.MagneticFieldLiteral,
         data_standard: Optional[DataStandard[StandardName]] = None,
-        *,
-        include_solar_wind_indices: bool = True,
     ) -> None:
         """Initializes the data organization strategy.
 
@@ -68,15 +66,6 @@ class GFZStrategy(SavingStrategy):
             mag_field (str): The model extension type. "TS04" is remapped to "T04s".
             data_standard (DataStandard | None, optional): An optional `DataStandard` instance to use for
                 standardizing variables. If `None`, `ep.data_standards.GFZStandard` is used by default.
-            include_solar_wind_indices (bool): If ``True`` (the default), add a
-                "solar_wind_indices" output file containing whichever of `Kp`, `Dst`, `Pdyn`,
-                `ByIMF`, `BzIMF`, `Vsw`, `Nsw`, `G1`, `G2`, `G3`, `W_params` the `mag_field` model
-                actually requires and the given `data_standard` registers, so the raw SWVO
-                product data used to compute the
-                magnetic-field output is saved alongside it for full traceability. Each index is
-                saved independently (``save_incomplete=True`` on that output file), so one index
-                failing to load does not prevent the others from being saved. Pass ``False`` to
-                opt out and keep only the original set of output files.
         """
         self.base_data_path = Path(base_data_path)
         self.mission = mission
@@ -102,12 +91,13 @@ class GFZStrategy(SavingStrategy):
             OutputFile("R0", ["Epoch", "R_Eq"]),
         ]
 
-        if include_solar_wind_indices:
-            required_sw_indices = get_saveable_sw_indices(self.mag_field, self.data_standard)
-            if required_sw_indices:
-                self.output_files.append(
-                    OutputFile("solar_wind_indices", ["Epoch", *required_sw_indices], save_incomplete=True)
-                )
+        # this output file is only ever written if the caller actually saved one of the required
+        # solar wind indices alongside the rest of the data; see SavingStrategy.get_target_variables.
+        required_sw_indices = get_saveable_sw_indices(self.mag_field, self.data_standard)
+        if required_sw_indices:
+            self.output_files.append(
+                OutputFile("solar_wind_indices", ["Epoch", *required_sw_indices], save_incomplete=True)
+            )
 
         self._loader = ep.utils.load_mat_data
 
