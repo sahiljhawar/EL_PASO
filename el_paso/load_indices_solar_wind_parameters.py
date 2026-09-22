@@ -124,7 +124,7 @@ def load_indices_solar_wind_parameters(
                 assert isinstance(output_df, pd.DataFrame)
 
                 result = _create_variables_from_data_frame(
-                    output_df, "kp", u.dimensionless_unscaled, target_time_variable, "previous"
+                    output_df, "kp", u.dimensionless_unscaled, target_time_variable, "previous", "Kp"
                 )
 
             case "Dst":
@@ -132,7 +132,9 @@ def load_indices_solar_wind_parameters(
                     start_time, end_time, download=True
                 )
 
-                result = _create_variables_from_data_frame(output_df, "dst", u.nT, target_time_variable, "linear")
+                result = _create_variables_from_data_frame(
+                    output_df, "dst", u.nT, target_time_variable, "linear", "Dst"
+                )
 
             case "Pdyn":
                 output_df = _cache_omni_high_res(base_data_path, start_time, end_time)
@@ -140,7 +142,9 @@ def load_indices_solar_wind_parameters(
 
                 output_df["pdyn"] = output_df["pdyn"].interpolate(method="spline", order=3).ffill().bfill()
 
-                result = _create_variables_from_data_frame(output_df, "pdyn", u.nPa, target_time_variable, "linear")
+                result = _create_variables_from_data_frame(
+                    output_df, "pdyn", u.nPa, target_time_variable, "linear", "Pdyn"
+                )
 
             case "BzIMF":
                 # we request two additional hours for interpolation
@@ -149,7 +153,9 @@ def load_indices_solar_wind_parameters(
 
                 output_df["bz_gsm"] = output_df["bz_gsm"].interpolate(method="spline", order=3).ffill().bfill()
 
-                result = _create_variables_from_data_frame(output_df, "bz_gsm", u.nT, target_time_variable, "linear")
+                result = _create_variables_from_data_frame(
+                    output_df, "bz_gsm", u.nT, target_time_variable, "linear", "BzIMF"
+                )
 
             case "ByIMF":
                 # we request two additional hours for interpolation
@@ -158,7 +164,9 @@ def load_indices_solar_wind_parameters(
 
                 output_df["by_gsm"] = output_df["by_gsm"].interpolate(method="spline", order=3).ffill().bfill()
 
-                result = _create_variables_from_data_frame(output_df, "by_gsm", u.nT, target_time_variable, "linear")
+                result = _create_variables_from_data_frame(
+                    output_df, "by_gsm", u.nT, target_time_variable, "linear", "ByIMF"
+                )
 
             case "Vsw":
                 # we request two additional hours for interpolation
@@ -173,6 +181,7 @@ def load_indices_solar_wind_parameters(
                     u.km * u.s**-1,
                     target_time_variable,
                     "linear",
+                    "Vsw",
                 )
 
             case "Nsw":
@@ -186,7 +195,7 @@ def load_indices_solar_wind_parameters(
                 output_df["proton_density"] = output_df["proton_density"].clip(lower=0)
 
                 result = _create_variables_from_data_frame(
-                    output_df, "proton_density", u.cm**-3, target_time_variable, "linear"
+                    output_df, "proton_density", u.cm**-3, target_time_variable, "linear", "Nsw"
                 )
 
             case "G1":
@@ -221,6 +230,7 @@ def _create_variables_from_data_frame(
     unit: u.UnitBase,
     target_time_variable: ep.Variable | None,
     time_interp_method: str,
+    index_name: str,
 ) -> ep.Variable | tuple[ep.Variable, ep.Variable]:
     data_var = ep.Variable(data=df_in[data_key].to_numpy(), original_unit=unit)
 
@@ -230,7 +240,9 @@ def _create_variables_from_data_frame(
 
     if "model" in df_in.columns:
         contributing_models = sorted(df_in["model"].dropna().unique())
-        data_var.metadata.add_processing_note(f"Kp values sourced from model(s): {', '.join(contributing_models)}.")
+        data_var.metadata.add_processing_note(
+            f"{index_name} values sourced from model(s): {', '.join(contributing_models)}."
+        )
 
     timestamps = np.asarray([t.timestamp() for t in df_in.index.to_pydatetime()])  # ty:ignore[unresolved-attribute]
     time_var = ep.Variable(data=timestamps, original_unit=ep.units.posixtime)
@@ -254,6 +266,13 @@ def _cache_omni_high_res(base_data_path: Path, start_time: datetime, end_time: d
     )
 
     return output_df
+
+
+def _merge_source_files(*variables: ep.Variable) -> list[str]:
+    merged: list[str] = []
+    for variable in variables:
+        merged += variable.metadata.source_files
+    return list(dict.fromkeys(merged))
 
 
 def _calculate_g1(
@@ -294,13 +313,7 @@ def _calculate_g1(
         )
 
     data_var = ep.Variable(data=np.asarray(g1), original_unit=u.dimensionless_unscaled)
-    data_var.metadata.source_files = list(
-        dict.fromkeys(
-            inputs["Vsw"][0].metadata.source_files
-            + inputs["BzIMF"][0].metadata.source_files
-            + inputs["ByIMF"][0].metadata.source_files
-        )
-    )
+    data_var.metadata.source_files = _merge_source_files(inputs["Vsw"][0], inputs["BzIMF"][0], inputs["ByIMF"][0])
     time_var = ep.Variable(data=timestamps, original_unit=ep.units.posixtime)
 
     if target_time_variable is not None:
@@ -338,9 +351,7 @@ def _calculate_g2(
         g2.append(float(np.nanmean(sw_speed[idx] * b_south[idx] / 200)))
 
     data_var = ep.Variable(data=np.asarray(g2), original_unit=u.dimensionless_unscaled)
-    data_var.metadata.source_files = list(
-        dict.fromkeys(inputs["Vsw"][0].metadata.source_files + inputs["BzIMF"][0].metadata.source_files)
-    )
+    data_var.metadata.source_files = _merge_source_files(inputs["Vsw"][0], inputs["BzIMF"][0])
     time_var = ep.Variable(data=timestamps, original_unit=ep.units.posixtime)
 
     if target_time_variable is not None:
@@ -381,13 +392,7 @@ def _calculate_g3(
         g3.append(float(np.nanmean(sw_density[idx] * sw_speed[idx] * b_south[idx] / 2000)))
 
     data_var = ep.Variable(data=np.asarray(g3), original_unit=u.dimensionless_unscaled)
-    data_var.metadata.source_files = list(
-        dict.fromkeys(
-            inputs["Vsw"][0].metadata.source_files
-            + inputs["Nsw"][0].metadata.source_files
-            + inputs["BzIMF"][0].metadata.source_files
-        )
-    )
+    data_var.metadata.source_files = _merge_source_files(inputs["Vsw"][0], inputs["Nsw"][0], inputs["BzIMF"][0])
     time_var = ep.Variable(data=timestamps, original_unit=ep.units.posixtime)
 
     if target_time_variable is not None:
@@ -504,13 +509,7 @@ def _calculate_w_parameters(
         time_var_to_return = time_var_calculation
 
     w_var = ep.Variable(data=w_data_to_return, original_unit=u.dimensionless_unscaled)
-    w_var.metadata.source_files = list(
-        dict.fromkeys(
-            inputs["BzIMF"].metadata.source_files
-            + inputs["Vsw"].metadata.source_files
-            + inputs["Nsw"].metadata.source_files
-        )
-    )
+    w_var.metadata.source_files = _merge_source_files(inputs["BzIMF"], inputs["Vsw"], inputs["Nsw"])
     w_var.truncate(time_var_to_return, start_time, end_time)
     time_var_to_return.truncate(time_var_to_return, start_time, end_time)
 
