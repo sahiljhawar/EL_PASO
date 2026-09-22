@@ -50,8 +50,6 @@ class MonthlyRBStrategy(SavingStrategy):
         mag_field: MagneticFieldLiteral,
         data_standard: DataStandard[StandardName],
         file_format: MFSFormats = "nc",
-        *,
-        include_solar_wind_indices: bool = True,
     ) -> None:
         """Initialize a monthly file saving strategy.
 
@@ -64,17 +62,6 @@ class MonthlyRBStrategy(SavingStrategy):
             file_format (MFSFormats): One of ``"nc"``, ``"cdf"``, ``"h5"``, or ``"mat"``.
                 A leading dot is also accepted.
             data_standard (DataStandard): Instance of the data standard implementation.
-            include_solar_wind_indices (bool): If ``True`` (the default), add a second
-                "solar_wind_indices" output file containing whichever of `Kp`, `Dst`, `Pdyn`,
-                `ByIMF`, `BzIMF`, `Vsw`, `Nsw`, `G1`, `G2`, `G3`, `W_params` the `mag_field` model
-                actually requires (per `MAGINPUT_REQUIRED_INPUTS`) and the given `data_standard`
-                registers, so the raw
-                SWVO product data used to compute the magnetic-field output is saved alongside it
-                for full traceability. Each index is saved independently (``save_incomplete=True``
-                on that output file), so one index failing to load does not prevent the others
-                from being saved. Pass ``False`` to opt out and keep only the single "full" output
-                file (e.g. to keep two differently-configured strategies producing an identical
-                variable set).
 
         Attributes:
             output_files: List of output file configurations, with variable names
@@ -94,12 +81,13 @@ class MonthlyRBStrategy(SavingStrategy):
             OutputFile("full", self._get_output_file_entries(), save_incomplete=True),
         ]
 
-        if include_solar_wind_indices:
-            required_sw_indices = get_saveable_sw_indices(mag_field, self.data_standard)
-            if required_sw_indices:
-                self.output_files.append(
-                    OutputFile("solar_wind_indices", ["Epoch", *required_sw_indices], save_incomplete=True)
-                )
+        # this output file is only ever written if the caller actually saved one of the required
+        # solar wind indices alongside the rest of the data; see SavingStrategy.get_target_variables.
+        required_sw_indices = get_saveable_sw_indices(mag_field, self.data_standard)
+        if required_sw_indices:
+            self.output_files.append(
+                OutputFile("solar_wind_indices", ["Epoch", *required_sw_indices], save_incomplete=True)
+            )
 
     def _get_output_file_entries(self) -> list[InternalName | tuple[InternalName, ...]]:
         """Return the standard variable list plus user-defined custom variables."""

@@ -77,6 +77,7 @@ def _mock_monthly_variables() -> dict[InternalName, ep.Variable]:
             original_unit=u.dimensionless_unscaled,
             data=np.full((time_size, alpha_size), 5.5),
         ),
+        "Kp": ep.Variable(original_unit=u.dimensionless_unscaled, data=np.full(time_size, 2.0)),
     }
 
     for variable in variables.values():

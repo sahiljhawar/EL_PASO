@@ -391,7 +391,11 @@ class SavingStrategy(ABC):
             - If no variable names are specified in output_file, all variables in variables_dict are processed.
             - Variables are deep-copied before processing.
             - Each variable is standardized using the `standardize_variable` method.
-            - If a requested variable name is not found, a warning is issued and None is returned.
+            - If a requested variable name is not found and ``output_file.save_incomplete`` is False,
+                None is returned without a warning (the caller logs one). If it is True, missing names
+                are filled with an empty placeholder Variable, unless at most one name resolved at all
+                (e.g. only the shared time axis), in which case None is returned since the output would
+                otherwise hold nothing but that time axis.
         """
         target_variables: VariablesDict = {}
         first_call_of_interval = True
@@ -419,6 +423,7 @@ class SavingStrategy(ABC):
             return target_variables
 
         missing_names = []
+        resolved_count = 0
 
         for name_to_save in output_file.names_to_save:
             # a tuple entry means "either of these species-specific names satisfies it"
@@ -428,6 +433,7 @@ class SavingStrategy(ABC):
                 resolved_name = name_to_save if name_to_save in variables_dict else None
 
             if resolved_name is not None:
+                resolved_count += 1
                 var_to_save = deepcopy(variables_dict[resolved_name])
 
                 if (
@@ -460,6 +466,12 @@ class SavingStrategy(ABC):
                     return None
 
         if len(missing_names) > 0:
+            # if an optional output file resolved at most one name (typically just the shared
+            # time axis, e.g. "Epoch"), none of its actual content is available: skip the whole
+            # file instead of writing one that holds only a time axis and empty fallbacks.
+            if output_file.save_incomplete and resolved_count <= 1:
+                return None
+
             msg = f"Could not find target variable(s) {', '.join(sorted(missing_names))}!"
             logger.warning(msg, stacklevel=2)
 
