@@ -63,6 +63,7 @@ def process_arase_xep(
     *,
     use_level_3_orbit_data: bool = True,
     skip_existing: bool = True,
+    save_sw: bool = False,
 ) -> None:
     """Process Arase XEP Level 2 omnidirectional electron flux data and save derived products.
 
@@ -104,6 +105,9 @@ def process_arase_xep(
                                                 quantities via IRBEM. Defaults to True.
         skip_existing (bool): If True, skip downloading files that already exist locally.
                                             Defaults to True.
+        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to
+                                            compute the magnetic field variables alongside the rest of the
+                                            output. Defaults to False.
     """
     del satellite
 
@@ -311,6 +315,8 @@ def process_arase_xep(
             "InvK": orb_variables["InvK"],
             "InvMu": orb_variables["InvMu"],
         }
+
+    if save_sw and not use_level_3_orbit_data:
         variables_to_save.update(indices_solar_wind)
 
     match save_strategy:

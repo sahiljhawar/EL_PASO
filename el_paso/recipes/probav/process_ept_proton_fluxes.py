@@ -60,6 +60,8 @@ def process_ept_proton_fluxes(
     client_secret: str | None = None,
     save_strategy: typing.Literal["gfz", "netcdf", "both"] = "netcdf",
     skip_existing: bool = True,  # noqa: FBT001, FBT002,
+    *,
+    save_sw: bool = False,
 ) -> None:
     """Process PROBA-V EPT proton flux data into pitch-angle-resolved fluxes with magnetic field coordinates.
 
@@ -91,6 +93,8 @@ def process_ept_proton_fluxes(
         save_strategy (typing.Literal["gfz", "netcdf", "both"]): Which saving strategy (or
             strategies) to use for the processed output.
         skip_existing (bool): If True, skip downloading files that already exist locally.
+        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
+            the magnetic field variables alongside the rest of the output. Defaults to False.
 
     Raises:
         ValueError: If `client_id` or `client_secret` is not provided and not available via the
@@ -297,7 +301,8 @@ def process_ept_proton_fluxes(
         "Position": variables["xGEO"],
     }
 
-    variables_to_save.update(indices_solar_wind)
+    if save_sw:
+        variables_to_save.update(indices_solar_wind)
 
     if save_strategy in ("gfz", "both"):
         strategy = probav_ept_proton_gfz_strategy(processed_data_path, mag_field)

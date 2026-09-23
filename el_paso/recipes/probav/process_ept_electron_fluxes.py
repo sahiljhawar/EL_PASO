@@ -63,6 +63,7 @@ def process_ept_electron_fluxes(
     skip_existing: bool = True,  # noqa: FBT001, FBT002,
     *,
     apply_correction_factors: bool = False,
+    save_sw: bool = False,
 ) -> None:
     """Process PROBA-V EPT electron flux data into pitch-angle-resolved fluxes with magnetic field coordinates.
 
@@ -95,6 +96,8 @@ def process_ept_electron_fluxes(
             strategies) to use for the processed output.
         skip_existing (bool): If True, skip downloading files that already exist locally.
         apply_correction_factors (bool): Flag whether to apply correction factors to fluxes.
+        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
+            the magnetic field variables alongside the rest of the output. Defaults to False.
 
     Raises:
         ValueError: If `client_id` or `client_secret` is not provided and not available via the
@@ -302,7 +305,8 @@ def process_ept_electron_fluxes(
         "Position": variables["xGEO"],
     }
 
-    variables_to_save.update(indices_solar_wind)
+    if save_sw:
+        variables_to_save.update(indices_solar_wind)
 
     if save_strategy in ("gfz", "both"):
         strategy = probav_ept_electron_gfz_strategy(processed_data_path, mag_field)
