@@ -53,6 +53,8 @@ def process_rbsp_rbspice_protons(
     num_cores: int = 16,
     save_strategy: Literal["gfz", "netcdf", "both"] = "both",
     skip_existing: bool = True,  # noqa: FBT001, FBT002,
+    *,
+    save_sw: bool = False,
 ) -> None:
     """Process RBSP RBSPICE proton flux data into the EL-PASO data standard.
 
@@ -82,6 +84,8 @@ def process_rbsp_rbspice_protons(
         save_strategy (Literal["gfz", "netcdf", "both"]): Which saving strategy/strategies
             to use for writing the processed output. Defaults to "both".
         skip_existing (bool): If True, skip downloading files that already exist on disk.
+        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
+            the magnetic field variables alongside the rest of the output. Defaults to False.
     """
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
@@ -226,7 +230,8 @@ def process_rbsp_rbspice_protons(
         "PSD": psd_var,
     }
 
-    variables_to_save.update(indices_solar_wind)
+    if save_sw:
+        variables_to_save.update(indices_solar_wind)
 
     if save_strategy in ("gfz", "both"):
         strategy = rbsp_rbspice_proton_gfz_strategy(processed_data_path, mag_field, satellite)

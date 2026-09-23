@@ -79,6 +79,7 @@ def process_arase_mepe(
     *,
     use_level_3_orbit_data: bool = True,
     skip_existing: bool = True,
+    save_sw: bool = False,
 ) -> None:
     """Process Arase MEP-e Level 3 electron flux data and save derived products.
 
@@ -118,6 +119,9 @@ def process_arase_mepe(
                                                 quantities via IRBEM. Defaults to True.
         skip_existing (bool): If True, skip downloading files that already exist locally.
                                             Defaults to True.
+        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to
+                                            compute the magnetic field variables alongside the rest of the
+                                            output. Defaults to False.
     """
     del satellite
 
@@ -310,7 +314,7 @@ def process_arase_mepe(
         "L_m": orb_variables["Lm"],
     }
 
-    if not use_level_3_orbit_data:
+    if save_sw and not use_level_3_orbit_data:
         variables_to_save.update(indices_solar_wind)
 
     match save_strategy:

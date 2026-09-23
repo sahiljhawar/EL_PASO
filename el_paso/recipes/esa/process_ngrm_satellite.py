@@ -73,6 +73,7 @@ def process_ngrm_electron_fluxes(
     skip_existing: bool = True,  # noqa: FBT001, FBT002,
     *,
     calculate_Lstar: bool = True,
+    save_sw: bool = False,
 ) -> None:
     """Process ESA NGRM electron flux data for the given satellite into omnidirectional fluxes and PSD.
 
@@ -105,6 +106,8 @@ def process_ngrm_electron_fluxes(
             variables. ESA NGRM data only supports a single netCDF-based strategy.
         skip_existing (bool): If True, skip downloading files that already exist locally.
         calculate_Lstar (bool): If True, also compute the L* magnetic field quantity.
+        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
+            the magnetic field variables alongside the rest of the output. Defaults to False.
 
     Raises:
         ValueError: If `client_id` or `client_secret` is not provided and not available via the
@@ -319,7 +322,8 @@ def process_ngrm_electron_fluxes(
     if calculate_Lstar:
         variables_to_save["L_star"] = magnetic_field_variables[f"L_star_{mag_field}"]
 
-    variables_to_save.update(indices_solar_wind)
+    if save_sw:
+        variables_to_save.update(indices_solar_wind)
 
     saving_strategy = esa_ngrm_strategy(processed_data_path, mag_field, satellite)
 

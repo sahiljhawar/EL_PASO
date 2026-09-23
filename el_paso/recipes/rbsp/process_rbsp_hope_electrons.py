@@ -52,6 +52,7 @@ def process_rbsp_hope_electrons(
     *,
     calculate_Lstar: bool = True,
     skip_existing: bool = True,
+    save_sw: bool = False,
 ) -> None:
     """Process RBSP ECT/HOPE electron flux data into the EL-PASO data standard.
 
@@ -80,6 +81,8 @@ def process_rbsp_hope_electrons(
             to use for writing the processed output. Defaults to "netcdf".
         calculate_Lstar (bool): Whether Lstar should be calculated or not. Defaults to True.
         skip_existing (bool): If True, skip downloading files that already exist on disk.
+        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
+            the magnetic field variables alongside the rest of the output. Defaults to False.
     """
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
@@ -209,7 +212,8 @@ def process_rbsp_hope_electrons(
         "PSD": psd_var,
     }
 
-    variables_to_save.update(indices_solar_wind)
+    if save_sw:
+        variables_to_save.update(indices_solar_wind)
 
     if save_strategy in ("gfz", "both"):
         strategy = rbsp_hope_electron_gfz_strategy(processed_data_path, mag_field, satellite)
