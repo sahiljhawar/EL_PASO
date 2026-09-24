@@ -11,16 +11,14 @@ import typing
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable  # noqa: UP035
 
-import cdflib
-import h5py
-import netCDF4 as nC
 import numpy as np
-from scipy.io import savemat
 
 from el_paso.saving_strategy import OutputFile, SavingStrategy
 
 if TYPE_CHECKING:
     from datetime import datetime
+
+    import netCDF4 as nC
 
     from el_paso.typing import InternalName, TimeInterval, Variable
 
@@ -217,6 +215,8 @@ class SingleFileStrategy(SavingStrategy):
                 Keys are path strings (e.g., "var_name" or "group/subgroup/var_name").
                 The "metadata" key is skipped; metadata is stored as variable attributes.
         """
+        import netCDF4 as nC  # noqa: PLC0415
+
         with nC.Dataset(file_path, "w", format="NETCDF4") as file:
             for path, value in data_dict.items():
                 if path == "metadata":
@@ -312,6 +312,8 @@ class SingleFileStrategy(SavingStrategy):
             file_path (Path): Path to save the .mat file.
             data_dict (dict[str, Any]): Dictionary with variable data and metadata.
         """
+        from scipy.io import savemat  # noqa: PLC0415
+
         savemat(str(file_path), data_dict)
 
     def _write_h5_file(self, file_path: Path, data_dict: dict[str, Any]) -> None:
@@ -326,6 +328,8 @@ class SingleFileStrategy(SavingStrategy):
                 Keys are path strings (e.g., "var_name" or "group/subgroup/var_name").
                 The "metadata" key is skipped; metadata is stored as dataset attributes.
         """
+        import h5py  # noqa: PLC0415
+
         with h5py.File(file_path, "w") as file:
             for path, value in data_dict.items():
                 if path == "metadata":
@@ -361,6 +365,8 @@ class SingleFileStrategy(SavingStrategy):
                 Keys are variable names. The "metadata" key contains global and variable attributes.
                 Metadata should follow the format: {var_name: {attr_name: attr_value, ...}, ...}
         """
+        import cdflib  # noqa: PLC0415
+
         try:
             cdf_file = cdflib.cdfwrite.CDF(str(file_path), delete=True)
 

@@ -14,7 +14,6 @@ from copy import deepcopy
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal, NamedTuple
 
-import netCDF4 as nC
 import numpy as np
 from astropy import units as u
 
@@ -336,6 +335,8 @@ class SavingStrategy(ABC):
 
     def _validate_netcdf_appendable(self, file_path: Path) -> None:
         """Validate that the existing NetCDF file has an unlimited time dimension."""
+        import netCDF4 as nC  # noqa: PLC0415
+
         with nC.Dataset(file_path, "r", format="NETCDF4") as file:
             time_dim = file.dimensions.get("Epoch")
             if time_dim is None or not time_dim.isunlimited():

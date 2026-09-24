@@ -16,13 +16,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 import distance
 import numpy as np
-import xarray as xr
 
 import el_paso as ep
 from el_paso.dataset.metadata import DatasetMetadata
-from el_paso.dataset.utils import (
-    join_var,
-)
+from el_paso.dataset.utils import is_xr_variable, join_var
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -193,9 +190,9 @@ class DataSet:
     def __getattribute__(self, name: str) -> Any:  # noqa: ANN401
         value = super().__getattribute__(name)
 
-        if isinstance(value, xr.Variable):
+        if is_xr_variable(value):
             value = value.values
-        elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], xr.Variable):
+        elif isinstance(value, list) and len(value) > 0 and is_xr_variable(value[0]):
             non_empty = [v for v in value if v.shape[0] > 0]
 
             if not non_empty:
@@ -404,7 +401,7 @@ class DataSet:
             # 3. Process Datetimes
             time_key = self.saving_strategy.data_standard.get_standard_name("Epoch")
             raw_times = file_content[time_key]
-            if isinstance(raw_times, xr.Variable):
+            if is_xr_variable(raw_times):
                 raw_times = raw_times.values
 
             time_unit = self.saving_strategy.data_standard.variable_infos["Epoch"].unit
@@ -433,7 +430,7 @@ class DataSet:
                     continue
 
                 if key != "datetime" and (
-                    not isinstance(var_arr, xr.Variable)
+                    not is_xr_variable(var_arr)
                     and (not isinstance(var_arr, np.ndarray) or not np.issubdtype(var_arr.dtype, np.number))
                 ):
                     continue
