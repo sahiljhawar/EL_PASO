@@ -47,10 +47,10 @@ def test_cache_hit_skips_recomputation(tmp_path: Path) -> None:
     call_count = 0
     expected = _fake_result()
 
-    def mock_compute_core(*args, **kwargs) -> tuple[dict[str, ep.Variable], dict[str, ep.Variable]]:  # noqa: ANN002, ANN003, ARG001
+    def mock_compute_core(*args, **kwargs) -> dict[str, ep.Variable]:  # noqa: ANN002, ANN003, ARG001
         nonlocal call_count
         call_count += 1
-        return expected, {}
+        return expected
 
     with patch.object(compute_mod, "_compute_core", side_effect=mock_compute_core):
         result1 = compute_mod.compute_magnetic_field_variables(
@@ -82,10 +82,10 @@ def test_cache_miss_on_different_input(tmp_path: Path) -> None:
 
     call_count = 0
 
-    def mock_compute_core(*args, **kwargs) -> tuple[dict[str, ep.Variable], dict[str, ep.Variable]]:  # noqa: ANN002, ANN003, ARG001
+    def mock_compute_core(*args, **kwargs) -> dict[str, ep.Variable]:  # noqa: ANN002, ANN003, ARG001
         nonlocal call_count
         call_count += 1
-        return _fake_result(), {}
+        return _fake_result()
 
     xgeo1 = _make_xgeo_var()
     xgeo2 = ep.Variable(original_unit=ep.units.RE, data=np.array([[2.0, 0.0, 0.0]] * 3))
@@ -113,55 +113,16 @@ def test_cache_miss_on_different_input(tmp_path: Path) -> None:
 
 
 @pytest.mark.basic
-def test_cache_hit_regardless_of_return_indices_solar_wind(tmp_path: Path) -> None:
-    """return_indices_solar_wind must not affect the cache key."""
-    compute_mod = importlib.import_module("el_paso.processing.compute_magnetic_field_variables")
-
-    call_count = 0
-    expected = _fake_result()
-
-    def mock_compute_core(*args, **kwargs) -> tuple[dict[str, ep.Variable], dict[str, ep.Variable]]:  # noqa: ANN002, ANN003, ARG001
-        nonlocal call_count
-        call_count += 1
-        return expected, {"Kp": ep.Variable(original_unit=u.dimensionless_unscaled, data=np.array([1.0, 2.0, 3.0]))}
-
-    with patch.object(compute_mod, "_compute_core", side_effect=mock_compute_core):
-        result1 = compute_mod.compute_magnetic_field_variables(
-            time_var=_make_time_var(),
-            xgeo_var=_make_xgeo_var(),
-            variables_to_compute=[("B_Eq", "T89")],
-            irbem_options=IrbemOptions(),
-            num_cores=1,
-            cache_dir=tmp_path / "cache",
-            return_indices_solar_wind=False,
-        )
-
-        result2, indices_solar_wind = compute_mod.compute_magnetic_field_variables(
-            time_var=_make_time_var(),
-            xgeo_var=_make_xgeo_var(),
-            variables_to_compute=[("B_Eq", "T89")],
-            irbem_options=IrbemOptions(),
-            num_cores=1,
-            cache_dir=tmp_path / "cache",
-            return_indices_solar_wind=True,
-        )
-
-    assert call_count == 1
-    np.testing.assert_array_equal(result1["B_Eq_T89"].get_data(), result2["B_Eq_T89"].get_data())
-    assert "Kp" in indices_solar_wind
-
-
-@pytest.mark.basic
 def test_overwrite_cache_forces_recomputation(tmp_path: Path) -> None:
     """overwrite_cache=True must recompute even when a cached result exists."""
     compute_mod = importlib.import_module("el_paso.processing.compute_magnetic_field_variables")
 
     call_count = 0
 
-    def mock_compute_core(*args, **kwargs) -> tuple[dict[str, ep.Variable], dict[str, ep.Variable]]:  # noqa: ANN002, ANN003, ARG001
+    def mock_compute_core(*args, **kwargs) -> dict[str, ep.Variable]:  # noqa: ANN002, ANN003, ARG001
         nonlocal call_count
         call_count += 1
-        return _fake_result(), {}
+        return _fake_result()
 
     with patch.object(compute_mod, "_compute_core", side_effect=mock_compute_core):
         compute_mod.compute_magnetic_field_variables(
@@ -193,10 +154,10 @@ def test_no_caching_when_cache_dir_is_none() -> None:
 
     call_count = 0
 
-    def mock_compute_core(*args, **kwargs) -> tuple[dict[str, ep.Variable], dict[str, ep.Variable]]:  # noqa: ANN002, ANN003, ARG001
+    def mock_compute_core(*args, **kwargs) -> dict[str, ep.Variable]:  # noqa: ANN002, ANN003, ARG001
         nonlocal call_count
         call_count += 1
-        return _fake_result(), {}
+        return _fake_result()
 
     with patch.object(compute_mod, "_compute_core", side_effect=mock_compute_core):
         compute_mod.compute_magnetic_field_variables(

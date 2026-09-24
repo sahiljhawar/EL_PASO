@@ -205,7 +205,7 @@ def process_poes_ted_electron(
     if calculate_Lm_Lstar:
         variables_to_compute.extend([("L_star", mag_field), ("L_m", mag_field)])
 
-    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=variables["xGEO"],
         energy_var=variables["Energy"],
@@ -214,7 +214,6 @@ def process_poes_ted_electron(
         variables_to_compute=variables_to_compute,
         irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
-        return_indices_solar_wind=True,
     )
 
     variables |= magnetic_field_variables
@@ -243,12 +242,9 @@ def process_poes_ted_electron(
             "L_star": magnetic_field_variables[f"L_star_{mag_field}"],
         }
 
-    if save_sw:
-        variables_to_save.update(indices_solar_wind)
-
     saving_strategy = poes_ted_strategy(processed_data_path, mag_field, satellite)
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, save_sw=save_sw)
 
 
 CLI_DEFAULTS = {

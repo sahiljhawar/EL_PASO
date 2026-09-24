@@ -196,7 +196,7 @@ def process_goes_r_mps_high(
         ("InvK", mag_field),
     ]
 
-    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=xgeo_var,
         energy_var=mps_vars["diff_energy"],
@@ -205,7 +205,6 @@ def process_goes_r_mps_high(
         variables_to_compute=variables_to_compute,
         irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
-        return_indices_solar_wind=True,
     )
 
     psd_var = ep.processing.compute_phase_space_density(
@@ -229,15 +228,14 @@ def process_goes_r_mps_high(
         "InvK": magnetic_field_variables[f"InvK_{mag_field}"],
     }
 
-    if save_sw:
-        variables_to_save.update(indices_solar_wind)
-
     if save_strategy in ("gfz", "both"):
         saving_strategy = goes_r_mps_high_gfz_strategy(processed_data_path, mag_field, satellite)
     if save_strategy in ("netcdf", "both"):
         saving_strategy = goes_r_mps_high_netcdf_strategy(processed_data_path, mag_field, satellite)
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True)
+    ep.save(
+        variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw
+    )
 
 
 def _get_magn_variables(

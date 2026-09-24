@@ -6,14 +6,51 @@ import logging
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from unittest.mock import patch
 
 import el_paso as ep
 import netCDF4 as nC
 import numpy as np
 import pytest
 from astropy import units as u
+from el_paso.processing.magnetic_field_utils.construct_maginput import MagInputResult
+from el_paso.processing.magnetic_field_utils.mag_field_enum import MagneticField
+from el_paso.saving_strategy import OutputFile
 
 rng = np.random.default_rng(1337)
+
+
+class _SWStubStrategy(ep.SavingStrategy):
+    """Minimal concrete strategy that just records the variables_dict it was asked to save."""
+
+    def __init__(self) -> None:
+        self.data_standard = ep.data_standards.GFZStandard()
+        self.output_files = [OutputFile("probe", [])]
+        self.mag_field = "T89"
+        self.received_variables_dict: ep.typing.VariablesDict | None = None
+
+    def get_time_intervals_to_save(self, start_time: datetime, end_time: datetime) -> list:
+        return [(start_time, end_time)]
+
+    def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:  # noqa: ARG002
+        return Path("/tmp/unused.nc")  # noqa: S108
+
+    def get_file_path_stem(self) -> Path:
+        return Path("/tmp/unused")  # noqa: S108
+
+    def get_file_name_stem(self) -> str:
+        return "unused"
+
+    def get_target_variables(
+        self,
+        output_file: OutputFile,
+        variables_dict: ep.typing.VariablesDict,
+        time_var: ep.Variable | None,
+        start_time: datetime | None,
+        end_time: datetime | None,
+    ) -> None:
+        del output_file, time_var, start_time, end_time
+        self.received_variables_dict = variables_dict
 
 
 @pytest.mark.basic
@@ -142,3 +179,70 @@ def test_interval_without_records_is_skipped(tmp_path: Path) -> None:
     out_dir = tmp_path / "THEMIS" / "tha"
     assert (out_dir / "tha_fft_20240510.nc").exists()
     assert not (out_dir / "tha_fft_20240511.nc").exists()
+
+
+@pytest.mark.basic
+def test_save_sw_merges_indices_via_construct_maginput() -> None:
+    """save_sw=True must fetch indices through construct_maginput, not a fresh loader call.
+
+    construct_maginput is cached, so reusing it (rather than calling
+    load_indices_solar_wind_parameters directly) lets a save_sw=True call reuse whatever a prior
+    compute_magnetic_field_variables call in the same process already loaded.
+    """
+    time_var = ep.Variable(original_unit=ep.units.posixtime, data=np.array([1.0, 2.0, 3.0]))
+    kp_var = ep.Variable(original_unit=u.dimensionless_unscaled, data=np.array([1.0, 2.0, 3.0]))
+    fake_result = MagInputResult(maginput={}, indices_solar_wind={"Kp": kp_var})
+
+    strategy = _SWStubStrategy()
+
+    with (
+        patch("el_paso.save.construct_maginput", return_value=fake_result) as mock_construct,
+        patch("el_paso.save.get_saveable_sw_indices", return_value=["Kp"]) as mock_get_saveable,
+    ):
+        ep.save(
+            {},
+            strategy,
+            start_time=datetime(2013, 1, 1, tzinfo=timezone.utc),
+            end_time=datetime(2013, 1, 2, tzinfo=timezone.utc),
+            time_var=time_var,
+            save_sw=True,
+            ignore_validation=True,
+        )
+
+    mock_construct.assert_called_once_with(time_var, MagneticField.T89)
+    mock_get_saveable.assert_called_once_with(MagneticField.T89, strategy.data_standard)
+    assert strategy.received_variables_dict == {"Kp": kp_var}
+
+
+@pytest.mark.basic
+def test_save_sw_false_by_default_does_not_call_construct_maginput() -> None:
+    time_var = ep.Variable(original_unit=ep.units.posixtime, data=np.array([1.0, 2.0, 3.0]))
+    strategy = _SWStubStrategy()
+
+    with patch("el_paso.save.construct_maginput") as mock_construct:
+        ep.save(
+            {},
+            strategy,
+            start_time=datetime(2013, 1, 1, tzinfo=timezone.utc),
+            end_time=datetime(2013, 1, 2, tzinfo=timezone.utc),
+            time_var=time_var,
+            ignore_validation=True,
+        )
+
+    mock_construct.assert_not_called()
+    assert strategy.received_variables_dict == {}
+
+
+@pytest.mark.basic
+def test_save_sw_without_time_var_raises() -> None:
+    strategy = _SWStubStrategy()
+
+    with pytest.raises(ValueError, match="save_sw=True requires time_var"):
+        ep.save(
+            {},
+            strategy,
+            start_time=datetime(2013, 1, 1, tzinfo=timezone.utc),
+            end_time=datetime(2013, 1, 2, tzinfo=timezone.utc),
+            save_sw=True,
+            ignore_validation=True,
+        )
