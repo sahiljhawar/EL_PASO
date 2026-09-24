@@ -248,3 +248,74 @@ def test_save_sw_without_time_var_raises() -> None:
             save_sw=True,
             ignore_validation=True,
         )
+
+
+def _sw_append_variables(start_time: datetime, hours: int) -> dict[ep.typing.InternalName, ep.Variable]:
+    base_ts = start_time.timestamp()
+    times = base_ts + np.arange(hours) * 3600.0
+    return {
+        "Epoch": ep.Variable(original_unit=ep.units.posixtime, data=times),
+        "MLT": ep.Variable(original_unit=u.hour, data=np.full(hours, 12.0)),
+        "R_Eq": ep.Variable(original_unit=ep.units.RE, data=np.full(hours, 6.0)),
+    }
+
+
+@pytest.mark.basic
+def test_save_sw_appends_solar_wind_indices_file(tmp_path: Path) -> None:
+    """save_sw=True plus append=True must merge into the solar_wind_indices file by timestamp.
+
+    The second call's 12-hour-overlapping Kp value must replace the first call's value for the
+    shared timestamps, while the non-overlapping timestamps from both calls survive untouched.
+    """
+    strategy = ep.saving_strategies.GFZStrategy(
+        base_data_path=tmp_path,
+        mission="GOES",
+        satellite="primary",
+        instrument="MAGED",
+        mag_field="T89",
+        data_standard=ep.data_standards.GFZStandard(),
+    )
+
+    start_1 = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_1 = datetime(2013, 1, 2, tzinfo=timezone.utc)
+    variables_1 = _sw_append_variables(start_1, hours=24)
+    kp_1 = ep.Variable(original_unit=u.dimensionless_unscaled, data=np.full(24, 2.0))
+
+    with patch(
+        "el_paso.save.construct_maginput",
+        return_value=MagInputResult(maginput={}, indices_solar_wind={"Kp": kp_1}),
+    ):
+        ep.save(
+            variables_1, strategy, start_time=start_1, end_time=end_1, time_var=variables_1["Epoch"], save_sw=True
+        )
+
+    start_2 = datetime(2013, 1, 1, 12, tzinfo=timezone.utc)
+    end_2 = datetime(2013, 1, 2, 12, tzinfo=timezone.utc)
+    variables_2 = _sw_append_variables(start_2, hours=24)
+    kp_2 = ep.Variable(original_unit=u.dimensionless_unscaled, data=np.full(24, 8.0))
+
+    with patch(
+        "el_paso.save.construct_maginput",
+        return_value=MagInputResult(maginput={}, indices_solar_wind={"Kp": kp_2}),
+    ):
+        ep.save(
+            variables_2,
+            strategy,
+            start_time=start_2,
+            end_time=end_2,
+            time_var=variables_2["Epoch"],
+            save_sw=True,
+            append=True,
+        )
+
+    sw_output_file = next(f for f in strategy.output_files if f.name == "solar_wind_indices")
+    file_path = strategy.get_file_path(start_1, end_1, sw_output_file)
+    assert file_path.exists()
+
+    loaded_data = ep.utils.load_mat_data(file_path)
+    kp_data = np.asarray(loaded_data[strategy.data_standard.get_standard_name("Kp")]).flatten()
+
+    # 24 + 24 hourly samples with a 12-hour overlap merge down to 36 unique timestamps, not 48.
+    assert kp_data.shape[0] == 36
+    assert np.sum(kp_data == 2.0) == 12
+    assert np.sum(kp_data == 8.0) == 24
