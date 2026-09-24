@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import importlib
 import inspect
 import logging
 from datetime import datetime, timezone
@@ -15,13 +16,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 import distance
 import numpy as np
-import xarray as xr
 
 import el_paso as ep
 from el_paso.dataset.metadata import DatasetMetadata
-from el_paso.dataset.utils import (
-    join_var,
-)
+from el_paso.dataset.utils import is_xr_variable, join_var
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -38,6 +36,26 @@ if TYPE_CHECKING:
     FormatLoader = FileLoader
 
 logger = logging.getLogger(__name__)
+
+
+class _LazyMethod:
+    """A method whose defining module (and its scipy stack) is imported on first access.
+
+    On first access the real function replaces this descriptor on the owning class, so later
+    lookups are ordinary method lookups with the real signature and docstring.
+    """
+
+    def __init__(self, module: str) -> None:
+        self._module = module
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self._owner = owner
+        self._name = name
+
+    def __get__(self, obj: object, objtype: type | None = None) -> Any:  # noqa: ANN401
+        func = getattr(importlib.import_module(self._module, __package__), self._name)
+        setattr(self._owner, self._name, func)
+        return func if obj is None else func.__get__(obj, objtype)
 
 
 class DataSet:
@@ -172,9 +190,9 @@ class DataSet:
     def __getattribute__(self, name: str) -> Any:  # noqa: ANN401
         value = super().__getattribute__(name)
 
-        if isinstance(value, xr.Variable):
+        if is_xr_variable(value):
             value = value.values
-        elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], xr.Variable):
+        elif isinstance(value, list) and len(value) > 0 and is_xr_variable(value[0]):
             non_empty = [v for v in value if v.shape[0] > 0]
 
             if not non_empty:
@@ -383,7 +401,7 @@ class DataSet:
             # 3. Process Datetimes
             time_key = self.saving_strategy.data_standard.get_standard_name("Epoch")
             raw_times = file_content[time_key]
-            if isinstance(raw_times, xr.Variable):
+            if is_xr_variable(raw_times):
                 raw_times = raw_times.values
 
             time_unit = self.saving_strategy.data_standard.variable_infos["Epoch"].unit
@@ -412,7 +430,7 @@ class DataSet:
                     continue
 
                 if key != "datetime" and (
-                    not isinstance(var_arr, xr.Variable)
+                    not is_xr_variable(var_arr)
                     and (not isinstance(var_arr, np.ndarray) or not np.issubdtype(var_arr.dtype, np.number))
                 ):
                     continue
@@ -541,7 +559,14 @@ class DataSet:
 
         return different_vars
 
-    from .bin_and_interpolate_to_model_grid import bin_and_interpolate_to_model_grid  # noqa: PLC0415
-    from .identify_orbits import identify_orbits  # noqa: PLC0415
-    from .interp_functions import interp_flux, interp_psd  # noqa: PLC0415
-    from .linearize_trajectories import linearize_trajectories  # noqa: PLC0415
+    if TYPE_CHECKING:
+        from .bin_and_interpolate_to_model_grid import bin_and_interpolate_to_model_grid  # noqa: PLC0415
+        from .identify_orbits import identify_orbits  # noqa: PLC0415
+        from .interp_functions import interp_flux, interp_psd  # noqa: PLC0415
+        from .linearize_trajectories import linearize_trajectories  # noqa: PLC0415
+    else:
+        bin_and_interpolate_to_model_grid = _LazyMethod(".bin_and_interpolate_to_model_grid")
+        identify_orbits = _LazyMethod(".identify_orbits")
+        interp_flux = _LazyMethod(".interp_functions")
+        interp_psd = _LazyMethod(".interp_functions")
+        linearize_trajectories = _LazyMethod(".linearize_trajectories")

@@ -51,7 +51,7 @@ repos:
         entry: python hooks/check_recipe_strategies.py
         language: system
         pass_filenames: false
-        files: ^el_paso/recipes/
+        files: ^(el_paso/recipes/|el_paso/cli/app\.py$)
   - repo: https://github.com/sahiljhawar/reuseify
     rev: 1.0.3
     hooks:

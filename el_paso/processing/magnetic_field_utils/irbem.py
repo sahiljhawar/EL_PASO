@@ -3,6 +3,8 @@
 #
 # SPDX-License-Identifier: LGPL-3.0-only
 
+from __future__ import annotations
+
 import copy
 import ctypes
 import itertools
@@ -20,11 +22,14 @@ from typing import Literal, NamedTuple, Optional
 
 import dateutil.parser
 import numpy as np
-import pandas as pd
-from numpy.typing import NDArray
 
 import el_paso as ep
-from el_paso.typing import MagInputKeys
+
+if typing.TYPE_CHECKING:
+    import pandas as pd
+    from numpy.typing import NDArray
+
+    from el_paso.typing import MagInputKeys
 
 __author__ = "Mykhaylo Shumko"
 __last_modified__ = "2022-06-16"
@@ -74,6 +79,12 @@ EXT_MODELS = [
 DEFAULT_LIBIRBEM_PATH = Path(ep.__file__).parent / "libirbem.so"
 
 logger = logging.getLogger(__name__)
+
+
+def _is_pd_timestamp(value: object) -> typing.TypeGuard[pd.Timestamp]:
+    # If pandas was never imported, `value` cannot be a Timestamp, so don't pay to import it.
+    pd_module = sys.modules.get("pandas")
+    return pd_module is not None and isinstance(value, pd_module.Timestamp)
 
 
 class MakeLstarOutput(NamedTuple):
@@ -850,7 +861,7 @@ class MagFields:
 
         if isinstance(time, datetime):
             time_dt = time
-        elif isinstance(time, pd.Timestamp):
+        elif _is_pd_timestamp(time):
             time_dt = time.to_pydatetime()
         else:
             time_dt = dateutil.parser.parse(time)
@@ -901,7 +912,7 @@ class MagFields:
         if isinstance(time[0], datetime):
             time = typing.cast("Sequence[datetime]", time)
             time_dt = time
-        elif isinstance(time[0], pd.Timestamp):
+        elif _is_pd_timestamp(time[0]):
             time = typing.cast("Sequence[pd.Timestamp]", time)
             time_dt = [t.to_pydatetime() for t in time]
         else:
