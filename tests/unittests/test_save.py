@@ -189,7 +189,8 @@ def test_save_sw_merges_indices_via_construct_maginput() -> None:
     load_indices_solar_wind_parameters directly) lets a save_sw=True call reuse whatever a prior
     compute_magnetic_field_variables call in the same process already loaded.
     """
-    time_var = ep.Variable(original_unit=ep.units.posixtime, data=np.array([1.0, 2.0, 3.0]))
+    base_ts = datetime(2013, 1, 1, 12, tzinfo=timezone.utc).timestamp()
+    time_var = ep.Variable(original_unit=ep.units.posixtime, data=base_ts + np.array([1.0, 2.0, 3.0]))
     kp_var = ep.Variable(original_unit=u.dimensionless_unscaled, data=np.array([1.0, 2.0, 3.0]))
     fake_result = MagInputResult(maginput={}, indices_solar_wind={"Kp": kp_var})
 
@@ -216,7 +217,8 @@ def test_save_sw_merges_indices_via_construct_maginput() -> None:
 
 @pytest.mark.basic
 def test_save_sw_false_by_default_does_not_call_construct_maginput() -> None:
-    time_var = ep.Variable(original_unit=ep.units.posixtime, data=np.array([1.0, 2.0, 3.0]))
+    base_ts = datetime(2013, 1, 1, 12, tzinfo=timezone.utc).timestamp()
+    time_var = ep.Variable(original_unit=ep.units.posixtime, data=base_ts + np.array([1.0, 2.0, 3.0]))
     strategy = _SWStubStrategy()
 
     with patch("el_paso.save.construct_maginput") as mock_construct:
