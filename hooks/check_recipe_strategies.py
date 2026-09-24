@@ -41,12 +41,13 @@ from typing import NamedTuple
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RECIPES_DIR = REPO_ROOT / "el_paso" / "recipes"
 
-ALLOWED_INLINE_STRATEGY: dict[Path, set[int]] = {
-    RECIPES_DIR / "rbsp" / "process_rbsp_efw_emfisis_density_combined.py": {
-        195
-    },  # https://github.com/GFZ/EL_PASO/issues/139
-}
+# ALLOWED_INLINE_STRATEGY: dict[Path, set[int]] = {
+#     RECIPES_DIR / "rbsp" / "process_rbsp_efw_emfisis_density_combined.py": {
+#         195
+#     },  # https://github.com/GFZ/EL_PASO/issues/139
+# }  # noqa: ERA001
 
+ALLOWED_INLINE_STRATEGY: dict[Path, set[int]] = {}
 ALLOWED_STR_SATELLITE: dict[Path, frozenset[str]] = {}
 
 
@@ -156,8 +157,14 @@ def _import_aliases_from_submodule(init_tree: ast.Module, target_module: str) ->
 
 
 def _all_list_names(init_tree: ast.Module) -> set[str]:
+    """Collect every string literal assigned into an `__all__` list anywhere in the module.
+
+    Walks the whole tree, not just the top-level body, so this also picks up the literal
+    `__all__` a `lazy_loader.attach`-based `__init__.py` re-declares under `if TYPE_CHECKING:`
+    for type checkers, alongside its real, dynamically-built top-level `__all__`.
+    """
     names: set[str] = set()
-    for node in init_tree.body:
+    for node in ast.walk(init_tree):
         if (
             isinstance(node, ast.Assign)
             and len(node.targets) == 1
