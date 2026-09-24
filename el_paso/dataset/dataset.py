@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import importlib
 import inspect
 import logging
 from datetime import datetime, timezone
@@ -38,6 +39,26 @@ if TYPE_CHECKING:
     FormatLoader = FileLoader
 
 logger = logging.getLogger(__name__)
+
+
+class _LazyMethod:
+    """A method whose defining module (and its scipy stack) is imported on first access.
+
+    On first access the real function replaces this descriptor on the owning class, so later
+    lookups are ordinary method lookups with the real signature and docstring.
+    """
+
+    def __init__(self, module: str) -> None:
+        self._module = module
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self._owner = owner
+        self._name = name
+
+    def __get__(self, obj: object, objtype: type | None = None) -> Any:  # noqa: ANN401
+        func = getattr(importlib.import_module(self._module, __package__), self._name)
+        setattr(self._owner, self._name, func)
+        return func if obj is None else func.__get__(obj, objtype)
 
 
 class DataSet:
@@ -541,7 +562,14 @@ class DataSet:
 
         return different_vars
 
-    from .bin_and_interpolate_to_model_grid import bin_and_interpolate_to_model_grid  # noqa: PLC0415
-    from .identify_orbits import identify_orbits  # noqa: PLC0415
-    from .interp_functions import interp_flux, interp_psd  # noqa: PLC0415
-    from .linearize_trajectories import linearize_trajectories  # noqa: PLC0415
+    if TYPE_CHECKING:
+        from .bin_and_interpolate_to_model_grid import bin_and_interpolate_to_model_grid  # noqa: PLC0415
+        from .identify_orbits import identify_orbits  # noqa: PLC0415
+        from .interp_functions import interp_flux, interp_psd  # noqa: PLC0415
+        from .linearize_trajectories import linearize_trajectories  # noqa: PLC0415
+    else:
+        bin_and_interpolate_to_model_grid = _LazyMethod(".bin_and_interpolate_to_model_grid")
+        identify_orbits = _LazyMethod(".identify_orbits")
+        interp_flux = _LazyMethod(".interp_functions")
+        interp_psd = _LazyMethod(".interp_functions")
+        linearize_trajectories = _LazyMethod(".linearize_trajectories")
