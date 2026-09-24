@@ -61,8 +61,6 @@ Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest
     - ECT-combined
     - EMFISIS waves
     - EMFISIS and EFW density
-- **DMSP**
-    - SSJ (electrons)
 
 Every recipe shares one command line interface; see
 [Running a recipe](#running-a-recipe) below.
