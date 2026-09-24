@@ -13,14 +13,32 @@ import numpy as np
 from astropy import units as u
 
 import el_paso as ep
+from el_paso.recipes.rbsp import RBSPSatellite
 
 logger = logging.getLogger(__name__)
+
+
+def rbsp_efw_emfisis_density_combined_strategy(
+    base_data_path: str | Path,
+    satellite: RBSPSatellite,
+    mag_field: ep.typing.MagneticFieldLiteral,
+    data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+) -> ep.SavingStrategy:
+    """Daily NetCDF wave saving strategy for THEMIS FFT."""
+    return ep.saving_strategies.RBSPDensityStrategy(
+        base_data_path=base_data_path,
+        mission="RBSP",
+        satellite=satellite,
+        instrument="densities_combined",
+        mag_field=mag_field,
+        data_standard=data_standard,
+    )
 
 
 def process_rbsp_efw_emfisis_density_combined(
     start_time: datetime,
     end_time: datetime,
-    satellite: Literal["a", "b"] = "a",
+    satellite: RBSPSatellite = "a",
     mag_field: Literal["T89", "T96", "TS04"] = "T89",
     raw_data_path: str | Path = ".",
     processed_data_path: str | Path = ".",
@@ -63,7 +81,7 @@ def process_rbsp_efw_emfisis_density_combined(
 
     Raises:
         NotImplementedError: Always raised before the processed variables are saved; saving via
-            `DensityNetCDFStrategy` is not yet implemented.
+            `RBSPDensityStrategy` is not yet implemented.
     """
     del save_strategy
 
@@ -151,13 +169,13 @@ def process_rbsp_efw_emfisis_density_combined(
     efw_variables["Density_mapped"] = ep.processing.compute_equatorial_plasmaspheric_density(
         efw_variables["Density"],
         efw_variables["xGEO"],
-        magnetic_field_variables["xGEO_eq_" + mag_field],
+        magnetic_field_variables["xGEO_Eq_" + mag_field],
         method="Denton_average",
     )
     emfisis_variables["Density_mapped"] = ep.processing.compute_equatorial_plasmaspheric_density(
         emfisis_variables["Density"],
         efw_variables["xGEO"],
-        magnetic_field_variables["xGEO_eq_" + mag_field],
+        magnetic_field_variables["xGEO_Eq_" + mag_field],
         method="Denton_average",
     )
 
@@ -168,36 +186,32 @@ def process_rbsp_efw_emfisis_density_combined(
         hiss_derived_densities_vars["Density_mapped"] = ep.processing.compute_equatorial_plasmaspheric_density(
             hiss_derived_densities_vars["Density"],
             efw_variables["xGEO"],
-            magnetic_field_variables["xGEO_eq_" + mag_field],
+            magnetic_field_variables["xGEO_Eq_" + mag_field],
             method="Denton_average",
         )
 
-    variables_to_save = {
-        "time": binned_time_variable,
-        "density_efw_local": efw_variables["Density"],
-        "density_emfisis_local": emfisis_variables["Density"],
-        "density_efw_eq": efw_variables["Density_mapped"],
-        "density_emfisis_eq": emfisis_variables["Density_mapped"],
+    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+        "Epoch": binned_time_variable,
+        "Number_density_efw": efw_variables["Density"],
+        "Number_density_emfisis": emfisis_variables["Density"],
+        "Number_density_efw_Eq": efw_variables["Density_mapped"],
+        "Number_density_emfisis_Eq": emfisis_variables["Density_mapped"],
         "MLT": magnetic_field_variables["MLT_" + mag_field],
-        "R_eq": magnetic_field_variables["R_eq_" + mag_field],
-        "density_emfisis_digi_type": emfisis_variables["Digi_type"],
-        "xGEO": efw_variables["xGEO"],
-        "xGEO_eq": magnetic_field_variables["xGEO_eq_" + mag_field],
+        "R_Eq": magnetic_field_variables["R_Eq_" + mag_field],
+        "Position": efw_variables["xGEO"],
+        "xGEO_Eq": magnetic_field_variables["xGEO_Eq_" + mag_field],
     }
 
     if add_hiss_derived_densitites:
         variables_to_save |= {
-            "density_hiss_derived_local": hiss_derived_densities_vars["Density"],
-            "density_hiss_derived_eq": hiss_derived_densities_vars["Density_mapped"],
+            "Number_density_hiss_derived": hiss_derived_densities_vars["Density"],
+            "Number_density_hiss_derived_Eq": hiss_derived_densities_vars["Density_mapped"],
         }
 
-    raise NotImplementedError
-
-    saving_strategy = ep.saving_strategies.DensityNetCDFStrategy(
-        base_data_path=processed_data_path,
-        file_name_stem=f"rbsp_{satellite}_densities_combined",
-        mag_field=mag_field,
-        satellite="RBSP",
+    saving_strategy = rbsp_efw_emfisis_density_combined_strategy(
+        processed_data_path,
+        satellite,
+        mag_field,
     )
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
