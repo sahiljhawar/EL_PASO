@@ -17,19 +17,16 @@ from functools import wraps
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, ParamSpec, TypeVar, cast
 
-import cdflib
-import h5py
-import netCDF4 as nC
 import numpy as np
-import pandas as pd
-import xarray as xr
-from mat73 import loadmat as mat73_loadmat
 from packaging import version as version_pkg
 
 import el_paso as ep
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
+
+    import h5py
+    import netCDF4 as nC
 
     from el_paso.typing import DataStandard, SavedDataDict, StandardName, TimeInterval
 
@@ -241,6 +238,8 @@ def datenum_to_datetime(datenum_val: float) -> datetime:
     Returns:
         datetime: The converted datetime object with UTC timezone.
     """
+    import pandas as pd  # noqa: PLC0415
+
     with warnings.catch_warnings():
         warnings.filterwarnings("ignore", message="Discarding nonzero nanoseconds", category=UserWarning)
 
@@ -344,6 +343,8 @@ def load_h5_data(file_path: Path) -> dict[StandardName, Any]:
         as a NumPy array, plus a ``"metadata"`` entry mapping each path to its
         HDF5 attributes.
     """
+    import h5py  # noqa: PLC0415
+
     loaded_data: dict[StandardName, Any] = {"metadata": {}}
 
     def _recursively_load_datasets(group: h5py.Group | h5py.File, prefix: str = "") -> None:
@@ -381,6 +382,8 @@ def load_netcdf_data(file_path: Path, target_var_names: list[str] | None = None)
         original_cadence_seconds, standard_name). Returns an empty dict if
         ``file_path`` does not exist.
     """
+    import netCDF4 as nC  # noqa: PLC0415
+
     loaded_data: dict[StandardName, Any] = {"metadata": {}}
 
     def _recursively_load(group: nC.Group | nC.Dataset, prefix: str = "") -> None:
@@ -432,6 +435,8 @@ def load_netcdf_data_lazy(file_path: Path) -> dict[StandardName, Any]:
         logger.error(f"File not found: {file_path}")
         return {}
 
+    import xarray as xr  # noqa: PLC0415
+
     loaded_data: dict[StandardName, Any] = {"metadata": {}}
     grouped_datasets = xr.open_groups(file_path)
 
@@ -469,6 +474,8 @@ def load_cdf_data(file_path: Path) -> dict[StandardName, Any]:
         NumPy array, plus a ``"metadata"`` entry mapping each variable name to
         its CDF variable attributes (empty dict if attributes could not be read).
     """
+    import cdflib  # noqa: PLC0415
+
     loaded_data: dict[StandardName, Any] = {"metadata": {}}
     cdf_file = cdflib.CDF(str(file_path))
     try:
@@ -511,6 +518,7 @@ def load_mat_data(file_path: Path) -> dict[StandardName, Any]:
         array values converted to plain Python scalars/lists (or ``""`` for
         empty arrays) for JSON/MATLAB-struct compatibility.
     """
+    from mat73 import loadmat as mat73_loadmat  # noqa: PLC0415
     from scipy.io.matlab import loadmat  # noqa: PLC0415
 
     try:
@@ -629,6 +637,8 @@ def write_h5_file(file_path: Path, data_dict: SavedDataDict, data_standard: Data
         data_standard (DataStandard): Used to resolve each internal name to its
             standard (canonical) name, which determines the group/dataset path.
     """
+    import h5py  # noqa: PLC0415
+
     with h5py.File(file_path, "w") as file:
         for internal_name, value in data_dict.items():
             if internal_name == "metadata":
@@ -758,6 +768,8 @@ def write_netcdf_file(file_path: Path, data_dict: DataDict, data_standard: DataS
         data_standard (DataStandard): Used to resolve each internal name to its
             standard (canonical) name, dimensions, and dimension sizes.
     """
+    import netCDF4 as nC  # noqa: PLC0415
+
     with nC.Dataset(file_path, "w", format="NETCDF4") as file:
         size_time = np.asarray(data_dict["Epoch"]).shape[0]
         if size_time == 0:
@@ -862,6 +874,8 @@ def write_cdf_file(file_path: Path, data_dict: DataDict, data_standard: DataStan
     Raises:
         RuntimeError: If writing the CDF file fails for any reason.
     """
+    import cdflib  # noqa: PLC0415
+
     try:
         cdf_file = cdflib.cdfwrite.CDF(str(file_path), delete=True)
         try:
