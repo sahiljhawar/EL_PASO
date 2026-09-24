@@ -147,7 +147,7 @@ GFZVarNames: TypeAlias = Literal[
 ]
 """Variable names used by the GFZ output standard.
 
-Generated from `GFZStandard().variable_infos` by `scripts/generate_metadata_stubs.py`. Do not edit the
+Generated from `GFZStandard().variable_infos` by `hooks/generate_metadata_stubs.py`. Do not edit the
 generated block by hand; edit `el_paso/data_standards/gfz_standard.py` and regenerate instead.
 """
 

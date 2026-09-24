@@ -68,6 +68,9 @@ path = "el_paso/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["el_paso"]
 
+[tool.hatch.build.targets.sdist]
+exclude = [".claude"]
+
 [tool.hatch.build.hooks.custom]
 
 [project.urls]

@@ -35,13 +35,13 @@ class GFZDataSet(DataSet):
 
     Attribute names and descriptions (other than `datetime`, `P`, `InvV`, which are computed by
     `DataSet`) are generated from `GFZStandard().variable_infos` by
-    `scripts/generate_metadata_stubs.py`.
+    `hooks/generate_metadata_stubs.py`.
 
     Attributes:
         datetime (list[dt.datetime]): List of datetime objects corresponding to each time step.
         P (NDArray[np.float64]): Computed phase angle, derived from MLT.
         InvV (NDArray[np.float64]): Computed third adiabatic invariant, derived from InvK and InvMu.
-        # BEGIN GENERATED GFZ_DATASET_ATTRS DOCS
+            <!-- BEGIN GENERATED GFZ_DATASET_ATTRS DOCS -->
         BB (NDArray[np.float64]): Magnetic power spectral density of the observed waves.
         B_eq (NDArray[np.float64]): Calculated magnetic field at the equator.
         B_sat (NDArray[np.float64]): Observered magnetic field at the satellite location.
@@ -83,7 +83,7 @@ class GFZDataSet(DataSet):
         time (NDArray[np.float64]): Time in MATLAB datenum format.
         wave_wna (NDArray[np.float64]): Frequency of the power spectral density.
         xGEO (NDArray[np.float64]): Position in geographic cartesian coordinates.
-        # END GENERATED GFZ_DATASET_ATTRS DOCS
+            <!-- END GENERATED GFZ_DATASET_ATTRS DOCS -->
     """
 
     datetime: list[dt.datetime]
@@ -193,11 +193,11 @@ class PRBEMDataSet(DataSet):
     adiabatic invariants.
 
     Attribute names and descriptions (other than `datetime`) are generated from
-    `PRBEMStandard().variable_infos` by `scripts/generate_metadata_stubs.py`.
+    `PRBEMStandard().variable_infos` by `hooks/generate_metadata_stubs.py`.
 
     Attributes:
         datetime (list[dt.datetime]): List of datetime objects corresponding to each time step.
-        # BEGIN GENERATED PRBEM_DATASET_ATTRS DOCS
+            <!-- BEGIN GENERATED PRBEM_DATASET_ATTRS DOCS -->
         Alpha (NDArray[np.float64]): Local pitch angle the instrument is looking at
         Alpha_Eq (NDArray[np.float64]): Computed equatorial pitch angle the instrument is looking from Alpha, B_Calc
             and B_Eq
@@ -220,7 +220,7 @@ class PRBEMDataSet(DataSet):
         R_Eq (NDArray[np.float64]): Radial distance of the satellite location mapped to the equator.
         xGEO_Eq (NDArray[np.float64]): Satellite position mapped to the magnetic equator, in geographic cartesian
             coordinates.
-        # END GENERATED PRBEM_DATASET_ATTRS DOCS
+            <!-- END GENERATED PRBEM_DATASET_ATTRS DOCS -->
         metadata (PRBEMMetaData): Metadata container for all loaded variables.
     """
 
