@@ -75,7 +75,7 @@ def process_rbsp_ect_combined(
         save_strategy (Literal["gfz", "netcdf", "both"]): Which saving strategy/strategies
             to use for writing the processed output. Defaults to "netcdf".
         num_cores (int): Number of CPU cores used for the magnetic field computations.
-            Defaults to 4.
+            Defaults to 16.
         skip_existing (bool): If True, skip downloading files that already exist on disk.
     """
     raw_data_path = Path(raw_data_path)
