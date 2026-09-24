@@ -416,6 +416,7 @@ def test_file_format_override_takes_effect(tmp_path: Path, file_format: str) -> 
     assert strategy.file_format == "." + file_format  # ty:ignore[unresolved-attribute]
 
 
+@pytest.mark.basic
 def test_file_format_is_keyword_only(tmp_path: Path) -> None:
     with pytest.raises(TypeError):
         arase_xep_strategy(tmp_path, "T89", "nc")  # ty:ignore[too-many-positional-arguments]

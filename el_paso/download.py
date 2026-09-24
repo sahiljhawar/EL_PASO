@@ -27,7 +27,13 @@ from requests.auth import HTTPDigestAuth
 from richpool import JoblibPool
 
 import el_paso as ep
-from el_paso.utils import enforce_utc_timezone, fill_str_template_with_time, get_file_by_version, timed_function
+from el_paso.utils import (
+    enforce_utc_timezone,
+    env_flag_enabled,
+    fill_str_template_with_time,
+    get_file_by_version,
+    timed_function,
+)
 
 if typing.TYPE_CHECKING:
     from el_paso.typing import FileCadence
@@ -159,7 +165,7 @@ def download(
     Raises:
         NotImplementedError: If "monthly" cadence or an unsupported cadence is specified.
     """
-    if ep.skip_download or os.getenv("EL_PASO_SKIP_DOWNLOAD"):
+    if ep.skip_download or env_flag_enabled("EL_PASO_SKIP_DOWNLOAD"):
         logger.info("Skipping ep.download!")
         return
 
@@ -200,7 +206,7 @@ def download(
             desc="Downloading",
         )
 
-    if ep.exit_after_download or os.getenv("EL_PASO_EXIT_AFTER_DOWNLOAD"):
+    if ep.exit_after_download or env_flag_enabled("EL_PASO_EXIT_AFTER_DOWNLOAD"):
         logger.info("Exiting after ep.download is completed!")
         sys.exit(0)
 

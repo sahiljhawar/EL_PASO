@@ -34,13 +34,31 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_FALSY_ENV_VALUES = frozenset({"", "0", "false", "no", "off"})
+
+
+def env_flag_enabled(name: str) -> bool:
+    """Return whether the boolean environment variable `name` is switched on.
+
+    Unset, empty, and ``0``/``false``/``no``/``off`` (case-insensitive, surrounding
+    whitespace ignored) all count as off; any other value counts as on.
+
+    Args:
+        name (str): Name of the environment variable.
+
+    Returns:
+        bool: True if the variable is set to a value that is not in the falsy set.
+    """
+    value = os.environ.get(name)
+    return value is not None and value.strip().lower() not in _FALSY_ENV_VALUES
+
 
 def get_el_paso_model_data_path() -> Path:
     """Return the directory used to store downloaded model coefficient data.
 
     Resolved from the `EL_PASO_MODEL_DATA_PATH` environment variable if set,
-    otherwise defaults to `~/.elpaso/model_data`. The directory is created if
-    it does not already exist.
+    otherwise defaults to `~/.elpaso`. The directory is created if it does not
+    already exist.
 
     Returns:
         Path: Absolute path to the model data directory.
