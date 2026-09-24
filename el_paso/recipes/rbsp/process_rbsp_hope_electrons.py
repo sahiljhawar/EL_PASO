@@ -180,7 +180,7 @@ def process_rbsp_hope_electrons(
         ("InvMu", mag_field),
     ]
 
-    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_variable,
         xgeo_var=variables["xGEO"],
         variables_to_compute=vars_to_compute,
@@ -189,7 +189,6 @@ def process_rbsp_hope_electrons(
         pa_local_var=variables["Pitch_angle"],
         energy_var=variables["Energy"],
         particle_species="electron",
-        return_indices_solar_wind=True,
     )
 
     psd_var = ep.processing.compute_phase_space_density(variables["FEDU"], variables["Energy"], "electron")
@@ -212,16 +211,15 @@ def process_rbsp_hope_electrons(
         "PSD": psd_var,
     }
 
-    if save_sw:
-        variables_to_save.update(indices_solar_wind)
-
     if save_strategy in ("gfz", "both"):
         strategy = rbsp_hope_electron_gfz_strategy(processed_data_path, mag_field, satellite)
 
     if save_strategy in ("netcdf", "both"):
         strategy = rbsp_hope_electron_netcdf_strategy(processed_data_path, mag_field, satellite)
 
-    ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=True)
+    ep.save(
+        variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=True, save_sw=save_sw
+    )
 
 
 if __name__ == "__main__":

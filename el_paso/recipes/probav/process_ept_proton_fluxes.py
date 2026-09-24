@@ -271,7 +271,7 @@ def process_ept_proton_fluxes(
         ("L_m", mag_field),
     ]
 
-    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=variables["xGEO"],
         energy_var=variables["Energy_FPDU"],
@@ -282,7 +282,6 @@ def process_ept_proton_fluxes(
             lstar_quantity=ep.processing.magnetic_field_utils.LstarQuantity.NONE,
         ),
         num_cores=num_cores,
-        return_indices_solar_wind=True,
     )
 
     variables |= magnetic_field_variables
@@ -301,15 +300,12 @@ def process_ept_proton_fluxes(
         "Position": variables["xGEO"],
     }
 
-    if save_sw:
-        variables_to_save.update(indices_solar_wind)
-
     if save_strategy in ("gfz", "both"):
         strategy = probav_ept_proton_gfz_strategy(processed_data_path, mag_field)
 
     if save_strategy in ("netcdf", "both"):
         strategy = probav_ept_proton_netcdf_strategy(processed_data_path, mag_field)
-    ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True)
+    ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw)
 
 
 if __name__ == "__main__":

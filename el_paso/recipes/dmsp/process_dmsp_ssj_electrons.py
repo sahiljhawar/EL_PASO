@@ -181,7 +181,7 @@ def process_dmsp_ssj_electrons(
         ("Alpha_LC", mag_field),
     ]
 
-    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=xgeo_var,
         energy_var=ssj_vars["diff_energy"],
@@ -190,7 +190,6 @@ def process_dmsp_ssj_electrons(
         variables_to_compute=variables_to_compute,
         irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
-        return_indices_solar_wind=True,
     )
 
     variables_to_save: ep.typing.VariablesDict = {
@@ -211,12 +210,9 @@ def process_dmsp_ssj_electrons(
         "Alpha_LC_Eq": magnetic_field_variables[f"Alpha_LC_Eq_{mag_field}"],
     }
 
-    if save_sw:
-        variables_to_save.update(indices_solar_wind)
-
     saving_strategy = dmsp_ssj_electron_strategy(processed_data_path, mag_field, satellite)
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, save_sw=save_sw)
 
 
 def _get_ssm_variables(

@@ -186,7 +186,7 @@ def process_arase_xep_real_time(
         ("InvK", mag_field),
     ]
 
-    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=variables_combined["xGEO"],
         energy_var=variables_combined["Energy_FEDO"],
@@ -195,7 +195,6 @@ def process_arase_xep_real_time(
         variables_to_compute=variables_to_compute,
         irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
-        return_indices_solar_wind=True,
     )
 
     variables_combined |= magnetic_field_variables
@@ -234,9 +233,6 @@ def process_arase_xep_real_time(
         "Position": variables_combined["xGEO"],
     }
 
-    if save_sw:
-        variables_to_save.update(indices_solar_wind)
-
     if save_strategy in ("gfz", "both"):
         saving_strategy = arase_xep_realtime_gfz_strategy(processed_data_path, mag_field)
 
@@ -247,6 +243,7 @@ def process_arase_xep_real_time(
             end_time,
             time_var=binned_time_var,
             append=True,
+            save_sw=save_sw,
         )
 
     if save_strategy in ("netcdf", "both"):
@@ -259,6 +256,7 @@ def process_arase_xep_real_time(
             end_time,
             time_var=binned_time_var,
             append=True,
+            save_sw=save_sw,
         )
 
 

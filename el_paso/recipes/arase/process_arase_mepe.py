@@ -119,9 +119,9 @@ def process_arase_mepe(
                                                 quantities via IRBEM. Defaults to True.
         skip_existing (bool): If True, skip downloading files that already exist locally.
                                             Defaults to True.
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to
-                                            compute the magnetic field variables alongside the rest of the
-                                            output. Defaults to False.
+        save_sw (bool): If True, also save the solar wind/geomagnetic indices relevant to
+                                            `mag_field` alongside the rest of the output, regardless of
+                                            `use_level_3_orbit_data`. Defaults to False.
     """
     del satellite
 
@@ -276,14 +276,13 @@ def process_arase_mepe(
             ("L_m", mag_field),
         ]
 
-        magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
+        magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
             time_var=binned_time_variable,
             xgeo_var=pos_geo_var,
             variables_to_compute=variables_to_compute,
             irbem_options=irbem_options,
             num_cores=num_cores,
             pa_local_var=mepe_variables["Pitch_angle"],
-            return_indices_solar_wind=True,
         )
 
         orb_variables["R0"] = magnetic_field_variables["R_Eq_" + mag_field]
@@ -314,9 +313,6 @@ def process_arase_mepe(
         "L_m": orb_variables["Lm"],
     }
 
-    if save_sw and not use_level_3_orbit_data:
-        variables_to_save.update(indices_solar_wind)
-
     match save_strategy:
         case "gfz":
             saving_strategy = arase_mepe_gfz_strategy(processed_data_path, mag_field_save, data_standard_instance)
@@ -327,7 +323,7 @@ def process_arase_mepe(
         case "netcdf":
             saving_strategy = arase_mepe_netcdf_strategy(processed_data_path, mag_field, data_standard_instance)
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable, save_sw=save_sw)
 
 
 if __name__ == "__main__":

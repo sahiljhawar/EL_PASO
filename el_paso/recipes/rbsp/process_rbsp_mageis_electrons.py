@@ -187,7 +187,7 @@ def process_rbsp_mageis_electrons(
         ("InvMu", mag_field),
     ]
 
-    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_variable,
         xgeo_var=variables["xGEO"],
         variables_to_compute=vars_to_compute,
@@ -196,7 +196,6 @@ def process_rbsp_mageis_electrons(
         pa_local_var=variables["Pitch_angle"],
         energy_var=variables["Energy"],
         particle_species="electron",
-        return_indices_solar_wind=True,
     )
 
     psd_var = ep.processing.compute_phase_space_density(variables["FEDU"], variables["Energy"], "electron")
@@ -219,11 +218,10 @@ def process_rbsp_mageis_electrons(
         "PSD": psd_var,
     }
 
-    if save_sw:
-        variables_to_save.update(indices_solar_wind)
-
     strategy = rbsp_mageis_electron_strategy(processed_data_path, mag_field, satellite)
-    ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=False)
+    ep.save(
+        variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=False, save_sw=save_sw
+    )
 
 
 def _xgeo_data_modifier(

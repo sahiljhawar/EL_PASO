@@ -12,6 +12,8 @@ from typing import TYPE_CHECKING, Any, get_args
 import numpy as np
 
 import el_paso as ep
+from el_paso.processing.magnetic_field_utils.construct_maginput import construct_maginput, get_saveable_sw_indices
+from el_paso.processing.magnetic_field_utils.mag_field_enum import MagneticField
 from el_paso.typing import FixedDimensionName, InternalName, Variable
 from el_paso.utils import enforce_utc_timezone, timed_function
 
@@ -35,6 +37,7 @@ def save(
     *,
     append: bool = False,
     ignore_validation: bool = False,
+    save_sw: bool = False,
 ) -> None:
     """Saves variables to files based on the specified saving strategy and time intervals.
 
@@ -56,10 +59,14 @@ def save(
             rather than overwriting them. Defaults to `False`.
         ignore_validation (bool, optional): If `True`, validation of the input against the `ep.typing.InternalName`
             variables will be skipped. Defaults to `False`.
+        save_sw (bool, optional): If `True`, also load and save the solar wind/geomagnetic
+            indices (e.g. Kp, Dst) that `saving_strategy`'s magnetic field model requires,
+            alongside the rest of `variables_dict`. Requires `time_var`. Defaults to `False`.
 
     Raises:
         TypeError: If `variables_dict` is not a dictionary of `Variable` objects.
         KeyError: If `variables_dict` contains invalid internal variable names.
+        ValueError: If `save_sw` is `True` but `time_var` was not provided.
 
     Note:
         If an output file is missing one or more of its required variables, a
@@ -71,6 +78,22 @@ def save(
 
     start_time = enforce_utc_timezone(start_time)
     end_time = enforce_utc_timezone(end_time)
+
+    if save_sw:
+        if time_var is None:
+            msg = "save_sw=True requires time_var, to interpolate the solar wind indices onto."
+            raise ValueError(msg)
+
+        mag_field = MagneticField(saving_strategy.mag_field)
+        sw_names = get_saveable_sw_indices(mag_field, saving_strategy.data_standard)
+        if sw_names:
+            # construct_maginput is cached: if this run already called compute_magnetic_field_variables
+            # with this same time_var/mag_field, this is a free cache hit instead of a fresh reload.
+            indices_solar_wind = construct_maginput(time_var, mag_field).indices_solar_wind
+            variables_dict = {
+                **{name: indices_solar_wind[name] for name in sw_names},
+                **variables_dict,
+            }
 
     time_intervals_to_save = saving_strategy.get_time_intervals_to_save(start_time, end_time)
 

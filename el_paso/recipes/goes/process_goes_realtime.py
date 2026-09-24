@@ -210,7 +210,7 @@ def process_goes_real_time(
         ("InvK", mag_field),
     ]
 
-    magnetic_field_variables, indices_solar_wind = ep.processing.compute_magnetic_field_variables(
+    magnetic_field_variables = ep.processing.compute_magnetic_field_variables(
         time_var=binned_time_var,
         xgeo_var=variables["xGEO"],
         energy_var=variables["Energy"],
@@ -219,7 +219,6 @@ def process_goes_real_time(
         variables_to_compute=variables_to_compute,
         irbem_options=ep.processing.magnetic_field_utils.IrbemOptions(),
         num_cores=num_cores,
-        return_indices_solar_wind=True,
     )
 
     FEDU_var = ep.processing.construct_pitch_angle_distribution(
@@ -249,16 +248,13 @@ def process_goes_real_time(
         "InvK": magnetic_field_variables[f"InvK_{mag_field}"],
     }
 
-    if save_sw:
-        vars_to_save.update(indices_solar_wind)
-
     if save_strategy in ("gfz", "both"):
         strategy = goes_realtime_gfz_strategy(processed_data_path, mag_field, satellite)
 
     if save_strategy in ("netcdf", "both"):
         strategy = goes_realtime_netcdf_strategy(processed_data_path, mag_field, satellite)
 
-    ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True)
+    ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw)
 
 
 CLI_DEFAULTS = {
