@@ -66,7 +66,7 @@ def process_arase_pwe_density(
         processed_data_path (str | Path): Base directory where the processed output
                                                     data is saved. Defaults to ".".
         num_cores (int): Number of CPU cores used for the IRBEM magnetic field
-                                computations. Defaults to 4.
+                                computations. Defaults to 16.
         bin_cadence (timedelta): Time binning cadence applied to all variables.
         save_strategy (Literal["netcdf"]): The saving strategy used to write the processed
                                                     data. Arase PWE density data only has one

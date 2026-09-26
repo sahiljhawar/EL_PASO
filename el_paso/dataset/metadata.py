@@ -139,11 +139,11 @@ class GFZMetaData(DatasetMetadata):
     """Metadata container for GFZStandard.
 
     Attribute names and descriptions are generated from `GFZStandard().variable_infos` by
-    `scripts/generate_metadata_stubs.py`; `datetime` is a computed extra added by `DataSet`.
+    `hooks/generate_metadata_stubs.py`; `datetime` is a computed extra added by `DataSet`.
 
     Attributes:
         datetime (VariableMetadata): Metadata for the computed `datetime` variable.
-        # BEGIN GENERATED GFZ_METADATA_ATTRS DOCS
+            <!-- BEGIN GENERATED GFZ_METADATA_ATTRS DOCS -->
         BB (VariableMetadata): Magnetic power spectral density of the observed waves.
         B_eq (VariableMetadata): Calculated magnetic field at the equator.
         B_sat (VariableMetadata): Observered magnetic field at the satellite location.
@@ -196,7 +196,7 @@ class GFZMetaData(DatasetMetadata):
         time (VariableMetadata): Time in MATLAB datenum format.
         wave_wna (VariableMetadata): Frequency of the power spectral density.
         xGEO (VariableMetadata): Position in geographic cartesian coordinates.
-        # END GENERATED GFZ_METADATA_ATTRS DOCS
+            <!-- END GENERATED GFZ_METADATA_ATTRS DOCS -->
     """
 
     datetime: VariableMetadata
@@ -260,11 +260,11 @@ class PRBEMMetaData(DatasetMetadata):
     """Metadata container for PRBEMStandard.
 
     Attribute names and descriptions are generated from `PRBEMStandard().variable_infos` by
-    `scripts/generate_metadata_stubs.py`; `datetime` is a computed extra added by `DataSet`.
+    `hooks/generate_metadata_stubs.py`; `datetime` is a computed extra added by `DataSet`.
 
     Attributes:
         datetime (VariableMetadata): Metadata for the computed `datetime` variable.
-        # BEGIN GENERATED PRBEM_METADATA_ATTRS DOCS
+            <!-- BEGIN GENERATED PRBEM_METADATA_ATTRS DOCS -->
         Alpha (VariableMetadata): Local pitch angle the instrument is looking at
         Alpha_Eq (VariableMetadata): Computed equatorial pitch angle the instrument is looking from Alpha, B_Calc
             and B_Eq
@@ -298,7 +298,7 @@ class PRBEMMetaData(DatasetMetadata):
         W_params (VariableMetadata): Tsyganenko-Sitnov W1-W6 parameters.
         xGEO_Eq (VariableMetadata): Satellite position mapped to the magnetic equator, in geographic cartesian
             coordinates.
-        # END GENERATED PRBEM_METADATA_ATTRS DOCS
+            <!-- END GENERATED PRBEM_METADATA_ATTRS DOCS -->
     """
 
     datetime: VariableMetadata

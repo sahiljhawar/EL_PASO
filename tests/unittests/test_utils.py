@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 from el_paso.utils import (
     enforce_utc_timezone,
+    env_flag_enabled,
     extract_version,
     fill_str_template_with_time,
     get_file_by_version,
@@ -153,3 +154,26 @@ def test_timed_function_without_name() -> None:
         return a * b
 
     assert multiply(6, 7) == 42
+
+
+# ── env_flag_enabled ──────────────────────────────────────────────────────────
+
+
+@pytest.mark.basic
+@pytest.mark.parametrize("value", ["1", "true", "True", "yes", "on", "anything"])
+def test_env_flag_enabled_truthy(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("EL_PASO_TEST_FLAG", value)
+    assert env_flag_enabled("EL_PASO_TEST_FLAG")
+
+
+@pytest.mark.basic
+@pytest.mark.parametrize("value", ["", "0", "false", "False", "FALSE", "no", "off", " 0 "])
+def test_env_flag_enabled_falsy(monkeypatch: pytest.MonkeyPatch, value: str) -> None:
+    monkeypatch.setenv("EL_PASO_TEST_FLAG", value)
+    assert not env_flag_enabled("EL_PASO_TEST_FLAG")
+
+
+@pytest.mark.basic
+def test_env_flag_enabled_unset(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("EL_PASO_TEST_FLAG", raising=False)
+    assert not env_flag_enabled("EL_PASO_TEST_FLAG")

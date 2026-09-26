@@ -29,6 +29,8 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import typer
 from rich.console import Console
 from rich.table import Table
+from typer._click.shell_completion import CompletionItem
+from typer._click.utils import make_default_short_help
 from typer.core import TyperGroup
 from typer.models import DeveloperExceptionConfig
 
@@ -168,6 +170,26 @@ def _summary(entry: RecipeEntry) -> str:
     return _summary_from_source(entry.module, entry.function)
 
 
+def _complete_lazily(
+    group: TyperGroup,
+    ctx: typer._click.Context,
+    incomplete: str,
+    summaries: dict[str, str],
+) -> list[CompletionItem]:
+    """Complete sub-command names from pre-read summaries, then the group's own options.
+
+    Typer's `TyperGroup.shell_complete` calls `get_command` for every matching
+    sub-command just to show its help, which would import every recipe on TAB.
+    """
+    results = [
+        CompletionItem(name, help=make_default_short_help(summary))
+        for name, summary in summaries.items()
+        if name.startswith(incomplete)
+    ]
+    results.extend(super(TyperGroup, group).shell_complete(ctx, incomplete))
+    return results
+
+
 def _single_command_from_typer_app(name: str, built: typer.Typer) -> typer._click.Command:
     """Convert a single-command Typer app into its underlying click-compatible command."""
     command = typer.main.get_command(built)
@@ -221,6 +243,11 @@ class LazyRecipeGroup(TyperGroup):
             with formatter.section("Commands"):
                 formatter.write_dl(rows)
 
+    def shell_complete(self, ctx: typer._click.Context, incomplete: str) -> list[CompletionItem]:
+        """Complete recipe names without importing any recipe."""
+        summaries = {name: _summary(self._entries[name]) for name in self.list_commands(ctx)}
+        return _complete_lazily(self, ctx, incomplete, summaries)
+
 
 class _RootGroup(TyperGroup):
     """The top-level group, which also defers building the ``omm`` command."""
@@ -241,17 +268,26 @@ class _RootGroup(TyperGroup):
         As in `LazyRecipeGroup`, click's own implementation would call
         `get_command` for every entry, which for ``omm`` means an import.
         """
-        rows = []
-        for name in self.list_commands(ctx):
-            if name == "omm":
-                rows.append((name, _summary_from_source("el_paso.download_omm", "download_omm")))
-                continue
-            command = super().get_command(ctx, name)
-            if command is not None and not command.hidden:
-                rows.append((name, command.get_short_help_str()))
+        rows = list(self._summaries(ctx).items())
         if rows:
             with formatter.section("Commands"):
                 formatter.write_dl(rows)
+
+    def shell_complete(self, ctx: typer._click.Context, incomplete: str) -> list[CompletionItem]:
+        """Complete sub-command names without building the ``omm`` command."""
+        return _complete_lazily(self, ctx, incomplete, self._summaries(ctx))
+
+    def _summaries(self, ctx: typer._click.Context) -> dict[str, str]:
+        """Return each visible sub-command's short help, reading ``omm``'s from source."""
+        summaries = {}
+        for name in self.list_commands(ctx):
+            if name == "omm":
+                summaries[name] = _summary_from_source("el_paso.download_omm", "download_omm")
+                continue
+            command = super().get_command(ctx, name)
+            if command is not None and not command.hidden:
+                summaries[name] = command.get_short_help_str()
+        return summaries
 
 
 app = _RootGroup(

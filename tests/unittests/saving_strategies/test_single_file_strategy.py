@@ -37,6 +37,7 @@ def test_basic_single_file_strategy(tmp_path: Path, file_format: str) -> None:
     assert save_path.exists()
 
 
+@pytest.mark.basic
 def test_save_raises_for_invalid_value_type(tmp_path: Path) -> None:
     variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
         "FEDU": ep.Variable(original_unit=u.dimensionless_unscaled, data=rng.normal((20, 21))),
@@ -53,6 +54,7 @@ def test_save_raises_for_invalid_value_type(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.basic
 def test_save_raises_for_invalid_internal_name(tmp_path: Path) -> None:
     variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
         "FEDU": ep.Variable(original_unit=u.dimensionless_unscaled, data=rng.normal((20, 21))),
