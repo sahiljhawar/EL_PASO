@@ -157,7 +157,22 @@ plugins:
       include_source: false # optionally include source or not
       allow_errors: true # fail build if execution errors
       ignore_h1_titles: true
-
+  - asciinema-player:
+      loglevel: "INFO"
+      title: "EL-PASO"
+      mkap_theme: "night"
+      cols: 153
+      rows: 42
+      fit: "width"
+      auto_play: false
+      preload: false
+      loop: true
+      start_at: "0:00"
+      speed: 1.0
+      theme: "asciinema"
+      controls: "auto"
+      pause_on_markers: false
+      terminal_font_family: "monospace"
 extra_css:
   - css/custom.css
 

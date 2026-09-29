@@ -115,4 +115,5 @@ docs = [
     "mkdocstrings-python",
     "mkdocs-jupyter",
     "termynal",
+    "mkdocs-asciinema-player>=1.2.0",
 ]
