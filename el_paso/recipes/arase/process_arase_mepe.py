@@ -290,7 +290,7 @@ def process_arase_mepe(
         case "T89":
             mag_field_save = "T89"
         case "TS04":
-            mag_field_save = "T04s"
+            mag_field_save = "T04s" if save_strategy == "gfz" else mag_field
         case "OP77Q":
             mag_field_save = "OP77"
 
@@ -314,10 +314,10 @@ def process_arase_mepe(
             saving_strategy = arase_mepe_gfz_strategy(processed_data_path, mag_field_save, data_standard_instance)
 
         case "h5":
-            saving_strategy = arase_mepe_h5_strategy(processed_data_path, mag_field, data_standard_instance)
+            saving_strategy = arase_mepe_h5_strategy(processed_data_path, mag_field_save, data_standard_instance)
 
         case "netcdf":
-            saving_strategy = arase_mepe_netcdf_strategy(processed_data_path, mag_field, data_standard_instance)
+            saving_strategy = arase_mepe_netcdf_strategy(processed_data_path, mag_field_save, data_standard_instance)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
 
