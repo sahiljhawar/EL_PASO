@@ -87,7 +87,7 @@ from el_paso.cache import cleanup_stale_cache as _cleanup_stale_cache  # noqa: E
 
 _cleanup_stale_cache()
 
-__version__ = "2.1.3rc2"
+__version__ = "2.1.3rc3"
 
 
 if TYPE_CHECKING:
