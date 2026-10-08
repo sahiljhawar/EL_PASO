@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
 # SPDX-FileContributor: Sahil Jhawar
 #
@@ -63,7 +64,7 @@ __getattr__, _lazy_dir, _lazy_all = lazy.attach(
             "PRBEMDataSet",
             "PRBEMMetaData",
         ],
-        "download": ["download"],
+        "download": ["download", "exit_if_download_only"],
         "download_omm": ["download_omm"],
         "extract_variables_from_files": ["ExtractionInfo", "extract_variables_from_files"],
         "load_indices_solar_wind_parameters": ["load_indices_solar_wind_parameters"],
@@ -114,7 +115,7 @@ if TYPE_CHECKING:
         PRBEMDataSet,
         PRBEMMetaData,
     )
-    from el_paso.download import download
+    from el_paso.download import download, exit_if_download_only
     from el_paso.download_omm import download_omm
     from el_paso.extract_variables_from_files import ExtractionInfo, extract_variables_from_files
     from el_paso.load_indices_solar_wind_parameters import load_indices_solar_wind_parameters
@@ -144,6 +145,7 @@ if TYPE_CHECKING:
         "dataset",
         "download",
         "download_omm",
+        "exit_if_download_only",
         "extract_variables_from_files",
         "get_release_msg",
         "is_in_release_mode",

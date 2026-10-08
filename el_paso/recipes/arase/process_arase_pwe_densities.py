@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -79,10 +81,6 @@ def process_arase_pwe_density(
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
 
-    orb_variables = get_arase_orbit_level_2_variables(
-        start_time, end_time, raw_data_path=raw_data_path, skip_existing=skip_existing
-    )
-
     file_name_stem = "erg_pwe_hfa_l3_1min_YYYYMMDD_.{6}.cdf"
     url = "https://ergsc.isee.nagoya-u.ac.jp/data/ergsc/satellite/erg/pwe/hfa/l3/YYYY/MM/"
 
@@ -95,6 +93,10 @@ def process_arase_pwe_density(
         file_cadence="daily",
         method="request",
         skip_existing=skip_existing,
+    )
+
+    orb_variables = get_arase_orbit_level_2_variables(
+        start_time, end_time, raw_data_path=raw_data_path, skip_existing=skip_existing
     )
 
     extraction_infos = [

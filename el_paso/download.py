@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
 # SPDX-FileContributor: Sahil Jhawar
 #
@@ -209,6 +210,21 @@ def download(
             tasks,
             desc="Downloading",
         )
+
+
+def exit_if_download_only() -> None:
+    """Exit the program if requested to stop once all downloads are completed.
+
+    Recipes usually call `ep.download` several times (e.g. once per data product), so
+    `ep.download` itself never exits. It does nothing unless `ep.exit_after_download` or the environment
+    variable `EL_PASO_EXIT_AFTER_DOWNLOAD` is set, and never exits if downloading is skipped.
+
+    Raises:
+        SystemExit: With exit code 0, if exiting after the download has been requested.
+    """
+    if ep.skip_download or env_flag_enabled("EL_PASO_SKIP_DOWNLOAD"):
+        logger.info("Skipping download!")
+        return
 
     if ep.exit_after_download or env_flag_enabled("EL_PASO_EXIT_AFTER_DOWNLOAD"):
         logger.info("Exiting after ep.download is completed!")

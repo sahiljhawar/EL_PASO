@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Parvathy
 # SPDX-FileContributor: Parvathy Santhini
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 import json
@@ -192,6 +194,8 @@ def process_gps_data(
         file_name_stem=file_name_stem,
         skip_existing=skip_existing,
     )
+
+    ep.exit_if_download_only()
 
     extraction_infos = [
         ep.ExtractionInfo(result_key="decimal_day", name_or_column="decimal_day", unit=u.day),
