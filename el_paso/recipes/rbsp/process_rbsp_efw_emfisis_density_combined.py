@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -87,19 +89,32 @@ def process_rbsp_efw_emfisis_density_combined(
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
 
-    efw_variables = _get_efw_variables(
-        start_time - timedelta(minutes=10),
-        end_time + timedelta(minutes=10),
-        satellite,
-        raw_data_path,
-        skip_existing=skip_existing,
-    )
+    padded_start_time = start_time - timedelta(minutes=10)
+    padded_end_time = end_time + timedelta(minutes=10)
+
+    efw_file_name_stem = "rbsp" + satellite + "_efw-l3_YYYYMMDD_.{3}.cdf"
+    emfisis_file_name_stem = "rbsp-" + satellite + "_density_emfisis-l4_YYYYMMDD_.{6,7}.cdf"
+
+    for url, file_name_stem in [
+        (f"https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l3/efw/YYYY/", efw_file_name_stem),
+        (f"https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l4/emfisis/density/YYYY/", emfisis_file_name_stem),
+    ]:
+        ep.download(
+            padded_start_time,
+            padded_end_time,
+            save_path=raw_data_path,
+            download_url=url,
+            file_name_stem=file_name_stem,
+            file_cadence="daily",
+            method="request",
+            skip_existing=skip_existing,
+        )
+
+    ep.exit_if_download_only()
+
+    efw_variables = _get_efw_variables(padded_start_time, padded_end_time, efw_file_name_stem, raw_data_path)
     emfisis_variables = _get_emfisis_variables(
-        start_time - timedelta(minutes=10),
-        end_time + timedelta(minutes=10),
-        satellite,
-        raw_data_path,
-        skip_existing=skip_existing,
+        padded_start_time, padded_end_time, emfisis_file_name_stem, raw_data_path
     )
 
     efw_time_bin_methods = {
@@ -216,24 +231,9 @@ def process_rbsp_efw_emfisis_density_combined(
 def _get_efw_variables(
     start_time: datetime,
     end_time: datetime,
-    satellite: Literal["a", "b"],
+    file_name_stem: str,
     raw_data_path: Path,
-    *,
-    skip_existing: bool = True,
 ) -> dict[str, ep.Variable]:
-    file_name_stem = "rbsp" + satellite + "_efw-l3_YYYYMMDD_.{3}.cdf"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=raw_data_path,
-        download_url=f"https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l3/efw/YYYY/",
-        file_name_stem=file_name_stem,
-        file_cadence="daily",
-        method="request",
-        skip_existing=skip_existing,
-    )
-
     extraction_infos = [
         ep.ExtractionInfo(
             result_key="Epoch",
@@ -271,24 +271,9 @@ def _get_efw_variables(
 def _get_emfisis_variables(
     start_time: datetime,
     end_time: datetime,
-    satellite: Literal["a", "b"],
+    file_name_stem: str,
     raw_data_path: Path,
-    *,
-    skip_existing: bool = True,
 ) -> dict[str, ep.Variable]:
-    file_name_stem = "rbsp-" + satellite + "_density_emfisis-l4_YYYYMMDD_.{6,7}.cdf"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=raw_data_path,
-        download_url=f"https://spdf.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l4/emfisis/density/YYYY/",
-        file_name_stem=file_name_stem,
-        file_cadence="daily",
-        method="request",
-        skip_existing=skip_existing,
-    )
-
     extraction_infos = [
         ep.ExtractionInfo(
             result_key="Epoch",

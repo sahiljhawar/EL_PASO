@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Alwin Roy
+# SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 from datetime import datetime, timedelta, timezone
@@ -86,16 +88,90 @@ def process_rbsp_emfisis_waves(
     del num_cores
     del save_strategy
 
-    wfr_vars = _get_wfr_data(start_time, end_time, Path(raw_data_path), satellite, skip_existing=skip_existing)
+    wfr_url = (
+        f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l2/emfisis/wfr/spectral-matrix-diagonal/YYYY/"
+    )
+
+    wfr_file_name_stem = "rbsp-" + satellite + r"_wfr-spectral-matrix-diagonal_emfisis-l2_YYYYMMDD_.{6}.cdf"
+
+    wfr_path = Path(raw_data_path) / "YYYY" / "MM" / "wfr"
+
+    ep.download(
+        start_time,
+        end_time,
+        save_path=wfr_path,
+        download_url=wfr_url,
+        file_name_stem=wfr_file_name_stem,
+        file_cadence="daily",
+        method="request",
+        skip_existing=skip_existing,
+    )
+
+    wna_url = (
+        f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l4/emfisis/wna-survey-sheath-corrected-e/YYYY/"
+    )
+
+    wna_file_name_stem = "rbsp-" + satellite + r"_wna-survey-sheath-corrected-e_emfisis-l4_YYYYMMDD_.{6}.cdf"
+
+    wna_path = Path(raw_data_path) / "YYYY" / "MM" / "sna"
+
+    ep.download(
+        start_time,
+        end_time,
+        save_path=wna_path,
+        download_url=wna_url,
+        file_name_stem=wna_file_name_stem,
+        file_cadence="daily",
+        method="request",
+        skip_existing=skip_existing,
+    )
+
+    density_url = f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l4/emfisis/density/YYYY/"
+
+    density_file_name_stem = "rbsp-" + satellite + r"_density_emfisis-l4_YYYYMMDD_.{7}.cdf"
+
+    density_path = Path(raw_data_path) / "YYYY" / "MM" / "density"
+
+    ep.download(
+        start_time,
+        end_time,
+        save_path=density_path,
+        download_url=density_url,
+        file_name_stem=density_file_name_stem,
+        file_cadence="daily",
+        method="request",
+        skip_existing=skip_existing,
+    )
+
+    magnetometer_url = (
+        f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l3/emfisis/magnetometer/4sec/sm/YYYY/"
+    )
+
+    magnetometer_file_name_stem = "rbsp-" + satellite + r"_magnetometer_4sec-sm_emfisis-l3_YYYYMMDD_.{6}.cdf"
+
+    magnetometer_path = Path(raw_data_path) / "YYYY" / "MM" / "magnetometer"
+
+    ep.download(
+        start_time,
+        end_time,
+        save_path=magnetometer_path,
+        download_url=magnetometer_url,
+        file_name_stem=magnetometer_file_name_stem,
+        file_cadence="daily",
+        method="request",
+        skip_existing=skip_existing,
+    )
+
+    ep.exit_if_download_only()
+
+    wfr_vars = _get_wfr_data(start_time, end_time, wfr_path, wfr_file_name_stem)
 
     target_time_var = wfr_vars["Epoch"]
-    density_vars = _get_density_data(
-        start_time, end_time, Path(raw_data_path), satellite, target_time_var, skip_existing=skip_existing
-    )
+    density_vars = _get_density_data(start_time, end_time, density_path, density_file_name_stem, target_time_var)
     mag_vars = _get_magnetometer_data(
-        start_time, end_time, Path(raw_data_path), satellite, target_time_var, skip_existing=skip_existing
+        start_time, end_time, magnetometer_path, magnetometer_file_name_stem, target_time_var
     )
-    wna_vars = _get_wna_data(start_time, end_time, Path(raw_data_path), satellite, skip_existing=skip_existing)
+    wna_vars = _get_wna_data(start_time, end_time, wna_path, wna_file_name_stem)
 
     mag_vars = _clean_magnetometer_data(mag_vars)
 
@@ -160,26 +236,8 @@ def _get_wfr_data(
     start_time: datetime,
     end_time: datetime,
     raw_data_path: Path,
-    satellite: RBSPSatellite,
-    *,
-    skip_existing: bool = True,
+    file_name_stem: str,
 ) -> dict[str, ep.Variable]:
-    url = f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l2/emfisis/wfr/spectral-matrix-diagonal/YYYY/"
-    file_name_stem = "rbsp-" + satellite + r"_wfr-spectral-matrix-diagonal_emfisis-l2_YYYYMMDD_.{6}.cdf"
-
-    raw_data_path = raw_data_path / "YYYY" / "MM" / "wfr"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=raw_data_path,
-        download_url=url,
-        file_name_stem=file_name_stem,
-        file_cadence="daily",
-        method="request",
-        skip_existing=skip_existing,
-    )
-
     extraction_infos = [
         ep.ExtractionInfo(result_key="Epoch", name_or_column="Epoch", unit=ep.units.tt2000),
         ep.ExtractionInfo(result_key="freq", name_or_column="WFR_frequencies", unit=u.Hz),
@@ -209,26 +267,8 @@ def _get_wna_data(
     start_time: datetime,
     end_time: datetime,
     raw_data_path: Path,
-    satellite: RBSPSatellite,
-    *,
-    skip_existing: bool = True,
+    file_name_stem: str,
 ) -> dict[str, ep.Variable]:
-    url = f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l4/emfisis/wna-survey-sheath-corrected-e/YYYY/"
-    file_name_stem = "rbsp-" + satellite + r"_wna-survey-sheath-corrected-e_emfisis-l4_YYYYMMDD_.{6}.cdf"
-
-    raw_data_path = raw_data_path / "YYYY" / "MM" / "sna"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=raw_data_path,
-        download_url=url,
-        file_name_stem=file_name_stem,
-        file_cadence="daily",
-        method="request",
-        skip_existing=skip_existing,
-    )
-
     extraction_infos = [
         ep.ExtractionInfo(result_key="Epoch", name_or_column="Epoch", unit=ep.units.tt2000),
         ep.ExtractionInfo(result_key="freq", name_or_column="WFR_frequencies", unit=u.Hz, is_time_dependent=False),
@@ -250,27 +290,9 @@ def _get_density_data(
     start_time: datetime,
     end_time: datetime,
     raw_data_path: Path,
-    satellite: RBSPSatellite,
+    file_name_stem: str,
     target_time_var: ep.Variable,
-    *,
-    skip_existing: bool = True,
 ) -> dict[str, ep.Variable]:
-    url = f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l4/emfisis/density/YYYY/"
-    file_name_stem = "rbsp-" + satellite + r"_density_emfisis-l4_YYYYMMDD_.{7}.cdf"
-
-    raw_data_path = raw_data_path / "YYYY" / "MM" / "density"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=raw_data_path,
-        download_url=url,
-        file_name_stem=file_name_stem,
-        file_cadence="daily",
-        method="request",
-        skip_existing=skip_existing,
-    )
-
     extraction_infos = [
         ep.ExtractionInfo(result_key="Epoch", name_or_column="Epoch", unit=ep.units.tt2000),
         ep.ExtractionInfo(result_key="Density", name_or_column="density", unit=u.cm ** (-3)),
@@ -300,27 +322,9 @@ def _get_magnetometer_data(
     start_time: datetime,
     end_time: datetime,
     raw_data_path: Path,
-    satellite: RBSPSatellite,
+    file_name_stem: str,
     target_time_var: ep.Variable,
-    *,
-    skip_existing: bool = True,
 ) -> dict[str, ep.Variable]:
-    url = f"https://cdaweb.gsfc.nasa.gov/pub/data/rbsp/rbsp{satellite}/l3/emfisis/magnetometer/4sec/sm/YYYY/"
-    file_name_stem = "rbsp-" + satellite + r"_magnetometer_4sec-sm_emfisis-l3_YYYYMMDD_.{6}.cdf"
-
-    raw_data_path = raw_data_path / "YYYY" / "MM" / "magnetometer"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=raw_data_path,
-        download_url=url,
-        file_name_stem=file_name_stem,
-        file_cadence="daily",
-        method="request",
-        skip_existing=skip_existing,
-    )
-
     extraction_infos = [
         ep.ExtractionInfo(result_key="Epoch", name_or_column="Epoch", unit=ep.units.tt2000),
         ep.ExtractionInfo(result_key="Bt", name_or_column="Magnitude", unit=u.nT),
