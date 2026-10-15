@@ -12,22 +12,32 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   ruff:
+    if: github.event.action != 'labeled' || github.event.label.name == 'run-basic-tests'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: astral-sh/ruff-action@main
         with:
           version: "latest"
           src: el_paso
 
   ty:
+    if: github.event.action != 'labeled' || github.event.label.name == 'run-basic-tests'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@main
@@ -46,6 +56,7 @@ jobs:
         run: ty check
 
   tests:
+    if: github.event.action != 'labeled' || github.event.label.name == 'run-basic-tests'
     needs: [ruff, ty]
     strategy:
       fail-fast: false
@@ -55,6 +66,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -90,7 +103,10 @@ jobs:
           SPACETRACK_USER: ${{ secrets.SPACETRACK_USER }}
           SPACETRACK_PASS: ${{ secrets.SPACETRACK_PASS }}
           _TYPER_FORCE_DISABLE_TERMINAL: "1"
-        run: uv run coverage run --source el_paso -m pytest -rf tests -m basic --indices_sw_param_data_path tests/system/data/indices_sw_params
+          # Pull requests run only the minimal tests, except the run started by adding the run-basic-tests label.
+          # Everything else (push to main, manual dispatch) runs the basic tests.
+          MARKER: ${{ github.event_name == 'pull_request' && !(github.event.action == 'labeled' && github.event.label.name == 'run-basic-tests') && 'minimal' || 'basic' }}
+        run: uv run coverage run --source el_paso -m pytest -rf tests -m "$MARKER" --indices_sw_param_data_path tests/system/data/indices_sw_params
 
       - name: Run Coveralls
         if: ${{ success() && matrix.python-version == '3.12' }}
