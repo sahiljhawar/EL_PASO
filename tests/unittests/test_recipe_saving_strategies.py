@@ -53,6 +53,7 @@ from el_paso.recipes.goes.process_goes_realtime import (
     goes_realtime_netcdf_strategy,
 )
 from el_paso.recipes.gps.process_gps import gps_cxd_strategy
+from el_paso.recipes.model.process_solar_wind_indices import solar_wind_indices_strategy
 from el_paso.recipes.poes.process_poes_meped import poes_meped_strategy
 from el_paso.recipes.poes.process_poes_ted import poes_ted_strategy
 from el_paso.recipes.probav.process_ept_electron_fluxes import (
@@ -263,6 +264,13 @@ CASES: list[
         {},
         ep.saving_strategies.MonthlyRBStrategy,
         {"mission": "GPS", "satellite": "ns41", "instrument": "cxd", "mag_field": "T89", "file_format": ".nc"},
+    ),
+    (
+        solar_wind_indices_strategy,
+        ("T89",),
+        {},
+        ep.saving_strategies.SolarWindIndicesStrategy,
+        {"mag_field": "T89", "file_format": ".nc"},
     ),
     (
         poes_ted_strategy,
