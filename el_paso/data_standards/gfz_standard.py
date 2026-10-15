@@ -123,6 +123,15 @@ class GFZStandard(DataStandard[GFZVarNames]):
                 u.radian,
                 ["Epoch"],
             ),
+            "Alpha_DLC": VariableInfo[GFZVarNames](
+                "alpha_dlc", "Drift loss cone size at the satellite location.", u.radian, ["Epoch"]
+            ),
+            "Alpha_DLC_Eq": VariableInfo[GFZVarNames](
+                "alpha_dlc_eq",
+                "Drift loss cone size at the satellite location mapped to the equator.",
+                u.radian,
+                ["Epoch"],
+            ),
             "PSD": VariableInfo[GFZVarNames](
                 "PSD",
                 "Calculated phase space density of particles.",
@@ -223,5 +232,8 @@ class GFZStandard(DataStandard[GFZVarNames]):
             ),
             "Number_density_Eq": VariableInfo[GFZVarNames](
                 "density_eq", "Electron number density at the magnetic equator.", u.cm ** (-3), ["Epoch"]
+            ),
+            "LCDS": VariableInfo[GFZVarNames](
+                "LCDS", "Last Closed Drift Shell.", u.dimensionless_unscaled, ["Epoch", "Alpha"]
             ),
         }

@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -29,10 +30,13 @@ from typing import TYPE_CHECKING, Any, NamedTuple
 import typer
 from rich.console import Console
 from rich.table import Table
-from typer.core import TyperGroup
+from typer._click.shell_completion import CompletionItem
+from typer._click.utils import make_default_short_help
+from typer.core import TyperCommand, TyperGroup
 from typer.models import DeveloperExceptionConfig
 
 import el_paso
+from el_paso.cache import mark_run_failed
 from el_paso.cli.recipe_cli import build_recipe_command
 
 if TYPE_CHECKING:
@@ -65,10 +69,21 @@ RECIPES: tuple[RecipeEntry, ...] = (
         "arase", "xep-realtime", "el_paso.recipes.arase.process_arase_xep_realtime", "process_arase_xep_real_time"
     ),
     RecipeEntry("dmsp", "ssj", "el_paso.recipes.dmsp.process_dmsp_ssj_electrons", "process_dmsp_ssj_electrons"),
+    RecipeEntry(
+        "esa", "gssc-emu-electrons", "el_paso.recipes.esa.process_gssc_emu_electrons", "process_gssc_emu_electrons"
+    ),
+    RecipeEntry("esa", "gssc-emu-protons", "el_paso.recipes.esa.process_gssc_emu_protons", "process_gssc_emu_protons"),
     RecipeEntry("esa", "ngrm", "el_paso.recipes.esa.process_ngrm_satellite", "process_ngrm_electron_fluxes"),
+    RecipeEntry(
+        "goes",
+        "eps-maged-epead",
+        "el_paso.recipes.goes.process_goes_eps_maged_and_epead",
+        "process_goes_eps_maged_and_epead",
+    ),
     RecipeEntry("goes", "mps-high", "el_paso.recipes.goes.process_goes_r_mps_high", "process_goes_r_mps_high"),
     RecipeEntry("goes", "realtime", "el_paso.recipes.goes.process_goes_realtime", "process_goes_real_time"),
     RecipeEntry("gps", "cxd", "el_paso.recipes.gps.process_gps", "process_gps_data"),
+    RecipeEntry("model", "lcds", "el_paso.recipes.model.process_lcds", "process_lcds"),
     RecipeEntry("poes", "meped", "el_paso.recipes.poes.process_poes_meped", "process_poes_meped_electron"),
     RecipeEntry("poes", "ted", "el_paso.recipes.poes.process_poes_ted", "process_poes_ted_electron"),
     RecipeEntry(
@@ -168,6 +183,26 @@ def _summary(entry: RecipeEntry) -> str:
     return _summary_from_source(entry.module, entry.function)
 
 
+def _complete_lazily(
+    group: TyperGroup,
+    ctx: typer._click.Context,
+    incomplete: str,
+    summaries: dict[str, str],
+) -> list[CompletionItem]:
+    """Complete sub-command names from pre-read summaries, then the group's own options.
+
+    Typer's `TyperGroup.shell_complete` calls `get_command` for every matching
+    sub-command just to show its help, which would import every recipe on TAB.
+    """
+    results = [
+        CompletionItem(name, help=make_default_short_help(summary))
+        for name, summary in summaries.items()
+        if name.startswith(incomplete)
+    ]
+    results.extend(super(TyperGroup, group).shell_complete(ctx, incomplete))
+    return results
+
+
 def _single_command_from_typer_app(name: str, built: typer.Typer) -> typer._click.Command:
     """Convert a single-command Typer app into its underlying click-compatible command."""
     command = typer.main.get_command(built)
@@ -185,7 +220,38 @@ def _as_click_command(name: str, recipe: Recipe, defaults: dict[str, object]) ->
     return _single_command_from_typer_app(name, built)
 
 
-class LazyRecipeGroup(TyperGroup):
+def _stub_command(name: str, short_help: str) -> typer._click.Command:
+    """A placeholder command carrying only a name and short help, never invoked.
+
+    Typer's rich help renderer (``rich_utils.rich_format_help``) calls
+    ``get_command`` on every listed sub-command to read its name/short-help for
+    the panel, bypassing a group's ``format_commands`` override entirely. This
+    stub lets ``get_command`` answer that call without importing the real
+    command's recipe merely to render ``--help``.
+    """
+    return TyperCommand(name=name, short_help=short_help)
+
+
+class _LazyHelpGroup(TyperGroup):
+    """A `TyperGroup` that flags `get_command` calls made only to render `--help`.
+
+    Typer's rich help renderer calls `get_command` for every listed sub-command
+    regardless of any `format_commands` override, so without this a lazily-built
+    group would import every one of its sub-commands just to answer `--help`.
+    """
+
+    _rendering_help: bool = False
+
+    def format_help(self, ctx: typer._click.Context, formatter: typer._click.HelpFormatter) -> None:
+        """Render `--help`, flagging `get_command` calls made purely for that."""
+        self._rendering_help = True
+        try:
+            super().format_help(ctx, formatter)
+        finally:
+            self._rendering_help = False
+
+
+class LazyRecipeGroup(_LazyHelpGroup):
     """A mission group that imports a recipe only once it is actually used.
 
     Building a recipe's command requires its signature, and therefore its import.
@@ -203,10 +269,15 @@ class LazyRecipeGroup(TyperGroup):
         return sorted(self._entries)
 
     def get_command(self, ctx: typer._click.Context, cmd_name: str) -> typer._click.Command | None:  # noqa: ARG002
-        """Build one recipe's command, importing exactly that recipe."""
+        """Build one recipe's command, importing exactly that recipe.
+
+        While rendering `--help`, returns a cheap stub instead: see `_LazyHelpGroup`.
+        """
         entry = self._entries.get(cmd_name)
         if entry is None:
             return None
+        if self._rendering_help:
+            return _stub_command(cmd_name, _summary(entry))
         recipe, defaults = load_recipe(entry)
         return _as_click_command(cmd_name, recipe, defaults)
 
@@ -221,13 +292,24 @@ class LazyRecipeGroup(TyperGroup):
             with formatter.section("Commands"):
                 formatter.write_dl(rows)
 
+    def shell_complete(self, ctx: typer._click.Context, incomplete: str) -> list[CompletionItem]:
+        """Complete recipe names without importing any recipe."""
+        summaries = {name: _summary(self._entries[name]) for name in self.list_commands(ctx)}
+        return _complete_lazily(self, ctx, incomplete, summaries)
 
-class _RootGroup(TyperGroup):
+
+class _RootGroup(_LazyHelpGroup):
     """The top-level group, which also defers building the ``omm`` command."""
 
     def get_command(self, ctx: typer._click.Context, cmd_name: str) -> typer._click.Command | None:
-        """Return a sub-command, building ``omm`` on demand."""
+        """Return a sub-command, building ``omm`` on demand.
+
+        While rendering `--help`, returns a cheap stub for ``omm`` instead: see
+        `_LazyHelpGroup`.
+        """
         if cmd_name == "omm":
+            if self._rendering_help:
+                return _stub_command("omm", _summary_from_source("el_paso.download_omm", "download_omm"))
             return _as_click_command("omm", el_paso.download_omm, {})  # ty: ignore[invalid-argument-type]
         return super().get_command(ctx, cmd_name)
 
@@ -241,17 +323,26 @@ class _RootGroup(TyperGroup):
         As in `LazyRecipeGroup`, click's own implementation would call
         `get_command` for every entry, which for ``omm`` means an import.
         """
-        rows = []
-        for name in self.list_commands(ctx):
-            if name == "omm":
-                rows.append((name, _summary_from_source("el_paso.download_omm", "download_omm")))
-                continue
-            command = super().get_command(ctx, name)
-            if command is not None and not command.hidden:
-                rows.append((name, command.get_short_help_str()))
+        rows = list(self._summaries(ctx).items())
         if rows:
             with formatter.section("Commands"):
                 formatter.write_dl(rows)
+
+    def shell_complete(self, ctx: typer._click.Context, incomplete: str) -> list[CompletionItem]:
+        """Complete sub-command names without building the ``omm`` command."""
+        return _complete_lazily(self, ctx, incomplete, self._summaries(ctx))
+
+    def _summaries(self, ctx: typer._click.Context) -> dict[str, str]:
+        """Return each visible sub-command's short help, reading ``omm``'s from source."""
+        summaries = {}
+        for name in self.list_commands(ctx):
+            if name == "omm":
+                summaries[name] = _summary_from_source("el_paso.download_omm", "download_omm")
+                continue
+            command = super().get_command(ctx, name)
+            if command is not None and not command.hidden:
+                summaries[name] = command.get_short_help_str()
+        return summaries
 
 
 app = _RootGroup(
@@ -298,6 +389,7 @@ def main() -> None:
     try:
         app()
     except Exception as exc:  # noqa: BLE001
+        mark_run_failed()
         setattr(
             exc,
             typer.main._typer_developer_exception_attr_name,

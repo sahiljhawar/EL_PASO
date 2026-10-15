@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -121,6 +123,8 @@ def process_goes_real_time(
         rename_file_name_stem=rename_file_name_stem,
         skip_existing=skip_existing,
     )
+
+    ep.exit_if_download_only()
 
     extraction_infos = [
         ep.ExtractionInfo(
@@ -250,11 +254,11 @@ def process_goes_real_time(
 
     if save_strategy in ("gfz", "both"):
         strategy = goes_realtime_gfz_strategy(processed_data_path, mag_field, satellite)
+        ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw)
 
     if save_strategy in ("netcdf", "both"):
         strategy = goes_realtime_netcdf_strategy(processed_data_path, mag_field, satellite)
-
-    ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw)
+        ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw)
 
 
 CLI_DEFAULTS = {

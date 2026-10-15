@@ -49,6 +49,7 @@ class _StubStrategy(SavingStrategy):
         return "test"
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_output_file_defaults() -> None:
     of = OutputFile(name="flux", names_to_save=["FEDU", "Epoch"])
@@ -57,12 +58,14 @@ def test_output_file_defaults() -> None:
     assert of.save_incomplete is False
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_output_file_save_incomplete_true() -> None:
     of = OutputFile(name="wave", names_to_save=["FEDU"], save_incomplete=True)
     assert of.save_incomplete is True
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_get_target_variables_skips_optional_output_with_no_content() -> None:
     """An optional output file whose only resolved name is the shared time axis must be skipped.
@@ -112,6 +115,7 @@ def test_get_all_standard_names() -> None:
     assert "xGEO" in names
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_merge_non_overlapping_appends() -> None:
     strategy = _StubStrategy()
@@ -122,6 +126,7 @@ def test_merge_non_overlapping_appends() -> None:
     np.testing.assert_array_equal(merged["Epoch"], [1.0, 2.0, 3.0, 4.0, 5.0])
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_merge_duplicate_epoch_replaced_by_new() -> None:
     strategy = _StubStrategy()
@@ -133,6 +138,7 @@ def test_merge_duplicate_epoch_replaced_by_new() -> None:
     np.testing.assert_array_equal(merged["Epoch"], [1.0, 2.0, 3.0, 4.0])
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_merge_result_sorted_ascending() -> None:
     strategy = _StubStrategy()
@@ -144,6 +150,7 @@ def test_merge_result_sorted_ascending() -> None:
     np.testing.assert_array_equal(merged["Epoch"], [1.0, 2.0, 3.0, 4.0, 5.0])
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_merge_key_only_in_existing() -> None:
     strategy = _StubStrategy()
@@ -154,6 +161,7 @@ def test_merge_key_only_in_existing() -> None:
     assert "Position_geo_alt" in merged
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_merge_key_only_in_new() -> None:
     strategy = _StubStrategy()
@@ -165,6 +173,7 @@ def test_merge_key_only_in_new() -> None:
     np.testing.assert_array_equal(merged["Position_geo_alt"], [300.0])
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_merge_metadata_combined() -> None:
     strategy = _StubStrategy()
@@ -176,6 +185,7 @@ def test_merge_metadata_combined() -> None:
     assert merged["metadata"]["instrument"] == "EPT"
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_merge_column_vector_normalized() -> None:
     """A (N, 1) Epoch column vector is treated as 1-D after normalization."""
@@ -188,6 +198,7 @@ def test_merge_column_vector_normalized() -> None:
     np.testing.assert_array_equal(merged["Epoch"], [1.0, 2.0, 3.0])
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_repr_returns_string() -> None:
     strategy = _StubStrategy()

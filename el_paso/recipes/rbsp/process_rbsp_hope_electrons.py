@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -76,7 +78,7 @@ def process_rbsp_hope_electrons(
             written to. Defaults to ".".
         bin_cadence (timedelta): Time-binning cadence applied to all variables.
         num_cores (int): Number of CPU cores used for the magnetic field computations.
-            Defaults to 32.
+            Defaults to 16.
         save_strategy (Literal["gfz", "netcdf", "both"]): Which saving strategy/strategies
             to use for writing the processed output. Defaults to "netcdf".
         calculate_Lstar (bool): Whether Lstar should be calculated or not. Defaults to True.
@@ -99,6 +101,8 @@ def process_rbsp_hope_electrons(
         method="request",
         skip_existing=skip_existing,
     )
+
+    ep.exit_if_download_only()
 
     extraction_infos = [
         ep.ExtractionInfo(
@@ -213,13 +217,27 @@ def process_rbsp_hope_electrons(
 
     if save_strategy in ("gfz", "both"):
         strategy = rbsp_hope_electron_gfz_strategy(processed_data_path, mag_field, satellite)
+        ep.save(
+            variables_to_save,
+            strategy,
+            start_time,
+            end_time,
+            time_var=binned_time_variable,
+            append=True,
+            save_sw=save_sw,
+        )
 
     if save_strategy in ("netcdf", "both"):
         strategy = rbsp_hope_electron_netcdf_strategy(processed_data_path, mag_field, satellite)
-
-    ep.save(
-        variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=True, save_sw=save_sw
-    )
+        ep.save(
+            variables_to_save,
+            strategy,
+            start_time,
+            end_time,
+            time_var=binned_time_variable,
+            append=True,
+            save_sw=save_sw,
+        )
 
 
 if __name__ == "__main__":

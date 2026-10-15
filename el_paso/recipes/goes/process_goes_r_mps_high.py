@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -40,7 +42,7 @@ def goes_r_mps_high_netcdf_strategy(
         Path(base_data_path),
         "GOES",
         satellite,
-        "MAGED",
+        "MPS_high",
         mag_field,
         data_standard=ep.data_standards.GFZStandard(),
         file_format=file_format,
@@ -78,7 +80,7 @@ def process_goes_r_mps_high(
     Args:
         start_time (datetime): Start of the time interval to process.
         end_time (datetime): End of the time interval to process.
-        satellite (Literal["goes18", "goes19"]): The GOES-R satellite to process.
+        satellite (Literal["goes16", "goes17", "goes18", "goes19"]): The GOES-R satellite to process.
         mag_field (MagneticFieldLiteral): Magnetic field model used for the derived quantities.
         raw_data_path (str | Path): Directory where the raw downloaded data files are stored.
         processed_data_path (str | Path): Directory where the processed output files are saved.
@@ -93,9 +95,54 @@ def process_goes_r_mps_high(
     """
     data_path_stem = f"{raw_data_path}/YYYY/MM/{satellite}/"
 
-    magn_vars = _get_magn_variables(satellite, data_path_stem, start_time, end_time, skip_existing=skip_existing)
-    mps_vars = _get_mps_high_variables(satellite, data_path_stem, start_time, end_time, skip_existing=skip_existing)
-    ephe_vars = _get_ephe_variables(satellite, data_path_stem, start_time, end_time, skip_existing=skip_existing)
+    magn_url = f"https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/{satellite}/l2/data/magn-l2-avg1m/YYYY/MM/"
+    sat_stem = "g" + satellite[-2:]
+
+    magn_file_name_stem = f"dn_magn-l2-avg1m_{sat_stem}_dYYYYMMDD_.{r'{6}'}.nc"
+
+    ep.download(
+        start_time,
+        end_time,
+        save_path=data_path_stem,
+        file_cadence="daily",
+        download_url=magn_url,
+        file_name_stem=magn_file_name_stem,
+        skip_existing=skip_existing,
+    )
+
+    ephe_url = f"https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/{satellite}/l2/data/ephe-l2-orb1m/YYYY/MM/"
+
+    ephe_file_name_stem = f"dn_ephe-l2-orb1m_{sat_stem}_dYYYYMMDD_.{r'{6}'}.nc"
+
+    ep.download(
+        start_time,
+        end_time,
+        save_path=data_path_stem,
+        file_cadence="daily",
+        download_url=ephe_url,
+        file_name_stem=ephe_file_name_stem,
+        skip_existing=skip_existing,
+    )
+
+    mps_url = f"https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/{satellite}/l2/data/mpsh-l2-avg5m_science/YYYY/MM/"
+
+    mps_file_name_stem = f"sci_mpsh-l2-avg5m_{sat_stem}_dYYYYMMDD_.{r'{6}'}.nc"
+
+    ep.download(
+        start_time,
+        end_time,
+        save_path=data_path_stem,
+        file_cadence="daily",
+        download_url=mps_url,
+        file_name_stem=mps_file_name_stem,
+        skip_existing=skip_existing,
+    )
+
+    ep.exit_if_download_only()
+
+    magn_vars = _get_magn_variables(magn_file_name_stem, data_path_stem, start_time, end_time)
+    mps_vars = _get_mps_high_variables(mps_file_name_stem, data_path_stem, start_time, end_time)
+    ephe_vars = _get_ephe_variables(ephe_file_name_stem, data_path_stem, start_time, end_time)
 
     time_bin_methods_magn = {
         "b_brf": ep.TimeBinMethod.NanMean,
@@ -165,7 +212,7 @@ def process_goes_r_mps_high(
 
     # fold pitch angles around 90 degree
     local_pa = local_pa_var.get_data(u.degree)
-    local_pa_folded = np.where(local_pa > 90, local_pa - 90, local_pa)
+    local_pa_folded = np.where(local_pa > 90, 180 - local_pa, local_pa)
     local_pa_var.set_data(local_pa_folded, unit=u.degree)
 
     # sort pitch angles in ascending order and apply to fluxes
@@ -230,40 +277,37 @@ def process_goes_r_mps_high(
 
     if save_strategy in ("gfz", "both"):
         saving_strategy = goes_r_mps_high_gfz_strategy(processed_data_path, mag_field, satellite)
+        ep.save(
+            variables_to_save,
+            saving_strategy,
+            start_time,
+            end_time,
+            time_var=binned_time_var,
+            append=True,
+            save_sw=save_sw,
+        )
+
     if save_strategy in ("netcdf", "both"):
         saving_strategy = goes_r_mps_high_netcdf_strategy(processed_data_path, mag_field, satellite)
-
-    ep.save(
-        variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw
-    )
+        ep.save(
+            variables_to_save,
+            saving_strategy,
+            start_time,
+            end_time,
+            time_var=binned_time_var,
+            append=True,
+            save_sw=save_sw,
+        )
 
 
 def _get_magn_variables(
-    satellite: GOESRSatellite,
+    file_name_stem: str,
     data_path_stem: str | Path,
     start_time: datetime,
     end_time: datetime,
-    *,
-    skip_existing: bool = True,
 ) -> dict[str, ep.Variable]:
-    url = f"https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/{satellite}/l2/data/magn-l2-avg1m/YYYY/MM/"
-
-    sat_stem = "g18" if satellite == "goes18" else "g19"
-    file_name_stem = f"dn_magn-l2-avg1m_{sat_stem}_dYYYYMMDD_.{r'{6}'}.nc"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=data_path_stem,
-        file_cadence="daily",
-        download_url=url,
-        file_name_stem=file_name_stem,
-        skip_existing=skip_existing,
-    )
-
     extraction_infos = [
         ep.ExtractionInfo(name_or_column="time", unit=ep.units.j2k, result_key="time"),
-        ep.ExtractionInfo(name_or_column="DQF", unit=u.dimensionless_unscaled, result_key="dqf"),
         ep.ExtractionInfo(name_or_column="b_brf", unit=u.nT, result_key="b_brf"),
     ]
 
@@ -278,28 +322,11 @@ def _get_magn_variables(
 
 
 def _get_ephe_variables(
-    satellite: GOESRSatellite,
+    file_name_stem: str,
     data_path_stem: str | Path,
     start_time: datetime,
     end_time: datetime,
-    *,
-    skip_existing: bool = True,
 ) -> dict[str, ep.Variable]:
-    url = f"https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/{satellite}/l2/data/ephe-l2-orb1m/YYYY/MM/"
-
-    sat_stem = "g18" if satellite == "goes18" else "g19"
-    file_name_stem = f"dn_ephe-l2-orb1m_{sat_stem}_dYYYYMMDD_.{r'{6}'}.nc"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=data_path_stem,
-        file_cadence="daily",
-        download_url=url,
-        file_name_stem=file_name_stem,
-        skip_existing=skip_existing,
-    )
-
     extraction_infos = [
         ep.ExtractionInfo(name_or_column="time", unit=ep.units.j2k, result_key="time"),
         ep.ExtractionInfo(name_or_column="gse_xyz", unit=u.km, result_key="xgse"),
@@ -316,28 +343,11 @@ def _get_ephe_variables(
 
 
 def _get_mps_high_variables(
-    satellite: GOESRSatellite,
+    file_name_stem: str,
     data_path_stem: str | Path,
     start_time: datetime,
     end_time: datetime,
-    *,
-    skip_existing: bool = True,
 ) -> dict[str, ep.Variable]:
-    url = f"https://data.ngdc.noaa.gov/platforms/solar-space-observing-satellites/goes/{satellite}/l2/data/mpsh-l2-avg5m_science/YYYY/MM/"
-
-    sat_stem = "g18" if satellite == "goes18" else "g19"
-    file_name_stem = f"sci_mpsh-l2-avg5m_{sat_stem}_dYYYYMMDD_.{r'{6}'}.nc"
-
-    ep.download(
-        start_time,
-        end_time,
-        save_path=data_path_stem,
-        file_cadence="daily",
-        download_url=url,
-        file_name_stem=file_name_stem,
-        skip_existing=skip_existing,
-    )
-
     extraction_infos = [
         ep.ExtractionInfo(name_or_column="time", unit=ep.units.j2k, result_key="time"),
         ep.ExtractionInfo(

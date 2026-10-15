@@ -8,6 +8,7 @@
 
 from __future__ import annotations
 
+import importlib
 import inspect
 import logging
 from datetime import datetime, timezone
@@ -15,13 +16,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 import distance
 import numpy as np
-import xarray as xr
 
 import el_paso as ep
 from el_paso.dataset.metadata import DatasetMetadata
-from el_paso.dataset.utils import (
-    join_var,
-)
+from el_paso.dataset.utils import is_xr_variable, join_var
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -38,6 +36,93 @@ if TYPE_CHECKING:
     FormatLoader = FileLoader
 
 logger = logging.getLogger(__name__)
+
+
+class _LazyMethod:
+    """A method whose defining module (and its scipy stack) is imported on first access.
+
+    On first access the real function replaces this descriptor on the owning class, so later
+    lookups are ordinary method lookups with the real signature and docstring.
+    """
+
+    def __init__(self, module: str) -> None:
+        self._module = module
+
+    def __set_name__(self, owner: type, name: str) -> None:
+        self._owner = owner
+        self._name = name
+
+    def __get__(self, obj: object, objtype: type | None = None) -> Any:  # noqa: ANN401
+        func = getattr(importlib.import_module(self._module, __package__), self._name)
+        setattr(self._owner, self._name, func)
+        return func if obj is None else func.__get__(obj, objtype)
+
+
+def _describe_difference(
+    var_name: str,
+    self_var: Any,  # noqa: ANN401
+    other_var: Any,  # noqa: ANN401
+    *,
+    rtol: float = 1e-5,
+    atol: float = 1e-8,
+) -> str:
+    """Describe how two values of the same variable differ, for use in assertion messages.
+
+    For numeric arrays of equal shape, the number of elements failing `np.isclose`, the number of
+    NaN mismatches, and the maximum absolute and relative difference (relative to the larger of the
+    two absolute values) are reported together with the index and both values at that position.
+
+    Args:
+        var_name (str): Name of the variable.
+        self_var (Any): Value of the variable in the first dataset.
+        other_var (Any): Value of the variable in the second dataset.
+        rtol (float): Relative tolerance passed to `np.isclose`. Defaults to 1e-5.
+        atol (float): Absolute tolerance passed to `np.isclose`. Defaults to 1e-8.
+
+    Returns:
+        str: A (possibly multi-line) description of the difference.
+    """
+    if not isinstance(other_var, type(self_var)):
+        return f"{var_name}: different types ({type(self_var).__name__} vs. {type(other_var).__name__})"
+
+    if not isinstance(self_var, np.ndarray):
+        if isinstance(self_var, list) and len(self_var) != len(other_var):
+            return f"{var_name}: different lengths ({len(self_var)} vs. {len(other_var)})"
+        return f"{var_name}: values differ"
+
+    if self_var.shape != other_var.shape:
+        return f"{var_name}: different shapes ({self_var.shape} vs. {other_var.shape})"
+
+    if not (np.issubdtype(self_var.dtype, np.number) and np.issubdtype(other_var.dtype, np.number)):
+        return f"{var_name}: values differ"
+
+    a = self_var.astype(np.float64)
+    b = other_var.astype(np.float64)
+
+    n_failing = int(np.sum(~np.isclose(a, b, rtol=rtol, atol=atol, equal_nan=True)))
+    lines = [f"{var_name}: {n_failing} of {a.size} elements differ"]
+
+    nan_mismatch = np.isnan(a) != np.isnan(b)
+    if nan_mismatch.any():
+        first_idx = tuple(int(i) for i in np.argwhere(nan_mismatch)[0])
+        lines.append(
+            f"  NaN in only one dataset: {int(nan_mismatch.sum())} elements "
+            f"(first at index {first_idx}: {a[first_idx]:.10g} vs. {b[first_idx]:.10g})"
+        )
+
+    both_finite = np.isfinite(a) & np.isfinite(b)
+    if both_finite.any():
+        abs_diff = np.where(both_finite, np.abs(a - b), -np.inf)
+        denominator = np.maximum(np.abs(a), np.abs(b))
+        rel_diff = np.full(a.shape, -np.inf)
+        np.divide(abs_diff, denominator, out=rel_diff, where=both_finite & (denominator > 0))
+        rel_diff[both_finite & (denominator == 0)] = 0.0
+
+        for label, diff in (("absolute", abs_diff), ("relative", rel_diff)):
+            idx = tuple(int(i) for i in np.unravel_index(np.argmax(diff), a.shape))
+            lines.append(f"  max {label} difference: {diff[idx]:.6g} at index {idx} ({a[idx]:.10g} vs. {b[idx]:.10g})")
+
+    return "\n".join(lines)
 
 
 class DataSet:
@@ -172,9 +257,9 @@ class DataSet:
     def __getattribute__(self, name: str) -> Any:  # noqa: ANN401
         value = super().__getattribute__(name)
 
-        if isinstance(value, xr.Variable):
+        if is_xr_variable(value):
             value = value.values
-        elif isinstance(value, list) and len(value) > 0 and isinstance(value[0], xr.Variable):
+        elif isinstance(value, list) and len(value) > 0 and is_xr_variable(value[0]):
             non_empty = [v for v in value if v.shape[0] > 0]
 
             if not non_empty:
@@ -211,18 +296,11 @@ class DataSet:
 
         # Handle computed properties for both modes
         if name == "P":
-            if len(self.MLT) == 0:  # MLT not found
-                self.P = np.asarray([])
-            else:
-                self.P = ((self.MLT + 12) / 12 * np.pi) % (2 * np.pi)
+            self._compute_P()
             return self.P
 
         if name == "InvV":
-            if len(self.InvK) == 0 or len(self.InvMu) == 0:  # invariants not found
-                self.InvV = np.asarray([])
-            else:
-                inv_K_repeated = np.repeat(self.InvK[:, np.newaxis, :], self.InvMu.shape[1], axis=1)
-                self.InvV = self.InvMu * (inv_K_repeated + 0.5) ** 2
+            self._compute_InvV()
             return self.InvV
 
         # check if a sat variable is requested
@@ -330,6 +408,26 @@ class DataSet:
         """
         return self.saving_strategy.satellite + " " + self.saving_strategy.instrument
 
+    def _compute_P(self) -> None:
+        # Strategies without MLT get an empty array
+        if "MLT" not in self.possible_variables or len(self.MLT) == 0:  # MLT not found
+            self.P = np.asarray([])
+        else:
+            self.P = ((self.MLT + 12) / 12 * np.pi) % (2 * np.pi)
+
+    def _compute_InvV(self) -> None:
+        # Strategies without InvK or InvMu get an empty array
+        if (
+            "InvK" not in self.possible_variables
+            or "InvMu" not in self.possible_variables
+            or len(self.InvK) == 0
+            or len(self.InvMu) == 0
+        ):  # invariants not found
+            self.InvV = np.asarray([])
+        else:
+            inv_K_repeated = np.repeat(self.InvK[:, np.newaxis, :], self.InvMu.shape[1], axis=1)
+            self.InvV = self.InvMu * (inv_K_repeated + 0.5) ** 2
+
     def _load_variable(self, requested_name: str) -> None:
 
         loaded_var_arrs: dict[str, NDArray[np.number]] = {}
@@ -338,11 +436,10 @@ class DataSet:
 
         # 1. Handle Computed Values
         if requested_name == "InvV":
-            inv_K_repeated = np.repeat(self.InvK[:, np.newaxis, :], self.InvMu.shape[1], axis=1)
-            self.InvV = self.InvMu * (inv_K_repeated + 0.5) ** 2
+            self._compute_InvV()
             return
         if requested_name == "P":
-            self.P = ((self.MLT + 12) / 12 * np.pi) % (2 * np.pi)
+            self._compute_P()
             return
 
         if original_requested_name == "datetime":
@@ -383,7 +480,7 @@ class DataSet:
             # 3. Process Datetimes
             time_key = self.saving_strategy.data_standard.get_standard_name("Epoch")
             raw_times = file_content[time_key]
-            if isinstance(raw_times, xr.Variable):
+            if is_xr_variable(raw_times):
                 raw_times = raw_times.values
 
             time_unit = self.saving_strategy.data_standard.variable_infos["Epoch"].unit
@@ -412,7 +509,7 @@ class DataSet:
                     continue
 
                 if key != "datetime" and (
-                    not isinstance(var_arr, xr.Variable)
+                    not is_xr_variable(var_arr)
                     and (not isinstance(var_arr, np.ndarray) or not np.issubdtype(var_arr.dtype, np.number))
                 ):
                     continue
@@ -461,14 +558,18 @@ class DataSet:
         """
         return [var for var in self.possible_variables if var in self.__dict__]
 
-    def assert_equal(self, other: DataSet) -> None:
+    def assert_equal(self, other: DataSet, *, rtol: float = 1e-5, atol: float = 1e-8) -> None:
         """Assert that two DataSet objects are equal.
 
         Compares the data standards, the set of standard variable names defined by
         the saving strategies, and the values of all currently loaded variables.
+        Numeric arrays are compared with `np.allclose`, so floating-point noise (e.g. from
+        magnetic field calculations on different hardware) can be tolerated via `rtol` and `atol`.
 
         Args:
             other (DataSet): The other DataSet instance to compare against.
+            rtol (float): Relative tolerance for numeric arrays. Defaults to 1e-5.
+            atol (float): Absolute tolerance for numeric arrays. Defaults to 1e-8.
 
         Raises:
             AssertionError: If the data standards differ, if the sets of standard
@@ -487,10 +588,11 @@ class DataSet:
             f"Standard names in saving strategies are different:\n{self_standard_names!r}!={other_standard_names!r}"
         )
 
-        different_vars = self.get_different_variables(other)
+        different_vars = self.get_different_variables(other, rtol=rtol, atol=atol)
 
         assert len(different_vars) == 0, "Variables differ between datasets:\n" + "\n".join(
-            str(var) for var in different_vars
+            _describe_difference(var, getattr(self, var), getattr(other, var), rtol=rtol, atol=atol)
+            for var in different_vars
         )
 
     def __eq__(self, other: object) -> bool:
@@ -506,11 +608,13 @@ class DataSet:
 
         return True
 
-    def get_different_variables(self, other: DataSet) -> list[str]:
+    def get_different_variables(self, other: DataSet, *, rtol: float = 1e-5, atol: float = 1e-8) -> list[str]:
         """Compare the currently loaded variables in this DataSet with another DataSet and return a list of variable names that are different.
 
         Args:
             other (DataSet): Another DataSet instance to compare against.
+            rtol (float): Relative tolerance for numeric arrays, passed to `np.allclose`. Defaults to 1e-5.
+            atol (float): Absolute tolerance for numeric arrays, passed to `np.allclose`. Defaults to 1e-8.
 
         Returns:
             list[str]: A list of variable names that are different between the two DataSet instances.
@@ -534,7 +638,9 @@ class DataSet:
                     different_vars.append(var_name)
                     continue
             elif isinstance(self_var, np.ndarray):
-                if self_var.shape != other_var.shape or not np.allclose(self_var, other_var, equal_nan=True):
+                if self_var.shape != other_var.shape or not np.allclose(
+                    self_var, other_var, rtol=rtol, atol=atol, equal_nan=True
+                ):
                     different_vars.append(var_name)
                     continue
             elif self_var != other_var:
@@ -543,7 +649,14 @@ class DataSet:
 
         return different_vars
 
-    from .bin_and_interpolate_to_model_grid import bin_and_interpolate_to_model_grid  # noqa: PLC0415
-    from .identify_orbits import identify_orbits  # noqa: PLC0415
-    from .interp_functions import interp_flux, interp_psd  # noqa: PLC0415
-    from .linearize_trajectories import linearize_trajectories  # noqa: PLC0415
+    if TYPE_CHECKING:
+        from .bin_and_interpolate_to_model_grid import bin_and_interpolate_to_model_grid  # noqa: PLC0415
+        from .identify_orbits import identify_orbits  # noqa: PLC0415
+        from .interp_functions import interp_flux, interp_psd  # noqa: PLC0415
+        from .linearize_trajectories import linearize_trajectories  # noqa: PLC0415
+    else:
+        bin_and_interpolate_to_model_grid = _LazyMethod(".bin_and_interpolate_to_model_grid")
+        identify_orbits = _LazyMethod(".identify_orbits")
+        interp_flux = _LazyMethod(".interp_functions")
+        interp_psd = _LazyMethod(".interp_functions")
+        linearize_trajectories = _LazyMethod(".linearize_trajectories")

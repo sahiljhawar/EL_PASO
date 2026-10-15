@@ -8,7 +8,7 @@
 These check that each recipe runs end to end against the live archive, writes the file its
 saving strategy promises, and that every variable it claims to save is readable back through
 `el_paso.dataset`. They deliberately do not compare against a reference solution, so they need
-no Zenodo data; they are a smoke test of the download, processing and saving path.
+no reference test data; they are a smoke test of the download, processing and saving path.
 """
 
 from collections.abc import Callable
@@ -75,8 +75,6 @@ def _assert_variables_load(dataset: DataSet, internal_names: list[ep.typing.Inte
 
 @pytest.mark.basic
 def test_themis_fft_waves(tmpdir: Path, skip_if_unreachable: Callable[..., None]) -> None:
-    skip_if_unreachable("https://themis.ssl.berkeley.edu")
-
     processed_data_path = Path(tmpdir)
 
     process_themis_fft_waves(
@@ -103,8 +101,6 @@ def test_themis_fft_waves(tmpdir: Path, skip_if_unreachable: Callable[..., None]
 
 @pytest.mark.basic
 def test_themis_scpot_density(tmpdir: Path, skip_if_unreachable: Callable[..., None]) -> None:
-    skip_if_unreachable("https://themis.ssl.berkeley.edu")
-
     processed_data_path = Path(tmpdir)
 
     process_themis_scpot_density(

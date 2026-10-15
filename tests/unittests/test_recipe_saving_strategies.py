@@ -37,7 +37,13 @@ from el_paso.recipes.arase.process_arase_xep_realtime import (
     arase_xep_realtime_strategy as arase_xep_realtime_netcdf_strategy,
 )
 from el_paso.recipes.dmsp.process_dmsp_ssj_electrons import dmsp_ssj_electron_strategy
+from el_paso.recipes.esa.process_gssc_emu_electrons import gssc_emu_electron_strategy
+from el_paso.recipes.esa.process_gssc_emu_protons import gssc_emu_proton_strategy
 from el_paso.recipes.esa.process_ngrm_satellite import esa_ngrm_strategy
+from el_paso.recipes.goes.process_goes_eps_maged_and_epead import (
+    goes_eps_maged_and_epead_gfz_strategy,
+    goes_eps_maged_and_epead_netcdf_strategy,
+)
 from el_paso.recipes.goes.process_goes_r_mps_high import (
     goes_r_mps_high_gfz_strategy,
     goes_r_mps_high_netcdf_strategy,
@@ -98,7 +104,7 @@ CASES: list[
         arase_xep_strategy,
         ("T89",),
         {},
-        ep.saving_strategies.MonthlyRBStrategy,
+        ep.saving_strategies.MonthlyOmniFluxRBStrategy,
         {"mission": "Arase", "satellite": "arase", "instrument": "xep", "mag_field": "T89", "file_format": ".nc"},
     ),
     (
@@ -172,6 +178,52 @@ CASES: list[
         {"mission": "ESA", "satellite": "edrs-c", "instrument": "ngrm", "mag_field": "T89", "file_format": ".nc"},
     ),
     (
+        gssc_emu_electron_strategy,
+        ("T89", "gsat0207"),
+        {},
+        ep.saving_strategies.MonthlyRBStrategy,
+        {
+            "mission": "ESA",
+            "satellite": "gsat0207",
+            "instrument": "emu-electron",
+            "mag_field": "T89",
+            "file_format": ".nc",
+        },
+    ),
+    (
+        gssc_emu_proton_strategy,
+        ("T89", "gsat0215"),
+        {},
+        ep.saving_strategies.MonthlyRBStrategy,
+        {
+            "mission": "ESA",
+            "satellite": "gsat0215",
+            "instrument": "emu-proton",
+            "mag_field": "T89",
+            "file_format": ".nc",
+        },
+    ),
+    (
+        goes_eps_maged_and_epead_gfz_strategy,
+        ("T89", "goes15"),
+        {},
+        ep.saving_strategies.GFZStrategy,
+        {"mission": "GOES", "satellite": "goes15", "instrument": "MAGEDandEPEAD", "mag_field": "T89"},
+    ),
+    (
+        goes_eps_maged_and_epead_netcdf_strategy,
+        ("T89", "goes15"),
+        {},
+        ep.saving_strategies.MonthlyRBStrategy,
+        {
+            "mission": "GOES",
+            "satellite": "goes15",
+            "instrument": "MAGED_EPEAD",
+            "mag_field": "T89",
+            "file_format": ".nc",
+        },
+    ),
+    (
         goes_r_mps_high_gfz_strategy,
         ("T89", "goes16"),
         {},
@@ -183,7 +235,7 @@ CASES: list[
         ("T89", "goes16"),
         {},
         ep.saving_strategies.MonthlyRBStrategy,
-        {"mission": "GOES", "satellite": "goes16", "instrument": "MAGED", "mag_field": "T89", "file_format": ".nc"},
+        {"mission": "GOES", "satellite": "goes16", "instrument": "MPS_high", "mag_field": "T89", "file_format": ".nc"},
     ),
     (
         goes_realtime_gfz_strategy,
@@ -361,6 +413,7 @@ _PRBEM_DEFAULTING_FACTORIES: dict[Callable[..., SavingStrategy], tuple[Any, ...]
 }
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 @pytest.mark.parametrize(
     ("factory", "extra_args", "extra_kwargs", "expected_cls", "expected_attrs"), CASES, ids=CASE_IDS
@@ -389,6 +442,7 @@ def test_strategy_factory_builds_expected_strategy(
         assert isinstance(strategy.data_standard, ep.data_standards.GFZStandard)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 @pytest.mark.parametrize(
     ("factory", "extra_args"), _PRBEM_DEFAULTING_FACTORIES.items(), ids=lambda f: getattr(f, "__name__", "")
@@ -408,6 +462,7 @@ def test_density_strategies_default_to_prbem_standard(
     assert isinstance(strategy.data_standard, ep.data_standards.PRBEMStandard)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 @pytest.mark.parametrize("file_format", ["h5", "cdf", "mat"])
 def test_file_format_override_takes_effect(tmp_path: Path, file_format: str) -> None:
@@ -416,11 +471,14 @@ def test_file_format_override_takes_effect(tmp_path: Path, file_format: str) -> 
     assert strategy.file_format == "." + file_format  # ty:ignore[unresolved-attribute]
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
 def test_file_format_is_keyword_only(tmp_path: Path) -> None:
     with pytest.raises(TypeError):
         arase_xep_strategy(tmp_path, "T89", "nc")  # ty:ignore[too-many-positional-arguments]
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 @pytest.mark.parametrize(
     "data_standard",
@@ -435,6 +493,7 @@ def test_arase_mepe_data_standard_override_takes_effect(
     assert strategy.data_standard is data_standard
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_rbsp_emfisis_waves_strategy(tmp_path: Path) -> None:
     strategy = rbsp_emfisis_waves_strategy(tmp_path, "a")
@@ -446,6 +505,7 @@ def test_rbsp_emfisis_waves_strategy(tmp_path: Path) -> None:
     assert isinstance(strategy.data_standard, ep.data_standards.GFZStandard)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_rbsp_emfisis_waves_strategy_data_standard_override(tmp_path: Path) -> None:
     prbem = ep.data_standards.PRBEMStandard()
@@ -455,6 +515,7 @@ def test_rbsp_emfisis_waves_strategy_data_standard_override(tmp_path: Path) -> N
     assert strategy.data_standard is prbem
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_themis_fft_waves_strategy(tmp_path: Path) -> None:
     strategy = themis_fft_waves_strategy(tmp_path, "a")
@@ -466,6 +527,7 @@ def test_themis_fft_waves_strategy(tmp_path: Path) -> None:
     assert isinstance(strategy.data_standard, ep.data_standards.GFZStandard)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_themis_fft_waves_strategy_data_standard_override(tmp_path: Path) -> None:
     prbem = ep.data_standards.PRBEMStandard()
@@ -475,6 +537,7 @@ def test_themis_fft_waves_strategy_data_standard_override(tmp_path: Path) -> Non
     assert strategy.data_standard is prbem
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_every_recipe_strategy_is_exported_from_its_mission_package() -> None:
     """Every `<...>_strategy` factory must be importable as `el_paso.recipes.<mission>.<name>`.

@@ -14,6 +14,7 @@ import pytest
 from el_paso import typing as ep_types
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 @pytest.mark.parametrize(
     ("attr_name", "import_info"),
@@ -31,6 +32,8 @@ def test_lazy_exports_resolve(
     assert resolved is expected
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
 def test_dir_includes_lazy_exports_and_is_sorted() -> None:
     exported_names = dir(ep_types)
 
@@ -38,6 +41,8 @@ def test_dir_includes_lazy_exports_and_is_sorted() -> None:
     assert set(ep_types._LAZY_EXPORTS).issubset(exported_names)
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
 def test_public_typing_definitions_are_in_all() -> None:
     """Test that all public typing definitions are included in __all__."""
     expected_public_names = _get_public_typing_definitions()
@@ -45,6 +50,8 @@ def test_public_typing_definitions_are_in_all() -> None:
     assert expected_public_names.issubset(ep_types.__all__)
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
 def test_public_typing_definitions_missing_from_all_are_detected() -> None:
     source_text = Path(ep_types.__file__).read_text()
     mocked_source = source_text.replace(
@@ -59,11 +66,15 @@ def test_public_typing_definitions_missing_from_all_are_detected() -> None:
     assert "MockedPublicType" not in ep_types.__all__
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
 @pytest.mark.parametrize("export_name", ep_types.__all__)
 def test_all_exports_are_importable(export_name: str) -> None:
     assert getattr(ep_types, export_name) is not None
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
 def test_type_checking_imports_are_lazy_exports_and_in_all() -> None:
     imported_names = _get_type_checking_imported_names()
 

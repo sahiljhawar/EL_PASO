@@ -1,0 +1,33 @@
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileContributor: Sahil Jhawar
+#
+# SPDX-License-Identifier: Apache-2.0
+
+name: Slash commands
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions: {}
+
+jobs:
+  run-basic-tests:
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/run-full-tests')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Re-apply the run-basic-tests label
+        env:
+          GH_TOKEN: ${{ secrets.SLASH_COMMAND_PAT }}
+          GH_REPO: ${{ github.repository }}
+          COMMENTER: ${{ github.event.comment.user.login }}
+          PR: ${{ github.event.issue.number }}
+        run: |
+          perm=$(gh api "repos/$GH_REPO/collaborators/$COMMENTER/permission" --jq .permission)
+          if [ "$perm" != admin ] && [ "$perm" != write ]; then
+            echo "::error::$COMMENTER has '$perm' permission, write is required"
+            exit 1
+          fi
+          gh label create run-basic-tests --description "Run the basic tests on this PR" 2>/dev/null || true
+          gh pr edit "$PR" --remove-label run-basic-tests 2>/dev/null || true
+          gh pr edit "$PR" --add-label run-basic-tests

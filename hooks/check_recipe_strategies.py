@@ -5,7 +5,7 @@
 
 """Guards recipe files against a few conventions drifting out of sync.
 
-Three independent checks, all against `el_paso/recipes/`:
+Four independent checks, all against `el_paso/recipes/`:
 
 1. Inline strategy construction. Every `process_*` recipe entry point should get its
    `SavingStrategy` from a named `<...>_strategy(...)` function (e.g.
@@ -27,6 +27,11 @@ Three independent checks, all against `el_paso/recipes/`:
    `process_*` entry point already must be. Otherwise the factory is unusable from outside its
    own module; see https://github.com/GFZ/EL_PASO/issues/148.
 
+4. CLI registry out of sync. Every top-level `process_*` function in a recipe file must have a
+   `RecipeEntry` in `RECIPES` (`el_paso/cli/app.py`), and every entry there must point at such a
+   function; otherwise the recipe is silently missing from the `el-paso` command line (or an
+   entry points at a recipe that no longer exists). Read statically, so nothing is imported.
+
 Run directly as a script (also wired up as a pre-commit hook); always scans the whole
 `el_paso/recipes/` tree regardless of which files changed.
 """
@@ -40,6 +45,7 @@ from typing import NamedTuple
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RECIPES_DIR = REPO_ROOT / "el_paso" / "recipes"
+CLI_APP_PATH = REPO_ROOT / "el_paso" / "cli" / "app.py"
 
 # ALLOWED_INLINE_STRATEGY: dict[Path, set[int]] = {
 #     RECIPES_DIR / "rbsp" / "process_rbsp_efw_emfisis_density_combined.py": {
@@ -220,8 +226,59 @@ def _find_missing_strategy_exports() -> list[Violation]:
     return violations
 
 
-def find_violations() -> tuple[list[Violation], list[Violation], list[Violation]]:
-    """Return (inline_strategy, str_satellite, missing_exports) violations."""
+def _registered_recipes() -> dict[tuple[str, str], int]:
+    """Map (module, function) -> line number for every `RecipeEntry(...)` in `RECIPES`."""
+    tree = ast.parse(CLI_APP_PATH.read_text(), filename=str(CLI_APP_PATH))
+    registered: dict[tuple[str, str], int] = {}
+
+    for node in tree.body:
+        if isinstance(node, ast.AnnAssign):
+            targets, value = [node.target], node.value
+        elif isinstance(node, ast.Assign):
+            targets, value = node.targets, node.value
+        else:
+            continue
+        if value is None or not any(isinstance(t, ast.Name) and t.id == "RECIPES" for t in targets):
+            continue
+
+        for call in ast.walk(value):
+            if isinstance(call, ast.Call) and isinstance(call.func, ast.Name) and call.func.id == "RecipeEntry":
+                args = [arg.value for arg in call.args if isinstance(arg, ast.Constant) and isinstance(arg.value, str)]
+                if len(args) == 4:  # mission, command, module, function
+                    registered[(args[2], args[3])] = call.lineno
+
+    return registered
+
+
+def _find_cli_registry_violations() -> list[Violation]:
+    registered = _registered_recipes()
+    if not registered:
+        return [Violation(CLI_APP_PATH, 1, "no RecipeEntry(...) found in RECIPES")]
+
+    on_disk: dict[tuple[str, str], tuple[Path, int]] = {}
+    for mission_dir in _iter_mission_dirs():
+        for module_path in sorted(mission_dir.glob("*.py")):
+            tree = ast.parse(module_path.read_text(), filename=str(module_path))
+            module = f"el_paso.recipes.{mission_dir.name}.{module_path.stem}"
+            for node in tree.body:
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name.startswith("process_"):
+                    on_disk[(module, node.name)] = (module_path, node.lineno)
+
+    violations = [
+        Violation(path, lineno, f"{function} has no RecipeEntry in RECIPES ({CLI_APP_PATH.relative_to(REPO_ROOT)})")
+        for (module, function), (path, lineno) in sorted(on_disk.items())
+        if (module, function) not in registered
+    ]
+    violations.extend(
+        Violation(CLI_APP_PATH, lineno, f"RecipeEntry points at {module}.{function}, which does not exist")
+        for (module, function), lineno in sorted(registered.items())
+        if (module, function) not in on_disk
+    )
+    return violations
+
+
+def find_violations() -> tuple[list[Violation], list[Violation], list[Violation], list[Violation]]:
+    """Return (inline_strategy, str_satellite, missing_exports, cli_registry) violations."""
     inline_strategy: list[Violation] = []
     str_satellite: list[Violation] = []
 
@@ -231,8 +288,9 @@ def find_violations() -> tuple[list[Violation], list[Violation], list[Violation]
         str_satellite.extend(_find_str_satellite_violations(path, tree))
 
     missing_exports = _find_missing_strategy_exports()
+    cli_registry = _find_cli_registry_violations()
 
-    return inline_strategy, str_satellite, missing_exports
+    return inline_strategy, str_satellite, missing_exports, cli_registry
 
 
 def _print_section(header: str, violations: list[Violation]) -> None:
@@ -248,7 +306,7 @@ def _print_section(header: str, violations: list[Violation]) -> None:
 
 def main() -> int:
     """Print every violation found and return a nonzero exit code if there were any."""
-    inline_strategy, str_satellite, missing_exports = find_violations()
+    inline_strategy, str_satellite, missing_exports, cli_registry = find_violations()
 
     _print_section(
         "A process_* recipe entry point builds a saving strategy inline instead of through a\n"
@@ -265,8 +323,13 @@ def main() -> int:
         "imported into __init__.py, or missing from its __all__). Violations:\n",
         missing_exports,
     )
+    _print_section(
+        "The el-paso CLI registry (RECIPES in el_paso/cli/app.py) is out of sync with the\n"
+        "process_* recipe functions on disk. Violations:\n",
+        cli_registry,
+    )
 
-    return 1 if (inline_strategy or str_satellite or missing_exports) else 0
+    return 1 if (inline_strategy or str_satellite or missing_exports or cli_registry) else 0
 
 
 if __name__ == "__main__":

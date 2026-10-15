@@ -79,7 +79,7 @@ class TimeBinMethod(Enum):
             match self.value:
                 case "Mean":
                     data = typing.cast("NDArray[np.floating]", data)
-                    binned_array = np.mean(data, axis=0)
+                    binned_array = np.nanmean(data, axis=0)
                 case "NanMean":
                     data = typing.cast("NDArray[np.floating]", data)
                     binned_array = np.nanmean(data, axis=0)
@@ -191,7 +191,7 @@ def bin_by_time(
 
         # calculate bin indices for given time array if it has not been calculated before
         if not index_iterables:
-            timestamps = typing.cast("NDArray[np.floating]", time_variable.get_data(ep.units.posixtime))
+            timestamps = time_variable.get_data(ep.units.posixtime).astype(np.float64)
             index_iterables = _calculate_index_iterables(timestamps, time_bins)
 
         unique_indices, indices_separation = index_iterables

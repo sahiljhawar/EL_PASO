@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Sahil Jhawar
+# SPDX-FileContributor: Bernhard Haas
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -16,6 +17,7 @@ import numpy as np
 import pytest
 from astropy import units as u
 from el_paso.dataset import DataSet, GFZDataSet
+from el_paso.dataset.dataset import _describe_difference
 from el_paso.dataset.utils import python2matlab
 
 if TYPE_CHECKING:
@@ -160,6 +162,7 @@ def prbem_dataset(tmp_path: Path) -> DataSet:
     return DataSet(saving_strategy=strategy, start_time=start_time, end_time=end_time, preferred_extension="nc")
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 class TestDataSet:  # noqa: D101
     def test_init_datetime_timezone(self, mock_dataset: DataSet):
@@ -219,6 +222,15 @@ class TestDataSet:  # noqa: D101
             ** 2
         )
         np.testing.assert_array_equal(mock_dataset.InvV, expected)
+
+    def test_computed_invv_variable_with_missing_invariants(self, mock_dataset: DataSet):
+        """InvV should be empty, not raise, when InvK/InvMu are not available."""
+        mock_dataset.InvK = np.asarray([])
+        mock_dataset.InvMu = np.asarray([])
+
+        mock_dataset._load_variable("InvV")
+
+        assert len(mock_dataset.InvV) == 0
 
     def test_computed_p_variable(self, mock_dataset: DataSet):
         """Test computed P variable."""
@@ -368,6 +380,7 @@ class TestDataSet:  # noqa: D101
             ), "File should not have been loaded again"
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 @pytest.mark.parametrize("file_format", ["nc", "h5", "cdf", "mat"])
 def test_dataset_equality_rejects_data_saved_with_different_standards(tmp_path: Path, file_format: MFSFormats) -> None:
@@ -422,6 +435,7 @@ def test_dataset_equality_rejects_data_saved_with_different_standards(tmp_path: 
         gfz_dataset.assert_equal(prbem_dataset)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 @pytest.mark.parametrize("file_format", ["nc", "h5", "cdf", "mat"])
 def test_comparison_loads_all_strategy_variables(tmp_path: Path, file_format: MFSFormats) -> None:
@@ -467,6 +481,35 @@ def test_comparison_loads_all_strategy_variables(tmp_path: Path, file_format: MF
     assert expected.issubset(loaded), f"Variables not loaded after comparison: {expected - loaded}"
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_comparison_without_computed_property_inputs(tmp_path: Path) -> None:
+    """Comparison must not fail for strategies lacking MLT/InvMu, the inputs of P and InvV."""
+    start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_time = datetime(2013, 1, 2, tzinfo=timezone.utc)
+
+    time_var = ep.Variable(
+        data=np.asarray([start_time.timestamp(), start_time.timestamp() + 3600]), original_unit=ep.units.posixtime
+    )
+    variables: dict[InternalName, ep.Variable] = {
+        "Epoch": time_var,
+        "Alpha": ep.Variable(data=np.tile([30.0, 60.0], (2, 1)), original_unit=u.deg),
+        "LCDS": ep.Variable(data=np.asarray([[6.0, 6.5], [6.2, np.inf]]), original_unit=u.dimensionless_unscaled),
+        "InvK": ep.Variable(data=np.asarray([[0.1, 0.02], [0.1, np.nan]]), original_unit=u.R_earth * u.nT**0.5),
+    }
+
+    strategy = ep.saving_strategies.LCDSStrategy(tmp_path, "T89", ep.data_standards.GFZStandard(), "nc")
+    ep.save(variables, strategy, start_time=start_time, end_time=end_time, time_var=time_var)
+
+    ds1 = DataSet(saving_strategy=strategy, start_time=start_time, end_time=end_time, verbose=False)
+    ds2 = DataSet(saving_strategy=strategy, start_time=start_time, end_time=end_time, verbose=False)
+
+    ds1.assert_equal(ds2)
+    assert len(ds1.P) == 0
+    assert len(ds1.InvV) == 0
+
+
+@pytest.mark.minimal
 @pytest.mark.basic
 @pytest.mark.parametrize("file_format", ["nc", "h5", "cdf", "mat"])
 @pytest.mark.parametrize("data_standard", [ep.data_standards.PRBEMStandard, ep.data_standards.GFZStandard])
@@ -529,6 +572,7 @@ _ECT_START = datetime(2017, 9, 8, tzinfo=timezone.utc)
 _ECT_END = _ECT_START + timedelta(days=0.4, seconds=-1)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_dataset_equals_gfz_dataset_on_ect_combined() -> None:
     """DataSet and GFZDataSet loaded from the same file must compare equal."""
@@ -547,61 +591,107 @@ def test_dataset_equals_gfz_dataset_on_ect_combined() -> None:
     assert base_ds == gfz_ds
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_gfz_epoch_resolves_to_time(gfz_dataset: DataSet) -> None:
     result = gfz_dataset.get_by_internal_name("Epoch")
     np.testing.assert_array_equal(result, gfz_dataset.time)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_gfz_fedu_resolves_to_flux(gfz_dataset: DataSet) -> None:
     result = gfz_dataset.get_by_internal_name("FEDU")
     np.testing.assert_array_equal(result, gfz_dataset.Flux)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_gfz_r_eq_resolves_to_r0(gfz_dataset: DataSet) -> None:
     result = gfz_dataset.get_by_internal_name("R_Eq")
     np.testing.assert_array_equal(result, gfz_dataset.R0)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_gfz_l_star_resolves_to_lstar(gfz_dataset: DataSet) -> None:
     result = gfz_dataset.get_by_internal_name("L_star")
     np.testing.assert_array_equal(result, gfz_dataset.Lstar)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_gfz_energy_fedu_resolves_to_energy_channels(gfz_dataset: DataSet) -> None:
     result = gfz_dataset.get_by_internal_name("Energy_FEDU")
     np.testing.assert_array_equal(result, gfz_dataset.energy_channels)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_gfz_alpha_eq_resolves_to_alpha_eq_model(gfz_dataset: DataSet) -> None:
     result = gfz_dataset.get_by_internal_name("Alpha_Eq")
     np.testing.assert_array_equal(result, gfz_dataset.alpha_eq_model)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_prbem_epoch_resolves_to_epoch(prbem_dataset: DataSet) -> None:
     result = prbem_dataset.get_by_internal_name("Epoch")
     np.testing.assert_array_equal(result, prbem_dataset.Epoch)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_prbem_r_eq_resolves_to_r_eq(prbem_dataset: DataSet) -> None:
     result = prbem_dataset.get_by_internal_name("R_Eq")
     np.testing.assert_array_equal(result, prbem_dataset.R_Eq)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_prbem_l_star_resolves_to_l_star(prbem_dataset: DataSet) -> None:
     result = prbem_dataset.get_by_internal_name("L_star")
     np.testing.assert_array_equal(result, prbem_dataset.L_star)
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_unknown_internal_name_raises(gfz_dataset: DataSet) -> None:
     with pytest.raises(ValueError):  # noqa: PT011
         gfz_dataset.get_by_internal_name("NotAnInternalName")  # ty:ignore[invalid-argument-type]
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_describe_difference_reports_max_absolute_and_relative_difference() -> None:
+    reference = np.array([[1.0, 2.0], [1e-4, np.nan]])
+    other = np.array([[1.0, 2.5], [2e-4, np.nan]])
+
+    message = _describe_difference("InvK", reference, other)
+
+    assert message.splitlines() == [
+        "InvK: 2 of 4 elements differ",
+        "  max absolute difference: 0.5 at index (0, 1) (2 vs. 2.5)",
+        "  max relative difference: 0.5 at index (1, 0) (0.0001 vs. 0.0002)",
+    ]
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_describe_difference_reports_nan_mismatches_and_shapes() -> None:
+    nan_message = _describe_difference("Lstar", np.array([1.0, np.nan, 3.0]), np.array([1.0, 2.0, 3.0]))
+    assert "NaN in only one dataset: 1 elements (first at index (1,): nan vs. 2)" in nan_message
+
+    assert _describe_difference("Flux", np.zeros((2, 3)), np.zeros((3, 2))) == (
+        "Flux: different shapes ((2, 3) vs. (3, 2))"
+    )
+    assert _describe_difference("MLT", np.zeros(2), [0.0, 0.0]) == "MLT: different types (ndarray vs. list)"
+
+
+@pytest.mark.basic
+def test_describe_difference_respects_tolerance() -> None:
+    reference = np.array([1.0, 0.04012066392])
+    other = np.array([1.0, 0.04011394512])  # relative difference of ~1.7e-4
+
+    assert _describe_difference("InvK", reference, other).startswith("InvK: 1 of 2 elements differ")
+    assert _describe_difference("InvK", reference, other, rtol=1e-3).startswith("InvK: 0 of 2 elements differ")

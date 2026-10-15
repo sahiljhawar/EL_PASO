@@ -1,5 +1,7 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
+# SPDX-FileCopyrightText: 2026 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -77,7 +79,7 @@ def process_rbsp_ect_combined(
         save_strategy (Literal["gfz", "netcdf", "both"]): Which saving strategy/strategies
             to use for writing the processed output. Defaults to "netcdf".
         num_cores (int): Number of CPU cores used for the magnetic field computations.
-            Defaults to 4.
+            Defaults to 16.
         skip_existing (bool): If True, skip downloading files that already exist on disk.
         save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
             the magnetic field variables alongside the rest of the output. Defaults to False.
@@ -97,6 +99,8 @@ def process_rbsp_ect_combined(
         method="request",
         skip_existing=skip_existing,
     )
+
+    ep.exit_if_download_only()
 
     extraction_infos = [
         ep.ExtractionInfo(
@@ -223,11 +227,11 @@ def process_rbsp_ect_combined(
 
     if save_strategy in ("gfz", "both"):
         strategy = rbsp_ect_combined_gfz_strategy(processed_data_path, mag_field, satellite)
+        ep.save(variables_to_save, strategy, start_time, end_time, binned_time_variable, append=True, save_sw=save_sw)
 
     if save_strategy in ("netcdf", "both"):
         strategy = rbsp_ect_combined_netcdf_strategy(processed_data_path, mag_field, satellite)
-
-    ep.save(variables_to_save, strategy, start_time, end_time, binned_time_variable, append=True, save_sw=save_sw)
+        ep.save(variables_to_save, strategy, start_time, end_time, binned_time_variable, append=True, save_sw=save_sw)
 
 
 if __name__ == "__main__":

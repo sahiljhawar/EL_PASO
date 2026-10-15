@@ -53,6 +53,7 @@ class _SWStubStrategy(ep.SavingStrategy):
         self.received_variables_dict = variables_dict
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_save_raises_warning_when_var_is_empty(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
 
@@ -79,6 +80,7 @@ def test_save_raises_warning_when_var_is_empty(tmp_path: Path, caplog: pytest.Lo
     )
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_time_independent_variable_is_written_to_every_daily_file(tmp_path: Path) -> None:
     """A variable that is not time dependent belongs in full in each interval's file.
@@ -141,6 +143,7 @@ def test_time_independent_variable_is_written_to_every_daily_file(tmp_path: Path
         np.testing.assert_allclose(second.variables["BB"][:], psd[samples_per_day:])
 
 
+@pytest.mark.minimal
 @pytest.mark.basic
 def test_interval_without_records_is_skipped(tmp_path: Path) -> None:
     """An interval containing no samples is skipped, leaving no file behind.
@@ -285,9 +288,7 @@ def test_save_sw_appends_solar_wind_indices_file(tmp_path: Path) -> None:
         "el_paso.save.construct_maginput",
         return_value=MagInputResult(maginput={}, indices_solar_wind={"Kp": kp_1}),
     ):
-        ep.save(
-            variables_1, strategy, start_time=start_1, end_time=end_1, time_var=variables_1["Epoch"], save_sw=True
-        )
+        ep.save(variables_1, strategy, start_time=start_1, end_time=end_1, time_var=variables_1["Epoch"], save_sw=True)
 
     start_2 = datetime(2013, 1, 1, 12, tzinfo=timezone.utc)
     end_2 = datetime(2013, 1, 2, 12, tzinfo=timezone.utc)
@@ -319,3 +320,29 @@ def test_save_sw_appends_solar_wind_indices_file(tmp_path: Path) -> None:
     assert kp_data.shape[0] == 36
     assert np.sum(kp_data == 2.0) == 12
     assert np.sum(kp_data == 8.0) == 24
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_variable_not_saved_by_strategy_is_warned_about(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    """A variable missing from every output file of the strategy is dropped, so `save` warns about it."""
+    start_time = datetime(2024, 5, 10, tzinfo=timezone.utc)
+    end_time = datetime(2024, 5, 10, 23, 59, tzinfo=timezone.utc)
+    times = np.array([start_time.timestamp() + 3600 * i for i in range(6)])
+
+    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+        "Epoch": ep.Variable(ep.units.posixtime, data=times),
+        "MLT": ep.Variable(u.hour, data=np.linspace(0, 5, times.size)),
+        "Energy_FEDO": ep.Variable(u.keV, data=np.tile(np.array([100.0, 200.0]), (times.size, 1))),
+    }
+
+    saving_strategy = ep.saving_strategies.MonthlyRBStrategy(
+        tmp_path, "Arase", "arase", "xep", "T89", data_standard=ep.data_standards.GFZStandard()
+    )
+
+    with caplog.at_level(logging.WARNING, logger="ep"):
+        ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=variables_to_save["Epoch"])
+
+    warnings = [r.getMessage() for r in caplog.records if r.levelno == logging.WARNING]
+    assert any("Energy_FEDO are not saved by MonthlyRBStrategy" in message for message in warnings)
+    assert not any("MLT" in message and "not saved by" in message for message in warnings)

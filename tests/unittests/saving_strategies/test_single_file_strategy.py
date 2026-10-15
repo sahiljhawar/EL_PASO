@@ -1,5 +1,6 @@
 # SPDX-FileCopyrightText: 2025 GFZ Helmholtz Centre for Geosciences
 # SPDX-FileContributor: Bernhard Haas
+# SPDX-FileContributor: Sahil Jhawar
 #
 # SPDX-License-Identifier: Apache-2.0
 
@@ -16,6 +17,7 @@ from astropy import units as u
 rng = np.random.default_rng(1337)
 
 
+@pytest.mark.minimal
 @pytest.mark.parametrize("file_format", [".mat", ".h5", ".nc", ".cdf"])
 @pytest.mark.basic
 def test_basic_single_file_strategy(tmp_path: Path, file_format: str) -> None:
@@ -37,6 +39,8 @@ def test_basic_single_file_strategy(tmp_path: Path, file_format: str) -> None:
     assert save_path.exists()
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
 def test_save_raises_for_invalid_value_type(tmp_path: Path) -> None:
     variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
         "FEDU": ep.Variable(original_unit=u.dimensionless_unscaled, data=rng.normal((20, 21))),
@@ -53,6 +57,8 @@ def test_save_raises_for_invalid_value_type(tmp_path: Path) -> None:
         )
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
 def test_save_raises_for_invalid_internal_name(tmp_path: Path) -> None:
     variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
         "FEDU": ep.Variable(original_unit=u.dimensionless_unscaled, data=rng.normal((20, 21))),
@@ -67,3 +73,35 @@ def test_save_raises_for_invalid_internal_name(tmp_path: Path) -> None:
             start_time=datetime(2013, 1, 1, tzinfo=timezone.utc),
             end_time=datetime(2013, 1, 2, tzinfo=timezone.utc),
         )
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_single_file_strategy_saves_variables_untruncated(tmp_path: Path) -> None:
+    from scipy.io import loadmat  # noqa: PLC0415
+
+    start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_time = datetime(2013, 1, 2, tzinfo=timezone.utc)
+    epoch = np.linspace(start_time.timestamp() - 3600, end_time.timestamp() + 3600, 51)
+
+    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+        "Epoch": ep.Variable(original_unit=ep.units.posixtime, data=epoch),
+        "FEDU": ep.Variable(original_unit=u.dimensionless_unscaled, data=rng.normal(size=(51, 3))),
+        "Pitch_angle": ep.Variable(original_unit=u.deg, data=np.linspace(0, 180, 11)),
+    }
+
+    save_path = tmp_path / "test.mat"
+    strategy = ep.saving_strategies.SingleFileStrategy(file_path=save_path)
+    ep.save(
+        variables_to_save,
+        strategy,
+        start_time=start_time,
+        end_time=end_time,
+        time_var=variables_to_save["Epoch"],
+        ignore_validation=True,
+    )
+
+    loaded = loadmat(save_path)
+    assert loaded["Epoch"].size == 51
+    assert loaded["FEDU"].shape == (51, 3)
+    assert loaded["Pitch_angle"].size == 11

@@ -20,7 +20,7 @@ SPDX-License-Identifier: Apache-2.0
 
 Its primary purpose is to prepare and standardize particle data for use in radiation belt modeling.
 
-<img width="1200" height="682" alt="el_paso_recipe" src="https://github.com/user-attachments/assets/1903bc32-eea6-41a0-8bf2-e48c4d9dcba9" />
+<img width="1493" height="963" alt="el_paso_recipe" src="https://github.com/user-attachments/assets/876072eb-00a9-44c6-9b83-a404bc49e8e1" />
 
 ## Features
 
@@ -39,6 +39,8 @@ Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest
     - PWE density
 - **DMSP**
     - SSJ (electrons)
+- **GOES (13 and 15)**
+    - EPS MAGED and EPEAD combined
 - **GOES-R**
     - MPS-High real-time
     - MPS-High
@@ -46,6 +48,7 @@ Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest
     - GPS processing
 - **ESA**
     - NGRM satellites
+    - GSSC EMU (electrons and protons)
 - **POES**
     - MEPED (electrons)
     - TED (electrons)
@@ -61,8 +64,8 @@ Full documentation can be viewed [here](https://el-paso.readthedocs.io/en/latest
     - ECT-combined
     - EMFISIS waves
     - EMFISIS and EFW density
-- **DMSP**
-    - SSJ (electrons)
+- **Models** (no spacecraft data needed)
+    - Last closed drift shell (LCDS)
 
 Every recipe shares one command line interface; see
 [Running a recipe](#running-a-recipe) below.
@@ -149,13 +152,13 @@ the full list.
 
 ### Step 1: Download the Test Data
 
-Most tests rely on reference/system test data hosted on [Zenodo](https://zenodo.org). Download it by running the following script from the repository root:
+Most tests rely on reference/system test data hosted on [Hugging Face](https://huggingface.co/datasets/spsw/EL-PASO-Test-Data). Download it by running the following script from the repository root:
 
 ```bash
 bash download_data_for_tests.sh
 ```
 
-This fetches the dataset archive and extracts it into `tests/system/`. You only need to do this once (rerun it if the data changes upstream).
+This fetches the pinned revision of the dataset into `tests/system/data/` using the Hugging Face CLI (run through `uvx`, so [uv](https://docs.astral.sh/uv/) must be installed). You only need to do this once (rerun it if the pinned revision changes).
 
 `pytest` is installed as part of the regular dependencies (see [Installation](#installation)), so no separate test install step is needed.
 

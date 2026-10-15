@@ -12,22 +12,32 @@ on:
   pull_request:
     branches:
       - main
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   ruff:
+    if: github.event.action != 'labeled' || github.event.label.name == 'run-basic-tests'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: astral-sh/ruff-action@main
         with:
           version: "latest"
           src: el_paso
 
   ty:
+    if: github.event.action != 'labeled' || github.event.label.name == 'run-basic-tests'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@main
@@ -35,7 +45,7 @@ jobs:
           enable-cache: true
 
       - name: Set up Python
-        run: uv python install
+        run: uv python install 3.12
 
       - name: Install project and ty
         run: |
@@ -46,6 +56,7 @@ jobs:
         run: ty check
 
   tests:
+    if: github.event.action != 'labeled' || github.event.label.name == 'run-basic-tests'
     needs: [ruff, ty]
     strategy:
       fail-fast: false
@@ -55,6 +66,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -66,18 +79,18 @@ jobs:
           uv sync
           uv pip install coveralls coverage pytest-cov
 
-      - name: Get zenodo record ID
-        id: zenodo-record
-        run: echo "id=$(grep -oP 'RECORD_ID="\K[^"]+' download_data_for_tests.sh)" >> "$GITHUB_OUTPUT"
+      - name: Get test data revision
+        id: test-data-revision
+        run: echo "id=$(grep -oP 'REVISION="\K[^"]+' download_data_for_tests.sh)" >> "$GITHUB_OUTPUT"
 
       - name: Cache test data
         id: cache-test-data
         uses: actions/cache@v6
         with:
           path: tests/system/data
-          key: zenodo-test-data-${{ steps.zenodo-record.outputs.id }}
+          key: hf-test-data-${{ steps.test-data-revision.outputs.id }}
 
-      - name: Download test data from zenodo
+      - name: Download test data from Hugging Face
         if: steps.cache-test-data.outputs.cache-hit != 'true'
         run: bash download_data_for_tests.sh
 
@@ -85,10 +98,15 @@ jobs:
         env:
           ESA_CLIENT_ID: ${{ secrets.ESA_CLIENT_ID }}
           ESA_CLIENT_SECRET: ${{ secrets.ESA_CLIENT_SECRET }}
+          GSSC_USER: ${{ secrets.GSSC_USER }}
+          GSSC_PASS: ${{ secrets.GSSC_PASSWORD }}
           SPACETRACK_USER: ${{ secrets.SPACETRACK_USER }}
           SPACETRACK_PASS: ${{ secrets.SPACETRACK_PASS }}
           _TYPER_FORCE_DISABLE_TERMINAL: "1"
-        run: uv run coverage run --source el_paso -m pytest -rf tests -m basic --indices_sw_param_data_path tests/system/data/indices_sw_params
+          # Pull requests run only the minimal tests, except the run started by adding the run-basic-tests label.
+          # Everything else (push to main, manual dispatch) runs the basic tests.
+          MARKER: ${{ github.event_name == 'pull_request' && !(github.event.action == 'labeled' && github.event.label.name == 'run-basic-tests') && 'minimal' || 'basic' }}
+        run: uv run coverage run --source el_paso -m pytest -rf tests -m "$MARKER" --indices_sw_param_data_path tests/system/data/indices_sw_params
 
       - name: Run Coveralls
         if: ${{ success() && matrix.python-version == '3.12' }}
