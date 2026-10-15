@@ -13,6 +13,7 @@ from unittest.mock import MagicMock
 
 import el_paso as ep
 import pytest
+import requests
 
 _ISS_OMM_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <ndm xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
@@ -405,13 +406,16 @@ def test_download_omm_live(tmp_path: Path, skip_if_unreachable: Callable[..., No
     if not username or not password:
         pytest.skip("SPACETRACK_USER/SPACETRACK_PASS not set; skipping live Space-Track test.")
 
-    ep.download_omm(
-        norad_ids="25544",
-        start_time=datetime(2024, 1, 1, tzinfo=timezone.utc),
-        end_time=datetime(2024, 1, 2, tzinfo=timezone.utc),
-        save_path=tmp_path,
-        skip_existing=False,
-    )
+    try:
+        ep.download_omm(
+            norad_ids="25544",
+            start_time=datetime(2024, 1, 1, tzinfo=timezone.utc),
+            end_time=datetime(2024, 1, 2, tzinfo=timezone.utc),
+            save_path=tmp_path,
+            skip_existing=False,
+        )
+    except requests.exceptions.Timeout:
+        pytest.skip("Space-Track read timed out; skipping live test.")
 
     omm_files = list(tmp_path.glob("**/*.csv"))
     assert len(omm_files) == 1
