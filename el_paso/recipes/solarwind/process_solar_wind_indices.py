@@ -62,8 +62,7 @@ def process_solar_wind_indices(
         num_cores (int): Unused. Loading the indices is not parallelized.
         save_strategy (Literal["gfz"]): Unused.
         skip_existing (bool): Unused.
-        save_sw (bool): Unused. This recipe already saves all solar wind indices and
-            parameters; accepted only for interface consistency with other EL-PASO recipes.
+        save_sw (bool): Unused.
     """
     del satellite, mag_field, raw_data_path, num_cores, save_strategy, skip_existing, save_sw
 
