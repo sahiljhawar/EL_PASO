@@ -15,6 +15,7 @@ from astropy import units as u
 from dotenv import load_dotenv
 
 import el_paso as ep
+from el_paso.recipes.solarwind.process_solar_wind_indices import process_solar_wind_indices
 from el_paso.utils import timed_function
 
 CHI2_BAD_QUALITY_THRESHOLD = 2
@@ -98,8 +99,8 @@ def process_ept_electron_fluxes(
             strategies) to use for the processed output.
         skip_existing (bool): If True, skip downloading files that already exist locally.
         apply_correction_factors (bool): Flag whether to apply correction factors to fluxes.
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
-            the magnetic field variables alongside the rest of the output. Defaults to False.
+        save_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
 
     Raises:
         ValueError: If `client_id` or `client_secret` is not provided and not available via the
@@ -313,7 +314,12 @@ def process_ept_electron_fluxes(
 
     if save_strategy in ("netcdf", "both"):
         strategy = probav_ept_electron_netcdf_strategy(processed_data_path, mag_field)
-    ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw)
+    ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True)
+
+    if save_sw:
+        process_solar_wind_indices(
+            start_time, end_time, processed_data_path=processed_data_path, bin_cadence=bin_cadence
+        )
 
 
 if __name__ == "__main__":

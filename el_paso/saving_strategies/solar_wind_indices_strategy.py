@@ -5,30 +5,45 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
-from el_paso.processing.magnetic_field_utils.construct_maginput import get_saveable_sw_indices
-from el_paso.saving_strategies.lcds_strategy import LCDSStrategy
-from el_paso.saving_strategy import OutputFile
+import el_paso as ep
+from el_paso.saving_strategy import OutputFile, SavingStrategy
 
 if TYPE_CHECKING:
-    from pathlib import Path
+    from datetime import datetime
 
-    from el_paso.typing import DataStandard, MagneticFieldLiteral, MFSFormats, StandardName
+    from el_paso.load_indices_solar_wind_parameters import SW_Index
+    from el_paso.typing import DataStandard, MFSFormats, StandardName, TimeInterval
+
+ALL_SW_INDICES: list[SW_Index] = [
+    "Kp",
+    "Dst",
+    "Pdyn",
+    "ByIMF",
+    "BzIMF",
+    "Vsw",
+    "Nsw",
+    "G1",
+    "G2",
+    "G3",
+    "W_params",
+]
 
 
-class SolarWindIndicesStrategy(LCDSStrategy):
-    """Save only the solar wind/geomagnetic indices a magnetic field model needs, one file per month.
+class SolarWindIndicesStrategy(SavingStrategy):
+    """Save every solar wind/geomagnetic index EL-PASO can load, one file per month.
 
-    Shares the monthly interval and file naming logic of `LCDSStrategy`. The single output file
-    holds the time axis plus every index that `mag_field` requires and `data_standard` can store
-    (e.g. only Kp for T89).
+    Independent of any magnetic field model: the single output file holds the time axis plus
+    every index in `ALL_SW_INDICES` that `data_standard` can also store.
     """
+
+    output_files: list[OutputFile]
 
     def __init__(
         self,
         base_data_path: str | Path,
-        mag_field: MagneticFieldLiteral,
         data_standard: DataStandard[StandardName],
         file_format: MFSFormats = "nc",
     ) -> None:
@@ -36,16 +51,33 @@ class SolarWindIndicesStrategy(LCDSStrategy):
 
         Args:
             base_data_path (str | Path): Directory where monthly files are written.
-            mag_field (MagneticFieldLiteral): Magnetic field model name, which decides the saved indices.
             data_standard (DataStandard): Instance of the data standard implementation.
             file_format (MFSFormats): One of ``"nc"``, ``"cdf"``, ``"h5"``, or ``"mat"``.
                 A leading dot is also accepted.
         """
-        super().__init__(base_data_path, mag_field, data_standard, file_format)
+        self.base_data_path = Path(base_data_path)
+        self.data_standard = data_standard
+        self.file_format = ep.utils.normalize_file_format(file_format)
 
+        saveable_indices = [idx for idx in ALL_SW_INDICES if idx in data_standard.variable_infos]
         self.output_files = [
-            OutputFile("full", ["Epoch", *get_saveable_sw_indices(mag_field, data_standard)], save_incomplete=True),
+            OutputFile("full", ["Epoch", *saveable_indices], save_incomplete=True),
         ]
+
+    def get_time_intervals_to_save(self, start_time: datetime | None, end_time: datetime | None) -> list[TimeInterval]:
+        """Split the requested time range into full monthly intervals."""
+        return ep.utils.get_monthly_datetime_intervals(start_time, end_time)
+
+    def get_file_path_stem(self) -> Path:
+        return self.base_data_path
 
     def get_file_name_stem(self) -> str:
         return "SolarWindIndices"
+
+    def get_file_path(self, interval_start: datetime, interval_end: datetime, output_file: OutputFile) -> Path:  # noqa: ARG002
+        """Generate the monthly file path for the configured format."""
+        start_year_month_day = interval_start.strftime("%Y%m%d")
+        end_year_month_day = interval_end.strftime("%Y%m%d")
+        file_name = f"{self.get_file_name_stem()}_{start_year_month_day}to{end_year_month_day}{self.file_format}"
+
+        return self.get_file_path_stem() / file_name

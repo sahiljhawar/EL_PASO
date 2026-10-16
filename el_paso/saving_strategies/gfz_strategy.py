@@ -12,7 +12,6 @@ from typing import TYPE_CHECKING, Optional
 
 import el_paso as ep
 from el_paso.data_standards import GFZStandard
-from el_paso.processing.magnetic_field_utils.construct_maginput import get_saveable_sw_indices
 from el_paso.saving_strategy import OutputFile, SavingStrategy
 
 if TYPE_CHECKING:
@@ -91,14 +90,6 @@ class GFZStrategy(SavingStrategy):
             OutputFile("R0", ["Epoch", "R_Eq"]),
         ]
 
-        # this output file is only ever written if the caller actually saved one of the required
-        # solar wind indices alongside the rest of the data; see SavingStrategy.get_target_variables.
-        required_sw_indices = get_saveable_sw_indices(self.mag_field, self.data_standard)
-        if required_sw_indices:
-            self.output_files.append(
-                OutputFile("solar_wind_indices", ["Epoch", *required_sw_indices], save_incomplete=True)
-            )
-
         self._loader = ep.utils.load_mat_data
 
     def get_time_intervals_to_save(self, start_time: datetime | None, end_time: datetime | None) -> list[TimeInterval]:
@@ -166,7 +157,6 @@ class GFZStrategy(SavingStrategy):
             "mlt",
             "bfield",
             "R0",
-            "solar_wind_indices",
         ]:
             file_name += f"_n4_4_{self.mag_field}"
 

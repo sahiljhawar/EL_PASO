@@ -13,7 +13,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import el_paso as ep
-from el_paso.processing.magnetic_field_utils.construct_maginput import get_saveable_sw_indices
 from el_paso.saving_strategy import OutputFile, SavingStrategy
 
 if TYPE_CHECKING:
@@ -80,14 +79,6 @@ class MonthlyRBStrategy(SavingStrategy):
         self.output_files = [
             OutputFile("full", self._get_output_file_entries(), save_incomplete=True),
         ]
-
-        # this output file is only ever written if the caller actually saved one of the required
-        # solar wind indices alongside the rest of the data; see SavingStrategy.get_target_variables.
-        required_sw_indices = get_saveable_sw_indices(mag_field, self.data_standard)
-        if required_sw_indices:
-            self.output_files.append(
-                OutputFile("solar_wind_indices", ["Epoch", *required_sw_indices], save_incomplete=True)
-            )
 
     def _get_output_file_entries(self) -> list[InternalName | tuple[InternalName, ...]]:
         """Return the standard variable list plus user-defined custom variables."""
@@ -156,8 +147,8 @@ class MonthlyRBStrategy(SavingStrategy):
         """Generate the monthly file path for the configured format.
 
         The default "full" output file keeps its historical, unsuffixed name for backwards
-        compatibility. Any additional output file (e.g. a "solar_wind_indices" group) gets
-        `output_file.name` appended to disambiguate it from "full" and from other extra groups.
+        compatibility. Any additional output file gets `output_file.name` appended to
+        disambiguate it from "full" and from other extra groups.
         """
         start_year_month_day = interval_start.strftime("%Y%m%d")
         end_year_month_day = interval_end.strftime("%Y%m%d")

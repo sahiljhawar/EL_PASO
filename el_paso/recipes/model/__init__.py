@@ -14,7 +14,6 @@ __getattr__, _lazy_dir, __all__ = lazy.attach(
     __name__,
     submod_attrs={
         "process_lcds": ["lcds_strategy", "process_lcds"],
-        "process_solar_wind_indices": ["process_solar_wind_indices", "solar_wind_indices_strategy"],
     },
 )
 
@@ -25,14 +24,8 @@ def __dir__() -> list[str]:
 
 if TYPE_CHECKING:
     from el_paso.recipes.model.process_lcds import lcds_strategy, process_lcds
-    from el_paso.recipes.model.process_solar_wind_indices import (
-        process_solar_wind_indices,
-        solar_wind_indices_strategy,
-    )
 
     __all__ = [
         "lcds_strategy",
         "process_lcds",
-        "process_solar_wind_indices",
-        "solar_wind_indices_strategy",
     ]

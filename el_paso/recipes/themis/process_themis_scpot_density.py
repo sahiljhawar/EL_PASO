@@ -10,6 +10,7 @@ from typing import Literal
 
 import el_paso as ep
 from el_paso.pyspedas_utils import set_pyspedas_data_dir
+from el_paso.recipes.solarwind.process_solar_wind_indices import process_solar_wind_indices
 from el_paso.recipes.themis import ThemisProbe
 from el_paso.recipes.themis.get_themis_pyspedas_variables import (
     get_themis_position_geo,
@@ -80,8 +81,8 @@ def process_themis_scpot_density(
         skip_existing (bool): Unused by this recipe; accepted only for interface consistency
             with other EL-PASO recipes, since pyspedas decides on its own whether a locally
             cached THEMIS file is still current. Defaults to True.
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
-            the magnetic field variables alongside the rest of the output. Defaults to False.
+        save_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     del skip_existing
     del save_strategy
@@ -148,7 +149,12 @@ def process_themis_scpot_density(
         "xGEO_Eq": magnetic_field_variables["xGEO_Eq_" + mag_field],
     }
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable, save_sw=save_sw)
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
+
+    if save_sw:
+        process_solar_wind_indices(
+            start_time, end_time, processed_data_path=processed_data_path, bin_cadence=bin_cadence
+        )
 
 
 CLI_DEFAULTS = {

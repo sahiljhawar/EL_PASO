@@ -241,17 +241,35 @@ class TestDataSet:  # noqa: D101
         expected = ((mock_dataset.MLT + 12) / 12 * np.pi) % (2 * np.pi)
         np.testing.assert_array_equal(mock_dataset.P, expected)
 
-    def test_loading_variable_from_skipped_output_file_does_not_clobber_shared_time(self, mock_dataset: DataSet):
+    def test_loading_variable_from_skipped_output_file_does_not_clobber_shared_time(self, tmp_path: Path) -> None:
         """A variable from a skipped output file must not clobber "time"."""
-        mock_dataset._load_variable("time")
-        loaded_time = np.array(mock_dataset.time, copy=True)
+        variables = _mock_monthly_variables()
+        del variables["MLT"]  # "MLT" is the only variable GFZStrategy's "mlt" output file needs.
+
+        start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+        end_time = datetime(2013, 1, 2, tzinfo=timezone.utc)
+
+        strategy = ep.saving_strategies.GFZStrategy(
+            base_data_path=tmp_path,
+            mission="GOES",
+            satellite="primary",
+            instrument="MAGED",
+            mag_field="T89",
+            data_standard=ep.data_standards.GFZStandard(),
+        )
+        ep.save(variables, strategy, start_time=start_time, end_time=end_time, time_var=variables["Epoch"])
+
+        dataset = DataSet(saving_strategy=strategy, start_time=start_time, end_time=end_time, preferred_extension="mat")
+
+        dataset._load_variable("time")
+        loaded_time = np.array(dataset.time, copy=True)
         assert loaded_time.size > 0
 
-        # "Kp" belongs to the "solar_wind_indices" output file, which was never written because
-        # _mock_monthly_variables() does not include any solar wind index variables.
-        mock_dataset._load_variable("Kp")
+        # "MLT" belongs to the "mlt" output file, which was never written because "MLT" is
+        # missing from `variables`.
+        dataset._load_variable("MLT")
 
-        np.testing.assert_array_equal(mock_dataset.time, loaded_time)
+        np.testing.assert_array_equal(dataset.time, loaded_time)
 
     def test_load_variable_real_file(self, mock_dataset: DataSet):
         mock_dataset._load_variable("alpha_local")
@@ -333,8 +351,8 @@ class TestDataSet:  # noqa: D101
 
     def test_all_variables_in_dir(self, mock_dataset: DataSet):
         # Loading one variable eagerly loads every variable that shares its output file, but a
-        # strategy may split its variables across multiple output files (e.g. MonthlyRBStrategy's
-        # "solar_wind_indices" group), so load one representative variable per output file.
+        # strategy may split its variables across multiple output files, so load one
+        # representative variable per output file.
         strategy = mock_dataset.saving_strategy
         for output_file in strategy.output_files:
             # Pick a name unique to this output file: shared names (e.g. "Epoch") resolve back

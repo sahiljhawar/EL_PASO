@@ -103,8 +103,7 @@ def test_rbsp_ect_combined_snapshot(
             )
 
             if renew_solution:
-                # Copy every output file this strategy produces (e.g. "full" and
-                # "solar_wind_indices"), not just the primary one, so a strategy that later gains
+                # Copy every output file this strategy produces, so a strategy that later gains
                 # more output groups stays covered.
                 # get_file_path() needs the strategy's own rounded interval (full-month bounds for
                 # MonthlyRBStrategy), not the raw start_time/end_time, to compute the correct name.

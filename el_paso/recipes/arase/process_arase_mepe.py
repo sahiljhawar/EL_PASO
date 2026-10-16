@@ -21,6 +21,7 @@ from el_paso.recipes.arase import (
     get_arase_orbit_level_3_variables,
 )
 from el_paso.recipes.arase.get_arase_orbit_variables import interpolate_level_3_to_pitch_angles
+from el_paso.recipes.solarwind.process_solar_wind_indices import process_solar_wind_indices
 
 
 def arase_mepe_gfz_strategy(
@@ -122,9 +123,8 @@ def process_arase_mepe(
                                                 quantities via IRBEM. Defaults to True.
         skip_existing (bool): If True, skip downloading files that already exist locally.
                                             Defaults to True.
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices relevant to
-                                            `mag_field` alongside the rest of the output, regardless of
-                                            `use_level_3_orbit_data`. Defaults to False.
+        save_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     del satellite
 
@@ -330,7 +330,12 @@ def process_arase_mepe(
         case "netcdf":
             saving_strategy = arase_mepe_netcdf_strategy(processed_data_path, mag_field_save, data_standard_instance)
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable, save_sw=save_sw)
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
+
+    if save_sw:
+        process_solar_wind_indices(
+            start_time, end_time, processed_data_path=processed_data_path, bin_cadence=bin_cadence
+        )
 
 
 if __name__ == "__main__":

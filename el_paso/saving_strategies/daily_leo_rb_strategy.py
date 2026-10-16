@@ -58,8 +58,8 @@ class DailyLEORBStrategy(ep.typing.MonthlyRBStrategy):
         """Generate the daily file path for the configured format.
 
         The default "full" output file keeps its historical, unsuffixed name for backwards
-        compatibility. Any additional output file (e.g. a "solar_wind_indices" group) gets
-        `output_file.name` appended to disambiguate it from "full".
+        compatibility. Any additional output file gets `output_file.name` appended to
+        disambiguate it from "full".
         """
         file_name = f"{self.get_file_name_stem()}_{interval_start.strftime('%Y%m%d')}_{self.mag_field}"
 

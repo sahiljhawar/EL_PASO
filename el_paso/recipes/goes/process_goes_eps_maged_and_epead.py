@@ -14,6 +14,7 @@ from numpy.typing import NDArray
 
 import el_paso as ep
 from el_paso.recipes.goes import GOESNOPSatellite
+from el_paso.recipes.solarwind.process_solar_wind_indices import process_solar_wind_indices
 
 if TYPE_CHECKING:
     from el_paso.typing import InternalName
@@ -100,8 +101,8 @@ def process_goes_eps_maged_and_epead(
             data. "gfz" saves using the GFZ format, "netcdf" saves monthly NetCDF files, and
             "both" saves using both strategies.
         skip_existing (bool): If True, skip downloading files that already exist on disk.
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
-            the magnetic field variables alongside the rest of the output. Defaults to False.
+        save_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     data_path_stem = f"{raw_data_path}/YYYY/MM/{satellite}/"
 
@@ -242,7 +243,6 @@ def process_goes_eps_maged_and_epead(
             end_time,
             time_var=maged_vars["Epoch"],
             append=True,
-            save_sw=save_sw,
         )
 
     if save_strategy in ("netcdf", "both"):
@@ -254,7 +254,11 @@ def process_goes_eps_maged_and_epead(
             end_time,
             time_var=maged_vars["Epoch"],
             append=True,
-            save_sw=save_sw,
+        )
+
+    if save_sw:
+        process_solar_wind_indices(
+            start_time, end_time, processed_data_path=processed_data_path, bin_cadence=bin_cadence
         )
 
 

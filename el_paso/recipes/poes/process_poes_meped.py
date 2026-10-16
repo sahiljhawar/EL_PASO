@@ -14,6 +14,7 @@ from astropy import units as u
 
 import el_paso as ep
 from el_paso.recipes.poes import POESSatellite
+from el_paso.recipes.solarwind.process_solar_wind_indices import process_solar_wind_indices
 
 
 def poes_meped_strategy(
@@ -72,9 +73,8 @@ def process_poes_meped_electron(
                                                     netCDF-based strategy.
         skip_existing (bool): If True, skip downloading files that already exist locally.
                                             Defaults to True.
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to
-                                            compute the magnetic field variables alongside the rest of the
-                                            output. Defaults to False.
+        save_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     del save_strategy
 
@@ -227,7 +227,12 @@ def process_poes_meped_electron(
 
     saving_strategy = poes_meped_strategy(processed_data_path, mag_field, satellite)
 
-    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, save_sw=save_sw)
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var)
+
+    if save_sw:
+        process_solar_wind_indices(
+            start_time, end_time, processed_data_path=processed_data_path, bin_cadence=bin_cadence
+        )
 
 
 CLI_DEFAULTS = {

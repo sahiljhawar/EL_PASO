@@ -19,9 +19,8 @@ from .mag_field_enum import MagneticField, kext
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
-    from el_paso.data_standard import DataStandard
     from el_paso.load_indices_solar_wind_parameters import SW_Index
-    from el_paso.typing import MagInputKeys, MagneticFieldLiteral, StandardName, VariablesDict
+    from el_paso.typing import MagInputKeys, VariablesDict
 
 logger = logging.getLogger(__name__)
 
@@ -72,33 +71,6 @@ MAGINPUT_TO_INDEX: dict[SW_Index, int | list[int]] = {
     "G3": 9,
     "W_params": list(range(10, 16)),
 }
-
-
-def get_saveable_sw_indices(
-    mag_field: MagneticFieldLiteral | MagneticField, data_standard: DataStandard[StandardName]
-) -> list[SW_Index]:
-    """Returns which SW indices a magnetic field model requires that can also be saved as output.
-
-    Intersects `MAGINPUT_REQUIRED_INPUTS` for `mag_field`'s kext with the names `data_standard`
-    actually registers, so saving strategies that want to persist the solar wind/geomagnetic
-    indices used to compute their magnetic-field output alongside it don't each have to duplicate
-    this filtering logic.
-
-    Args:
-        mag_field (MagneticFieldLiteral | MagneticField): The magnetic field model (or its
-            literal name) to look up required inputs for.
-        data_standard (DataStandard[StandardName]): The data standard whose registered
-            `InternalName`s constrain which of the required indices can actually be saved.
-
-    Returns:
-        list[SW_Index]: The saveable indices required by `mag_field`, in a stable order.
-    """
-    if isinstance(mag_field, str):
-        mag_field = MagneticField(mag_field)
-
-    kext_value = mag_field.get_kext()
-
-    return [idx for idx in MAGINPUT_REQUIRED_INPUTS.get(kext_value, []) if idx in data_standard.variable_infos]
 
 
 class MagInputResult(NamedTuple):

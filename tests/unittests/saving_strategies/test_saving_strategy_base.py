@@ -70,9 +70,9 @@ def test_output_file_save_incomplete_true() -> None:
 def test_get_target_variables_skips_optional_output_with_no_content() -> None:
     """An optional output file whose only resolved name is the shared time axis must be skipped.
 
-    This is what lets a saving strategy always register e.g. a "solar_wind_indices" output file
-    without every caller having to opt in/out depending on whether it actually computed and saved
-    any solar wind index variables alongside the rest of its data.
+    This is what lets a saving strategy always register an optional output file without every
+    caller having to opt in/out depending on whether it actually saved that group's variables
+    alongside the rest of its data.
     """
     strategy = _StubStrategy()
     output_file = OutputFile(name="solar_wind_indices", names_to_save=["Epoch", "Kp", "Dst"], save_incomplete=True)

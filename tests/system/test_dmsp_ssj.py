@@ -52,8 +52,8 @@ def test_dmsp_ssj(
     )
 
     if renew_solution:
-        # Copy every output file this strategy produces (e.g. "full" and "solar_wind_indices"),
-        # not just the primary one, so a strategy that later gains more output groups stays covered.
+        # Copy every output file this strategy produces, so a strategy that later gains
+        # more output groups stays covered.
         # get_file_path() needs the strategy's own rounded interval, not the raw start_time/end_time,
         # to compute the correct file name.
         dest_dir = Path(__file__).parent / "data" / "processed" / "DMSP" / "f17"

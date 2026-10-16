@@ -16,6 +16,7 @@ from astropy import units as u
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils import InternalFieldModel, IrbemOptions, LstarQuantity
 from el_paso.recipes.rbsp import RBSPSatellite
+from el_paso.recipes.solarwind.process_solar_wind_indices import process_solar_wind_indices
 
 
 def rbsp_rbspice_proton_gfz_strategy(
@@ -86,8 +87,8 @@ def process_rbsp_rbspice_protons(
         save_strategy (Literal["gfz", "netcdf", "both"]): Which saving strategy/strategies
             to use for writing the processed output. Defaults to "both".
         skip_existing (bool): If True, skip downloading files that already exist on disk.
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
-            the magnetic field variables alongside the rest of the output. Defaults to False.
+        save_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
@@ -242,7 +243,6 @@ def process_rbsp_rbspice_protons(
             end_time,
             time_var=binned_time_variable,
             append=True,
-            save_sw=save_sw,
         )
 
     if save_strategy in ("netcdf", "both"):
@@ -254,7 +254,11 @@ def process_rbsp_rbspice_protons(
             end_time,
             time_var=binned_time_variable,
             append=True,
-            save_sw=save_sw,
+        )
+
+    if save_sw:
+        process_solar_wind_indices(
+            start_time, end_time, processed_data_path=processed_data_path, bin_cadence=bin_cadence
         )
 
 

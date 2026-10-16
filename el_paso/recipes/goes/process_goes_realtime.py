@@ -16,6 +16,7 @@ from numpy.typing import NDArray
 
 import el_paso as ep
 from el_paso.recipes.goes import GOESRealtimeSatellite
+from el_paso.recipes.solarwind.process_solar_wind_indices import process_solar_wind_indices
 from el_paso.utils import timed_function
 
 logging.captureWarnings(capture=True)
@@ -105,8 +106,8 @@ def process_goes_real_time(
             processed data. "gfz" saves using the GFZ format, "netcdf" saves monthly NetCDF files,
             and "both" saves using both strategies.
         skip_existing (bool): If True, skip downloading files that already exist on disk.
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
-            the magnetic field variables alongside the rest of the output. Defaults to False.
+        save_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     # Part 1: specify source files to extract variables
     data_path_stem = f"{raw_data_path}/GOES/YYYY/MM/{satellite}/"
@@ -254,11 +255,16 @@ def process_goes_real_time(
 
     if save_strategy in ("gfz", "both"):
         strategy = goes_realtime_gfz_strategy(processed_data_path, mag_field, satellite)
-        ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw)
+        ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True)
 
     if save_strategy in ("netcdf", "both"):
         strategy = goes_realtime_netcdf_strategy(processed_data_path, mag_field, satellite)
-        ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw)
+        ep.save(vars_to_save, strategy, start_time, end_time, time_var=binned_time_var, append=True)
+
+    if save_sw:
+        process_solar_wind_indices(
+            start_time, end_time, processed_data_path=processed_data_path, bin_cadence=bin_cadence
+        )
 
 
 CLI_DEFAULTS = {

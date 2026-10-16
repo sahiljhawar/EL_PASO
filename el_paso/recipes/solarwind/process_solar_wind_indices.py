@@ -10,18 +10,17 @@ from typing import Literal
 import numpy as np
 
 import el_paso as ep
+from el_paso.saving_strategies.solar_wind_indices_strategy import ALL_SW_INDICES
 
 
 def solar_wind_indices_strategy(
     base_data_path: str | Path,
-    mag_field: ep.typing.MagneticFieldLiteral,
     *,
     file_format: ep.typing.MFSFormats = "nc",
 ) -> ep.SavingStrategy:
     """Monthly solar wind indices saving strategy following the GFZ data standard."""
     return ep.saving_strategies.SolarWindIndicesStrategy(
         base_data_path,
-        mag_field,
         ep.data_standards.GFZStandard(),
         file_format=file_format,
     )
@@ -39,31 +38,34 @@ def process_solar_wind_indices(
     save_strategy: Literal["gfz"] = "gfz",
     *,
     skip_existing: bool = True,
+    save_sw: bool = False,
 ) -> None:
-    """Save the solar wind and geomagnetic indices required by a magnetic field model over a time range.
+    """Save every solar wind and geomagnetic index EL-PASO can load over a time range.
 
-    Builds a uniform time grid from `start_time` to `end_time` at `bin_cadence`, loads the
-    indices that `mag_field` needs (e.g. Kp for T89, plus Dst, solar wind and IMF parameters for
-    TS04), interpolates them onto the grid, and writes them to `processed_data_path` as monthly
-    files using the GFZ data standard. The indices are independent of any spacecraft, so this
-    recipe takes no satellite. Use it to keep the model inputs on disk without processing particle data.
+    Builds a uniform time grid from `start_time` to `end_time` at `bin_cadence`, loads every
+    index in `el_paso.saving_strategies.solar_wind_indices_strategy.ALL_SW_INDICES` (Kp, Dst,
+    solar wind and IMF parameters, Tsyganenko G/W parameters), interpolates them onto the grid,
+    and writes them to `processed_data_path` as monthly files using the GFZ data standard. The
+    indices are independent of any magnetic field model and of any spacecraft, so this recipe
+    takes no meaningful `mag_field` or satellite. Use it to keep the model inputs on disk
+    without processing particle data, or call it from another recipe to save the indices
+    alongside that recipe's own product.
 
     Args:
         start_time (datetime): Start of the time range (inclusive).
         end_time (datetime): End of the time range (exclusive).
-        satellite (Literal["none"]): Unused. The indices do not belong to any spacecraft; the
-                                     parameter only keeps the recipe interface uniform.
-        mag_field (ep.typing.MagneticFieldLiteral): Magnetic field model whose required indices
-                                                    are saved (e.g. "T89", "TS04").
-        raw_data_path (str | Path): Unused. The indices are fetched by the processing step.
+        satellite (Literal["none"]): Unused.
+        mag_field (ep.typing.MagneticFieldLiteral): Unused.
+        raw_data_path (str | Path): Unused.
         processed_data_path (str | Path): Base directory in which the results are saved.
         bin_cadence (timedelta): Time step between consecutive samples of the time grid.
         num_cores (int): Unused. Loading the indices is not parallelized.
-        save_strategy (Literal["gfz"]): The saving strategy used to write the results. The indices
-                                        are only written in the GFZ monthly format.
-        skip_existing (bool): Unused. The recipe downloads no files.
+        save_strategy (Literal["gfz"]): Unused.
+        skip_existing (bool): Unused.
+        save_sw (bool): Unused. This recipe already saves all solar wind indices and
+            parameters; accepted only for interface consistency with other EL-PASO recipes.
     """
-    del satellite, raw_data_path, num_cores, save_strategy, skip_existing
+    del satellite, mag_field, raw_data_path, num_cores, save_strategy, skip_existing, save_sw
 
     timestamps = []
     curr_time = start_time
@@ -72,15 +74,21 @@ def process_solar_wind_indices(
         curr_time += bin_cadence
 
     time_var = ep.Variable(data=np.asarray(timestamps), original_unit=ep.units.posixtime)
+    time_var.metadata.original_cadence_seconds = bin_cadence.total_seconds()
 
-    # the indices are merged into the saved variables by `save_sw`, so only the time axis is passed here
+    indices_solar_wind = ep.load_indices_solar_wind_parameters(start_time, end_time, ALL_SW_INDICES, time_var)
+
+    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+        "Epoch": time_var,
+        **indices_solar_wind,
+    }
+
     ep.save(
-        {"Epoch": time_var},
-        solar_wind_indices_strategy(processed_data_path, mag_field),
+        variables_to_save,
+        solar_wind_indices_strategy(processed_data_path),
         start_time,
         end_time,
         time_var,
-        save_sw=True,
     )
 
 

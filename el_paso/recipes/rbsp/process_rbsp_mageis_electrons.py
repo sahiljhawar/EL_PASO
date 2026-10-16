@@ -18,6 +18,7 @@ from numpy.typing import NDArray
 import el_paso as ep
 from el_paso.processing.magnetic_field_utils import InternalFieldModel, IrbemOptions, LstarQuantity
 from el_paso.recipes.rbsp import RBSPSatellite
+from el_paso.recipes.solarwind.process_solar_wind_indices import process_solar_wind_indices
 
 BAD_CHANNELS = (13, 21, 22, 23, 24)
 
@@ -84,8 +85,8 @@ def process_rbsp_mageis_electrons(
             raw_data_path. Defaults to True.
         save_strategy (Literal["netcdf"]): Saving strategy used for the output files.
             Only "netcdf" is currently supported for this recipe. Defaults to "netcdf".
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
-            the magnetic field variables alongside the rest of the output. Defaults to False.
+        save_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     del save_strategy
     raw_data_path = Path(raw_data_path)
@@ -223,9 +224,12 @@ def process_rbsp_mageis_electrons(
     }
 
     strategy = rbsp_mageis_electron_strategy(processed_data_path, mag_field, satellite)
-    ep.save(
-        variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=False, save_sw=save_sw
-    )
+    ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=False)
+
+    if save_sw:
+        process_solar_wind_indices(
+            start_time, end_time, processed_data_path=processed_data_path, bin_cadence=bin_cadence
+        )
 
 
 def _xgeo_data_modifier(

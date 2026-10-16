@@ -17,6 +17,7 @@ from astropy.coordinates import GCRS, ITRS, CartesianRepresentation
 
 import el_paso as ep
 from el_paso.recipes.esa import ESANGRMSatellite
+from el_paso.recipes.solarwind.process_solar_wind_indices import process_solar_wind_indices
 from el_paso.utils import timed_function
 
 logger = logging.getLogger(__name__)
@@ -108,8 +109,8 @@ def process_ngrm_electron_fluxes(
             variables. ESA NGRM data only supports a single netCDF-based strategy.
         skip_existing (bool): If True, skip downloading files that already exist locally.
         calculate_Lstar (bool): If True, also compute the L* magnetic field quantity.
-        save_sw (bool): If True, also save the solar wind/geomagnetic indices used to compute
-            the magnetic field variables alongside the rest of the output. Defaults to False.
+        save_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
 
     Raises:
         ValueError: If `client_id` or `client_secret` is not provided and not available via the
@@ -327,9 +328,12 @@ def process_ngrm_electron_fluxes(
 
     saving_strategy = esa_ngrm_strategy(processed_data_path, mag_field, satellite)
 
-    ep.save(
-        variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True, save_sw=save_sw
-    )
+    ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=binned_time_var, append=True)
+
+    if save_sw:
+        process_solar_wind_indices(
+            start_time, end_time, processed_data_path=processed_data_path, bin_cadence=bin_cadence
+        )
 
 
 CLI_DEFAULTS = {

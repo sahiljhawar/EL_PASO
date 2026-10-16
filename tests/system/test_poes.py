@@ -53,8 +53,8 @@ def test_poes_ted_electron(
     )
 
     if renew_solution:
-        # Copy every output file this strategy produces (e.g. "full" and "solar_wind_indices"),
-        # not just the primary one, so a strategy that later gains more output groups stays covered.
+        # Copy every output file this strategy produces, so a strategy that later gains
+        # more output groups stays covered.
         # get_file_path() needs the strategy's own rounded interval, not the raw start_time/end_time,
         # to compute the correct file name.
         dest_dir = Path(__file__).parent / "data" / "processed" / "POES" / "metop1"
@@ -121,8 +121,8 @@ def test_poes_meped_electron(
     )
 
     if renew_solution:
-        # Copy every output file this strategy produces (e.g. "full" and "solar_wind_indices"),
-        # not just the primary one, so a strategy that later gains more output groups stays covered.
+        # Copy every output file this strategy produces, so a strategy that later gains
+        # more output groups stays covered.
         # get_file_path() needs the strategy's own rounded interval, not the raw start_time/end_time,
         # to compute the correct file name.
         dest_dir = Path(__file__).parent / "data" / "processed" / "POES" / "noaa18"
