@@ -51,7 +51,8 @@ class GFZDataSet(DataSet):
         FPDU (NDArray[np.float64]): Proton differential unidirectional flux.
         Flux (NDArray[np.float64]): Electron differential unidirectional flux.
         InvK (NDArray[np.float64]): Calculated modified second adiabatic invariant.
-        InvMu (NDArray[np.float64]): Calculated first adiabatic invariant.
+        InvMu (NDArray[np.float64]): Calculated first adiabatic invariant from modelled magnetic field.
+        InvMu_obs (NDArray[np.float64]): Calculated first adiabatic invariant from magnetic field observations.
         LCDS (NDArray[np.float64]): Last Closed Drift Shell.
         Lm (NDArray[np.float64]): Calculated Lm of the particles.
         Lstar (NDArray[np.float64]): Calculated Lstar of the particles.
@@ -103,6 +104,7 @@ class GFZDataSet(DataSet):
     Flux: NDArray[np.float64]
     InvK: NDArray[np.float64]
     InvMu: NDArray[np.float64]
+    InvMu_obs: NDArray[np.float64]
     LCDS: NDArray[np.float64]
     Lm: NDArray[np.float64]
     Lstar: NDArray[np.float64]
@@ -209,13 +211,15 @@ class PRBEMDataSet(DataSet):
             and B_Eq
         B_Calc (NDArray[np.float64]): Calculated magnetic field strength at the spacecraft position
         B_Eq (NDArray[np.float64]): Calculated magnetic field strength at magnetic equator
+        B_total_obs (NDArray[np.float64]): Observed magnetic field strength at the spacecraft position
         Energy_FEDU (NDArray[np.float64]): Central energy of unidirectional differential electron flux
         Energy_FPDU (NDArray[np.float64]): Central energy of unidirectional differential proton flux
         Epoch (NDArray[np.float64]): Posix Time
         FEDU (NDArray[np.float64]): Processed unidirectional differential electron flux
         FPDU (NDArray[np.float64]): Processed unidirectional differential proton flux
         InvK (NDArray[np.float64]): Calculated modified second adiabatic invariant.
-        InvMu (NDArray[np.float64]): Calculated first adiabatic invariant.
+        InvMu (NDArray[np.float64]): Calculated first adiabatic invariant from modelled magnetic field.
+        InvMu_obs (NDArray[np.float64]): Calculated first adiabatic invariant from magnetic field observations.
         L_m (NDArray[np.float64]): Calculated L McIlwain's L parameter
         L_star (NDArray[np.float64]): Calculated Roederer's L* parameter
         MLT (NDArray[np.float64]): Magnetic local time at the satellite location.
@@ -236,6 +240,7 @@ class PRBEMDataSet(DataSet):
     Alpha_Eq: NDArray[np.float64]
     B_Calc: NDArray[np.float64]
     B_Eq: NDArray[np.float64]
+    B_total_obs: NDArray[np.float64]
     Energy_FEDU: NDArray[np.float64]
     Energy_FPDU: NDArray[np.float64]
     Epoch: NDArray[np.float64]
@@ -243,6 +248,7 @@ class PRBEMDataSet(DataSet):
     FPDU: NDArray[np.float64]
     InvK: NDArray[np.float64]
     InvMu: NDArray[np.float64]
+    InvMu_obs: NDArray[np.float64]
     L_m: NDArray[np.float64]
     L_star: NDArray[np.float64]
     MLT: NDArray[np.float64]
