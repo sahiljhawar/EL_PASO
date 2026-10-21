@@ -3,20 +3,22 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
+import time
 import warnings
 from datetime import datetime, timezone
-from functools import cache, lru_cache
-from io import BytesIO
+from functools import cache
 from pathlib import Path
 from urllib.request import Request, urlopen
-from zipfile import ZipFile
 
 import numpy as np
 from numpy.typing import NDArray
 
 import el_paso as ep
 
-_DATA_URL = "https://datapub.gfz-potsdam.de/download/10.5880.GFZ.2.7.2022.001daedaf/2022-001_Smirnov-et-al_Data.zip"
+_HF_REVISION = "a8ecc4d725d0f68ebbf8ba27860c01a5709fef35"
+_HF_BASE_URL = f"https://huggingface.co/datasets/spsw/EL-PASO-PAD-Model-Data/resolve/{_HF_REVISION}"
+_DOWNLOAD_ATTEMPTS = 3
+_DOWNLOAD_TIMEOUT_S = 60
 _DATA_DIR = ep.utils.get_el_paso_model_data_path()
 _COEFS_DIR = _DATA_DIR / "2022-001_Smirnov-et-al_Data" / "2022-001_Smirnov-et-al_PAD_model"
 
@@ -135,7 +137,7 @@ def _apply_coefs(
 
 @cache
 def _load_coefs_arr(filename: str) -> NDArray[np.float64]:
-    return np.loadtxt(_ensure_coefficient_files() / filename)
+    return np.loadtxt(_ensure_coefficient_file(filename))
 
 
 def _design_matrix(
@@ -165,30 +167,39 @@ def _coefs_from_file(
     )
 
 
-@lru_cache(maxsize=1)
-def _ensure_coefficient_files() -> Path:
-    """Return the directory containing the Pijk_*.dat files, downloading if needed.
+def _ensure_coefficient_file(filename: str) -> Path:
+    """Return the path to a Pijk_*.dat coefficient file, downloading it if needed.
+
+    The files are fetched from a Hugging Face mirror of the original dataset.
 
     Data: Smirnov et al. (2022), GFZ Data Services, CC BY 4.0.
     https://doi.org/10.5880/GFZ.2.7.2022.001
     """
-    if any(_COEFS_DIR.glob("Pijk_*.dat")):
-        return _COEFS_DIR
+    path = _COEFS_DIR / filename
+    if path.exists():
+        return path
 
-    _DATA_DIR.mkdir(parents=True, exist_ok=True)
+    _COEFS_DIR.mkdir(parents=True, exist_ok=True)
 
-    request = Request(_DATA_URL, headers={"User-Agent": "el_paso"})
-    with urlopen(request, timeout=120) as response:  # noqa: S310
-        payload = response.read()
+    url = f"{_HF_BASE_URL}/{filename}"
+    request = Request(url, headers={"User-Agent": "el_paso"})  # noqa: S310
 
-    with ZipFile(BytesIO(payload)) as zf:
-        zf.extractall(_DATA_DIR)
+    for attempt in range(1, _DOWNLOAD_ATTEMPTS + 1):
+        try:
+            with urlopen(request, timeout=_DOWNLOAD_TIMEOUT_S) as response:  # noqa: S310
+                payload = response.read()
+            break
+        except OSError as err:
+            if attempt == _DOWNLOAD_ATTEMPTS:
+                msg = f"Failed to download {url} after {_DOWNLOAD_ATTEMPTS} attempts."
+                raise RuntimeError(msg) from err
+            time.sleep(2**attempt)
 
-    if not any(_COEFS_DIR.glob("Pijk_*.dat")):
-        msg = f"No Pijk_*.dat files found in {_COEFS_DIR} after extracting {_DATA_URL}."
-        raise RuntimeError(msg)
+    tmp_path = path.with_suffix(".tmp")
+    tmp_path.write_bytes(payload)
+    tmp_path.replace(path)
 
-    return _COEFS_DIR
+    return path
 
 
 def _get_coefs(
