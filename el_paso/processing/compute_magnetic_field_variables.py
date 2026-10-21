@@ -11,7 +11,7 @@ import logging
 import os
 import typing
 from pathlib import Path
-from typing import Literal, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple
 
 import numpy as np
 from astropy import units as u
@@ -24,6 +24,9 @@ from el_paso.cache import clear_cache_on_success, get_cache_dir
 from el_paso.processing.compute_electron_gyrofrequency import compute_electron_gyrofrequency
 from el_paso.typing import MagFieldVarTypes, MagneticFieldLiteral
 from el_paso.utils import make_dict_hashable, timed_function
+
+if TYPE_CHECKING:
+    from el_paso.typing import VariablesDict
 
 logger = logging.getLogger(__name__)
 
@@ -53,7 +56,7 @@ def compute_magnetic_field_variables(
     variables_to_compute: VariableRequest,
     irbem_options: mag_utils.IrbemOptions,
     num_cores: int,
-    indices_solar_wind: dict[str, Variable] | None = None,
+    indices_solar_wind: VariablesDict | None = None,
     pa_local_var: Variable | None = None,
     energy_var: Variable | None = None,
     particle_species: Literal["electron", "proton"] | None = None,
@@ -87,7 +90,7 @@ def compute_magnetic_field_variables(
             library calls, controlling aspects like model selection, bounce tracing, etc.
         num_cores (int): The number of CPU cores to use for parallel processing
             within IRBEM calls.
-        indices_solar_wind (dict[str, Variable] | None): Optional. A dictionary
+        indices_solar_wind (VariablesDict | None): Optional. A dictionary
             containing solar wind indices (e.g., "Kp", "Dst") as `Variable` objects.
             Defaults to None.
         pa_local_var (Variable | None): Optional. A Variable object containing
@@ -155,12 +158,11 @@ def compute_magnetic_field_variables(
             energy_var,
             particle_species,
         )
-
         if overwrite_cache:
             logger.info("Overwriting cached magnetic field variables (overwrite_cache=True).")
-            result, _ = cached_fn.call(*call_args, irbem_lib_path=irbem_lib_path)
+            computed_variables, _ = cached_fn.call(*call_args, irbem_lib_path=irbem_lib_path)
             logger.info("Magnetic field variables computed and cached at %s.", cache_dir)
-            return result
+            return computed_variables
 
         if cached_fn.check_call_in_cache(*call_args, irbem_lib_path=irbem_lib_path):
             logger.info("Loading magnetic field variables from cache at %s.", cache_dir)
@@ -189,7 +191,7 @@ def _compute_core(
     variables_to_compute: VariableRequest,
     irbem_options: mag_utils.IrbemOptions,
     num_cores: int,
-    indices_solar_wind: dict[str, Variable] | None = None,
+    indices_solar_wind: VariablesDict | None = None,
     pa_local_var: Variable | None = None,
     energy_var: Variable | None = None,
     particle_species: Literal["electron", "proton"] | None = None,
@@ -259,11 +261,9 @@ def _compute_core(
         )
 
     # only return the requested variables
-    computed_variables = {
+    return {
         var_name: computed_variables[var_name] for var_name in computed_variables if var_name in var_names_to_compute
     }
-
-    return computed_variables
 
 
 def _get_result(

@@ -17,6 +17,7 @@ from el_paso.recipes.rbsp._emfisis_magnetometer import (
     download_emfisis_magnetometer,
     emfisis_magnetometer_file_name_stem,
 )
+from el_paso.recipes.solar_wind_indices.process_solar_wind_indices import process_solar_wind_indices
 from el_paso.variable import Variable
 
 if TYPE_CHECKING:
@@ -50,6 +51,7 @@ def process_rbsp_emfisis_waves(
     save_strategy: Literal["netcdf"] = "netcdf",
     *,
     skip_existing: bool = True,
+    save_indices_sw: bool = False,
 ) -> None:
     """Process RBSP EMFISIS wave, density, and magnetometer data and save derived wave properties.
 
@@ -86,6 +88,8 @@ def process_rbsp_emfisis_waves(
             strategy factory only supports a single output format. Defaults to "netcdf".
         skip_existing (bool): If True, skip downloading files that already exist locally.
             Defaults to True.
+        save_indices_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     del mag_field
     del bin_cadence
@@ -169,7 +173,7 @@ def process_rbsp_emfisis_waves(
     orbit_vars = _calculate_orbital_vars(mag_vars)
     psd_var = _compute_total_psd(wfr_vars)
 
-    vars_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    vars_to_save: ep.typing.VariablesDict = {
         "Epoch": target_time_var,
         "Wave_frequency": wfr_vars["freq"],
         "Wave_frequency_bandwidth": wfr_vars["bandwidth"],
@@ -188,6 +192,13 @@ def process_rbsp_emfisis_waves(
     saving_strat = rbsp_emfisis_waves_strategy(processed_data_path, satellite)
 
     ep.save(vars_to_save, saving_strat, start_time, end_time, target_time_var)
+
+    if save_indices_sw:
+        process_solar_wind_indices(
+            start_time,
+            end_time,
+            processed_data_path=processed_data_path,
+        )
 
 
 def _calculate_orbital_vars(mag_vars: dict[str, ep.Variable]) -> dict[str, ep.Variable]:

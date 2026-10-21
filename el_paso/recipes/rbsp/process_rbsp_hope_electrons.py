@@ -14,6 +14,7 @@ from astropy import units as u
 import el_paso as ep
 from el_paso.recipes.rbsp import RBSPSatellite
 from el_paso.recipes.rbsp._emfisis_magnetometer import compute_observed_B_variables, download_emfisis_magnetometer
+from el_paso.recipes.solar_wind_indices.process_solar_wind_indices import process_solar_wind_indices
 
 
 def rbsp_hope_electron_gfz_strategy(
@@ -56,6 +57,7 @@ def process_rbsp_hope_electrons(
     calculate_Lstar: bool = True,
     skip_existing: bool = True,
     add_B_obs: bool = False,
+    save_indices_sw: bool = False,
 ) -> None:
     """Process RBSP ECT/HOPE electron flux data into the EL-PASO data standard.
 
@@ -86,6 +88,8 @@ def process_rbsp_hope_electrons(
         skip_existing (bool): If True, skip downloading files that already exist on disk.
         add_B_obs (bool): If True, also download the EMFISIS magnetometer data and save the observed
             magnetic field magnitude (B_total_obs) and InvMu_obs computed from it. Defaults to False.
+        save_indices_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
@@ -203,7 +207,7 @@ def process_rbsp_hope_electrons(
 
     psd_var = ep.processing.compute_phase_space_density(variables["FEDU"], variables["Energy"], "electron")
 
-    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    variables_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_variable,
         "FEDU": variables["FEDU"],
         "Position": variables["xGEO"],
@@ -240,6 +244,14 @@ def process_rbsp_hope_electrons(
         strategy = rbsp_hope_electron_netcdf_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, strategy, start_time, end_time, time_var=binned_time_variable, append=True)
+
+    if save_indices_sw:
+        process_solar_wind_indices(
+            start_time,
+            end_time,
+            processed_data_path=processed_data_path,
+            bin_cadence=bin_cadence,
+        )
 
 
 if __name__ == "__main__":

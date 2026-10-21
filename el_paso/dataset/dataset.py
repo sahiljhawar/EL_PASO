@@ -539,8 +539,9 @@ class DataSet:
             val = list(loaded_var_arrs[var_name]) if var_name == "datetime" else loaded_var_arrs[var_name]
             setattr(self, var_name, val)
 
-        # assign all vars, which are not present in the saved file, as empty; variables loaded from
-        # other files (e.g. Epoch, which every output file lists) must not be overwritten
+        # assign all vars, which are not present in the saved file, as empty. A name shared with
+        # another output file (e.g. "Epoch") may already hold real data loaded from that other,
+        # existing file, so it must be left untouched rather than clobbered with an empty array.
         for internal_name in output_file.names_to_save:
             alt_names = internal_name if isinstance(internal_name, tuple) else (internal_name,)
             for alt in alt_names:

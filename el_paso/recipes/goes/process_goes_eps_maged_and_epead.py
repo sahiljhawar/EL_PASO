@@ -14,6 +14,7 @@ from numpy.typing import NDArray
 
 import el_paso as ep
 from el_paso.recipes.goes import GOESNOPSatellite
+from el_paso.recipes.solar_wind_indices.process_solar_wind_indices import process_solar_wind_indices
 
 if TYPE_CHECKING:
     from el_paso.typing import InternalName
@@ -69,7 +70,9 @@ def process_goes_eps_maged_and_epead(
     num_cores: int = 16,
     save_strategy: Literal["gfz", "netcdf"] = "netcdf",
     skip_existing: bool = True,  # noqa: FBT001, FBT002,
-    add_B_obs: bool = False,  # noqa: FBT001, FBT002
+    *,
+    add_B_obs: bool = False,
+    save_indices_sw: bool = False,
 ) -> None:
     """Process combined GOES-13/15 EPS MAGED and EPEAD electron data into phase space densities.
 
@@ -100,6 +103,8 @@ def process_goes_eps_maged_and_epead(
         skip_existing (bool): If True, skip downloading files that already exist on disk.
         add_B_obs (bool): If True, also download the high-resolution L2 magnetometer data and save the
             observed magnetic field magnitude (B_total_obs) and InvMu_obs computed from it. Defaults to False.
+        save_indices_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
     """
     data_path_stem = f"{raw_data_path}/YYYY/MM/{satellite}/"
 
@@ -260,6 +265,14 @@ def process_goes_eps_maged_and_epead(
         saving_strategy = goes_eps_maged_and_epead_netcdf_strategy(processed_data_path, mag_field, satellite)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, time_var=maged_vars["Epoch"], append=True)
+
+    if save_indices_sw:
+        process_solar_wind_indices(
+            start_time,
+            end_time,
+            processed_data_path=processed_data_path,
+            bin_cadence=bin_cadence,
+        )
 
 
 def _get_and_prepare_eps_maged_variables(

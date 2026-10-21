@@ -22,6 +22,7 @@ from el_paso.recipes.arase import (
 )
 from el_paso.recipes.arase._mgf_magnetometer import compute_observed_B_variables, download_mgf_magnetometer
 from el_paso.recipes.arase.get_arase_orbit_variables import interpolate_level_3_to_pitch_angles
+from el_paso.recipes.solar_wind_indices.process_solar_wind_indices import process_solar_wind_indices
 
 
 def arase_mepe_gfz_strategy(
@@ -84,6 +85,7 @@ def process_arase_mepe(
     use_level_3_orbit_data: bool = True,
     skip_existing: bool = True,
     add_B_obs: bool = False,
+    save_indices_sw: bool = False,
 ) -> None:
     """Process Arase MEP-e Level 3 electron flux data and save derived products.
 
@@ -127,6 +129,8 @@ def process_arase_mepe(
         add_B_obs (bool): If True, also download the MGF Level 2 8-second magnetometer data and save
                                 the observed magnetic field magnitude (B_total_obs) and InvMu_obs computed
                                 from it. Only supported with the "gfz" data standard. Defaults to False.
+        save_indices_sw (bool): If True, also save all solar wind indices and parameters,
+            independent of this recipe's own output. Defaults to False.
 
     Raises:
         ValueError: If `add_B_obs` is set together with the "prbem" data standard, which does not
@@ -332,7 +336,7 @@ def process_arase_mepe(
         ep.data_standards.GFZStandard() if data_standard == "gfz" else ep.data_standards.PRBEMStandard()
     )
 
-    variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
+    variables_to_save: ep.typing.VariablesDict = {
         "Epoch": binned_time_variable,
         "FEDU": mepe_variables["FEDU"],
         "Energy_FEDU": mepe_variables["Energy"],
@@ -367,6 +371,14 @@ def process_arase_mepe(
             saving_strategy = arase_mepe_netcdf_strategy(processed_data_path, mag_field_save, data_standard_instance)
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
+
+    if save_indices_sw:
+        process_solar_wind_indices(
+            start_time,
+            end_time,
+            processed_data_path=processed_data_path,
+            bin_cadence=bin_cadence,
+        )
 
 
 if __name__ == "__main__":

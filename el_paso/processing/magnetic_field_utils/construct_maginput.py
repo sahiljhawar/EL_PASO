@@ -30,8 +30,8 @@ MAGINPUT_CLIP_RANGES: dict[kext, dict[SW_Index, tuple[float, float]]] = {
     MagneticField.T01.get_kext(): {
         "Dst": (-50, 20),
         "Pdyn": (0.5, 5),
-        "IMF_By": (-5, 5),
-        "IMF_Bz": (-5, 5),
+        "ByIMF": (-5, 5),
+        "BzIMF": (-5, 5),
         "G1": (0, 10),
         "G2": (0, 10),
     },
@@ -39,8 +39,8 @@ MAGINPUT_CLIP_RANGES: dict[kext, dict[SW_Index, tuple[float, float]]] = {
     MagneticField.T96.get_kext(): {
         "Dst": (-100, 20),
         "Pdyn": (0.5, 10),
-        "IMF_By": (-10, 10),
-        "IMF_Bz": (-10, 10),
+        "ByIMF": (-10, 10),
+        "BzIMF": (-10, 10),
     },
     MagneticField.T89.get_kext(): {},
     MagneticField.OP77Q.get_kext(): {},
@@ -50,10 +50,10 @@ MAGINPUT_CLIP_RANGES: dict[kext, dict[SW_Index, tuple[float, float]]] = {
 
 MAGINPUT_REQUIRED_INPUTS: dict[kext, list[SW_Index]] = {
     MagneticField.T89.get_kext(): ["Kp"],
-    MagneticField.T96.get_kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz"],
-    MagneticField.T01.get_kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz", "SW_speed", "SW_density", "G1", "G2"],
-    MagneticField.T01s.get_kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz", "SW_speed", "SW_density", "G2", "G3"],
-    MagneticField.T04s.get_kext(): ["Kp", "Dst", "Pdyn", "IMF_By", "IMF_Bz", "W_params"],
+    MagneticField.T96.get_kext(): ["Kp", "Dst", "Pdyn", "ByIMF", "BzIMF"],
+    MagneticField.T01.get_kext(): ["Kp", "Dst", "Pdyn", "ByIMF", "BzIMF", "Vsw", "Nsw", "G1", "G2"],
+    MagneticField.T01s.get_kext(): ["Kp", "Dst", "Pdyn", "ByIMF", "BzIMF", "Vsw", "Nsw", "G2", "G3"],
+    MagneticField.T04s.get_kext(): ["Kp", "Dst", "Pdyn", "ByIMF", "BzIMF", "W_params"],
     MagneticField.OP77Q.get_kext(): [],
     MagneticField.Dip.get_kext(): [],
 }
@@ -61,11 +61,11 @@ MAGINPUT_REQUIRED_INPUTS: dict[kext, list[SW_Index]] = {
 MAGINPUT_TO_INDEX: dict[SW_Index, int | list[int]] = {
     "Kp": 0,
     "Dst": 1,
-    "SW_density": 2,
-    "SW_speed": 3,
+    "Nsw": 2,
+    "Vsw": 3,
     "Pdyn": 4,
-    "IMF_By": 5,
-    "IMF_Bz": 6,
+    "ByIMF": 5,
+    "BzIMF": 6,
     "G1": 7,
     "G2": 8,
     "G3": 9,
@@ -87,8 +87,8 @@ def construct_maginput(
 
     - "Kp": Kp index * 10 (as in OMNI2 files), in the range 0 to 90.
     - "Dst": Dst index (nT).
-    - "dens": Solar wind density (cm^-3).
-    - "velo": Solar wind velocity (km/s).
+    - "Nsw": Solar wind density (cm^-3).
+    - "Vsw": Solar wind velocity (km/s).
     - "Pdyn": Solar wind dynamic pressure (nPa).
     - "ByIMF" / "BzIMF": GSM y/z components of the interplanetary magnetic field (nT).
     - "G1", "G2", "G3": Tsyganenko G parameters.
@@ -98,7 +98,7 @@ def construct_maginput(
     Args:
         time_var (ep.Variable): Array of new time points for interpolation.
         magnetic_field (MagneticField): The magnetic field model used to determine the required inputs.
-        indices_solar_wind (dict[str, ep.Variable] | None, optional): A dictionary of pre-loaded solar
+        indices_solar_wind (dict[SW_Index, ep.Variable] | None, optional): A dictionary of pre-loaded solar
                                                                     wind variables. Defaults to None.
 
     Returns:
@@ -145,8 +145,8 @@ def construct_maginput(
     maginput_dict: dict[MagInputKeys, NDArray[np.float64]] = {
         "Kp": maginput[:, 0],
         "Dst": maginput[:, 1],
-        "dens": maginput[:, 2],
-        "velo": maginput[:, 3],
+        "Nsw": maginput[:, 2],
+        "Vsw": maginput[:, 3],
         "Pdyn": maginput[:, 4],
         "ByIMF": maginput[:, 5],
         "BzIMF": maginput[:, 6],
