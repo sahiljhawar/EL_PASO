@@ -25,15 +25,18 @@ def rbsp_efw_emfisis_density_combined_strategy(
     satellite: RBSPSatellite,
     mag_field: ep.typing.MagneticFieldLiteral,
     data_standard: ep.typing.DataStandard[ep.typing.StandardName] | None = None,
+    *,
+    file_format: ep.typing.MFSFormats = "nc",
 ) -> ep.SavingStrategy:
-    """Daily NetCDF wave saving strategy for THEMIS FFT."""
+    """Monthly density saving strategy for the combined RBSP EFW/EMFISIS densities."""
     return ep.saving_strategies.RBSPDensityStrategy(
         base_data_path=base_data_path,
         mission="RBSP",
-        satellite=satellite,
+        satellite="rbsp" + satellite,
         instrument="densities_combined",
         mag_field=mag_field,
         data_standard=data_standard,
+        file_format=file_format,
     )
 
 
@@ -46,7 +49,7 @@ def process_rbsp_efw_emfisis_density_combined(
     processed_data_path: str | Path = ".",
     bin_cadence: timedelta = timedelta(minutes=1),
     num_cores: int = 16,
-    save_strategy: Literal["netcdf"] = "netcdf",
+    save_strategy: Literal["netcdf", "mat"] = "netcdf",
     *,
     skip_existing: bool = True,
     add_hiss_derived_densitites: bool = True,
@@ -74,8 +77,8 @@ def process_rbsp_efw_emfisis_density_combined(
             would be written to.
         bin_cadence (timedelta): Time-binning cadence applied to the density and position variables.
         num_cores (int): Number of CPU cores used for the magnetic field computations.
-        save_strategy (Literal["netcdf"]): The saving strategy used to write the processed
-            data. This recipe only supports a single netCDF-based strategy.
+        save_strategy (Literal["netcdf", "mat"]): The file format of the monthly output files,
+            either NetCDF (`.nc`) or MATLAB (`.mat`).
         skip_existing (bool): If True, skip downloading files that already exist locally.
         add_hiss_derived_densitites (bool): If True, also load, time-bin, and map to the
             equator the hiss-derived density data.
@@ -83,13 +86,7 @@ def process_rbsp_efw_emfisis_density_combined(
             hiss-derived density text files.
         save_indices_sw (bool): If True, also save all solar wind indices and parameters,
             independent of this recipe's own output. Defaults to False.
-
-    Raises:
-        NotImplementedError: Always raised before the processed variables are saved; saving via
-            `RBSPDensityStrategy` is not yet implemented.
     """
-    del save_strategy
-
     raw_data_path = Path(raw_data_path)
     processed_data_path = Path(processed_data_path)
 
@@ -136,7 +133,6 @@ def process_rbsp_efw_emfisis_density_combined(
     )
 
     emfisis_time_bin_methods = {
-        "Digi_type": ep.TimeBinMethod.Unique,
         "Density": ep.TimeBinMethod.NanMedian,
     }
 
@@ -148,10 +144,6 @@ def process_rbsp_efw_emfisis_density_combined(
         start_time=start_time,
         end_time=end_time,
     )
-
-    digi_type_cleaned = np.asarray([s.strip() for s in emfisis_variables["Digi_type"].get_data()])
-    digi_type_cleaned = digi_type_cleaned.astype("S")
-    emfisis_variables["Digi_type"].set_data(digi_type_cleaned, "same")
 
     datetimes = [datetime.fromtimestamp(t, tz=timezone.utc) for t in binned_time_variable.get_data(ep.units.posixtime)]
 
@@ -207,10 +199,10 @@ def process_rbsp_efw_emfisis_density_combined(
 
     variables_to_save: dict[ep.typing.InternalName, ep.Variable] = {
         "Epoch": binned_time_variable,
-        "Number_density_efw": efw_variables["Density"],
-        "Number_density_emfisis": emfisis_variables["Density"],
-        "Number_density_efw_Eq": efw_variables["Density_mapped"],
-        "Number_density_emfisis_Eq": emfisis_variables["Density_mapped"],
+        "Number_density_scpot": efw_variables["Density"],
+        "Number_density_spectrogram": emfisis_variables["Density"],
+        "Number_density_scpot_Eq": efw_variables["Density_mapped"],
+        "Number_density_spectrogram_Eq": emfisis_variables["Density_mapped"],
         "MLT": magnetic_field_variables["MLT_" + mag_field],
         "R_Eq": magnetic_field_variables["R_Eq_" + mag_field],
         "Position": efw_variables["xGEO"],
@@ -219,14 +211,15 @@ def process_rbsp_efw_emfisis_density_combined(
 
     if add_hiss_derived_densitites:
         variables_to_save |= {
-            "Number_density_hiss_derived": hiss_derived_densities_vars["Density"],
-            "Number_density_hiss_derived_Eq": hiss_derived_densities_vars["Density_mapped"],
+            "Number_density_other": hiss_derived_densities_vars["Density"],
+            "Number_density_other_Eq": hiss_derived_densities_vars["Density_mapped"],
         }
 
     saving_strategy = rbsp_efw_emfisis_density_combined_strategy(
         processed_data_path,
         satellite,
         mag_field,
+        file_format="mat" if save_strategy == "mat" else "nc",
     )
 
     ep.save(variables_to_save, saving_strategy, start_time, end_time, binned_time_variable)
