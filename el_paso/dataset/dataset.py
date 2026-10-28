@@ -537,7 +537,14 @@ class DataSet:
         for var_name in var_names_stored:
             # Assign the data array onto the dataset
             val = list(loaded_var_arrs[var_name]) if var_name == "datetime" else loaded_var_arrs[var_name]
-            setattr(self, var_name, val)
+            if var_name in self._internal_attrs or var_name in self.possible_variables:
+                setattr(self, var_name, val)
+            else:
+                logger.warning(
+                    f"Variable '{var_name}' found in the saved file is not part of "
+                    f"{self.saving_strategy.data_standard}. Loading it anyway."
+                )
+                object.__setattr__(self, var_name, val)
 
         # assign all vars, which are not present in the saved file, as empty. A name shared with
         # another output file (e.g. "Epoch") may already hold real data loaded from that other,
