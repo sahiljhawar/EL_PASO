@@ -606,6 +606,43 @@ def test_loading_variable_from_missing_file_keeps_loaded_epoch(tmp_path: Path) -
     np.testing.assert_array_equal(getattr(dataset, epoch_name), epoch)
 
 
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_variable_missing_from_standard_is_loaded_with_warning(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A variable in the saved file which is not part of the data standard is loaded and logged, not rejected."""
+    import netCDF4 as nC  # noqa: PLC0415
+
+    variables = _mock_monthly_variables()
+    start_time = datetime(2013, 1, 1, tzinfo=timezone.utc)
+    end_time = datetime(2013, 1, 2, tzinfo=timezone.utc)
+    strategy = ep.saving_strategies.MonthlyRBStrategy(
+        tmp_path, "GOES", "primary", "MAGED", "T89", data_standard=ep.data_standards.GFZStandard(), file_format="nc"
+    )
+    ep.save(variables, strategy, start_time=start_time, end_time=end_time, time_var=variables["Epoch"])
+
+    # emulate a file written with a newer data standard by appending a variable unknown to this one
+    nc_file = next(tmp_path.rglob("*.nc"))
+    with nC.Dataset(nc_file, "a") as file:
+        time_name = next(iter(file.variables))
+        extra = file.createVariable("NEW_UNKNOWN_VAR", "f8", file.variables[time_name].dimensions)
+        extra[:] = 42.0
+
+    dataset = DataSet(saving_strategy=strategy, start_time=start_time, end_time=end_time, verbose=False)
+
+    with caplog.at_level(logging.WARNING):
+        assert dataset.datetime
+        loaded = dataset.NEW_UNKNOWN_VAR
+
+    assert "NEW_UNKNOWN_VAR" in caplog.text
+    assert np.all(loaded == 42.0)
+    assert "NEW_UNKNOWN_VAR" not in dataset.get_loaded_variables()
+
+    with pytest.raises(AttributeError, match="Cannot set attribute"):
+        dataset.NEW_UNKNOWN_VAR_2 = 1
+
+
 _PROCESSED = pathlib.Path(__file__).parent.parent.parent / "system" / "data" / "processed"
 _ECT_START = datetime(2017, 9, 8, tzinfo=timezone.utc)
 _ECT_END = _ECT_START + timedelta(days=0.4, seconds=-1)
