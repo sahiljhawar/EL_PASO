@@ -73,7 +73,7 @@ def _assert_variables_load(dataset: DataSet, internal_names: list[ep.typing.Inte
         assert not np.all(np.isnan(data)), f"{internal_name} is entirely NaN"
 
 
-@pytest.mark.basic
+@pytest.mark.network
 def test_themis_fft_waves(tmpdir: Path, skip_if_unreachable: Callable[..., None]) -> None:
     processed_data_path = Path(tmpdir)
 
@@ -99,7 +99,7 @@ def test_themis_fft_waves(tmpdir: Path, skip_if_unreachable: Callable[..., None]
     _assert_variables_load(dataset, _WAVE_VARIABLES)
 
 
-@pytest.mark.basic
+@pytest.mark.network
 def test_themis_scpot_density(tmpdir: Path, skip_if_unreachable: Callable[..., None]) -> None:
     processed_data_path = Path(tmpdir)
 

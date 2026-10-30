@@ -16,7 +16,7 @@ import pytest
 
 
 @pytest.mark.usefixtures("enable_downloads")
-@pytest.mark.basic
+@pytest.mark.network
 def test_esa_api(tmp_path: Path):
 
     client_id = os.environ.get("ESA_CLIENT_ID")
@@ -48,7 +48,7 @@ def test_esa_api(tmp_path: Path):
 
 
 @pytest.mark.usefixtures("enable_downloads")
-@pytest.mark.basic
+@pytest.mark.network
 def test_request(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
 
     download_mod = importlib.import_module("el_paso.download")
@@ -249,7 +249,7 @@ def test_download_includes_end_file_when_start_is_late_in_its_day(
 
 
 @pytest.mark.usefixtures("enable_downloads")
-@pytest.mark.basic
+@pytest.mark.network
 def test_ftp(tmp_path: Path):
 
     start_time = datetime(2024, 1, 3, tzinfo=timezone.utc)

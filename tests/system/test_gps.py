@@ -10,7 +10,7 @@ import pytest
 from el_paso.recipes.gps import process_gps_data
 
 
-@pytest.mark.basic
+@pytest.mark.network
 @pytest.mark.usefixtures("enable_downloads")
 def test_lanl_gps(
     tmpdir: Path,

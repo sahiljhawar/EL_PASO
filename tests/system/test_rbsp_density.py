@@ -57,7 +57,7 @@ def _assert_variables_load(dataset: DataSet, internal_names: list[ep.typing.Inte
         assert not np.all(np.isnan(data)), f"{internal_name} is entirely NaN"
 
 
-@pytest.mark.basic
+@pytest.mark.network
 def test_rbsp_density_without_hiss(
     tmpdir: Path,
     skip_if_unreachable: Callable[..., None],
