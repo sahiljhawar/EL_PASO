@@ -106,11 +106,11 @@ def matlab2python(datenum: float | Iterable[float]) -> Iterable[datetime] | date
     warnings.filterwarnings("ignore", message="Discarding nonzero nanoseconds in conversion")
 
     datenum = np.asarray(datenum, dtype=float)
-    datenum = pd.to_datetime(datenum - 719529, unit="D", origin=pd.Timestamp("1970-01-01")).to_pydatetime()  # ty:ignore[unresolved-attribute]
+    datenum = pd.to_datetime(datenum - 719529, unit="D", origin=pd.Timestamp("1970-01-01")).to_pydatetime()
 
     if isinstance(datenum, Iterable):
-        datenum = enforce_utc_timezone(list(datenum))  # ty: ignore[invalid-assignment]
-        datenum: Iterable[datetime] = [round_seconds(x) for x in datenum]  # ty: ignore[not-iterable, invalid-argument-type]
+        datenum = enforce_utc_timezone(list(datenum))  # ty: ignore[no-matching-overload]
+        datenum: Iterable[datetime] = [round_seconds(x) for x in datenum]
     else:
         datenum: datetime = round_seconds(enforce_utc_timezone(datenum))
 
