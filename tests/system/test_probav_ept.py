@@ -13,7 +13,7 @@ from el_paso.recipes.probav import process_ept_electron_fluxes
 
 
 @pytest.mark.parametrize("apply_correction_factors", [True, False])
-@pytest.mark.basic
+@pytest.mark.network
 @pytest.mark.usefixtures("enable_downloads")
 @pytest.mark.skip(reason="update test data on Hugging Face")
 def test_probav_ept(

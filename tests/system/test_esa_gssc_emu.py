@@ -12,7 +12,7 @@ import pytest
 from el_paso.recipes.esa import process_gssc_emu_electrons, process_gssc_emu_protons
 
 
-@pytest.mark.basic
+@pytest.mark.network
 @pytest.mark.usefixtures("enable_downloads")
 def test_esa_gssc_emu_electrons(
     tmpdir: Path,
@@ -50,7 +50,7 @@ def test_esa_gssc_emu_electrons(
     assert out_path.exists()
 
 
-@pytest.mark.basic
+@pytest.mark.network
 @pytest.mark.usefixtures("enable_downloads")
 def test_esa_gssc_emu_protons(
     tmpdir: Path,
