@@ -187,7 +187,7 @@ def test_settings_conflicting_across_layers_name_the_variable() -> None:
         ({"FEDU": [1.0]}, TypeError, "FEDU: settings must be a mapping"),
         ({"FEDU": {"energies": [470.0]}}, TypeError, "energies needs a unit"),
         ({"FEDU": {"energies": [470.0, -1.0] * u.keV}}, ValueError, "positive"),
-        ({"FEDU": {"pitch_angle": [30.0, 60.0] * u.deg}}, ValueError, "single angle"),
+        ({"FEDU": {"pitch_angle": [[30.0, 60.0]] * u.deg}}, ValueError, "1-d list of angles"),
         ({"FEDU": {"pitch_angle": 200 * u.deg}}, ValueError, "between 0 and 180"),
         ({"FEDU": {"vmin": 1.0 * u.keV}}, TypeError, "plain number"),
     ],
@@ -443,3 +443,124 @@ def test_colormap_defaults_to_colorcet_rainbow4(synthetic_dataset: DataSet) -> N
 def test_unknown_colormap_is_rejected(synthetic_dataset: DataSet) -> None:
     with pytest.raises(ValueError, match="unknown colormap 'nope'"):
         synthetic_dataset.plot(["FEDU"], colormap="nope")
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_pitch_angle_accepts_several_angles() -> None:
+    settings = resolve_panel_settings(["FEDU"], {"FEDU": {"pitch_angle": [30.0, 90.0] * u.deg}})
+    pitch_angle = settings["FEDU"].pitch_angle
+    assert pitch_angle is not None
+    assert pitch_angle.to_value(u.deg) == pytest.approx([30.0, 90.0])
+    with pytest.raises(ValueError, match="between 0 and 180"):
+        resolve_panel_settings(["FEDU"], {"FEDU": {"pitch_angle": [30.0, 200.0] * u.deg}})
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_pitch_angle_channels(synthetic_dataset: DataSet) -> None:
+    from el_paso.dataset.plot import pitch_angle_channels  # noqa: PLC0415
+
+    assert pitch_angle_channels(synthetic_dataset, "FEDU") == pytest.approx([10.0, 30.0, 60.0, 90.0])
+    assert pitch_angle_channels(synthetic_dataset, "L_m") == pytest.approx([10.0, 30.0, 60.0, 90.0])
+    assert pitch_angle_channels(synthetic_dataset, "B_Eq").size == 0
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_panel_shapes_are_energy_rows_by_pitch_angle_columns(synthetic_dataset: DataSet) -> None:
+    from el_paso.dataset.plot import count_panels, panel_shapes  # noqa: PLC0415
+
+    variables: list[InternalName] = ["FEDU", "B_Eq", "Position"]
+    angles = [30.0, 60.0, 90.0] * u.deg
+    energies = [0.5, 1.0] * u.MeV
+
+    assert panel_shapes(synthetic_dataset, variables) == [(1, 1), (1, 1), (1, 1)]
+    assert panel_shapes(synthetic_dataset, variables, along="L_m") == [(3, 1), (1, 1), (1, 1)]
+    # B_Eq has no pitch-angle dimension, but L_m has: one column per pitch angle as well
+    assert panel_shapes(synthetic_dataset, variables, along="L_m", energies=energies, pitch_angle=angles) == [
+        (2, 3),
+        (1, 3),
+        (1, 3),
+    ]
+    assert count_panels(synthetic_dataset, variables, along="L_m", energies=energies, pitch_angle=angles) == [6, 3, 3]
+    # without along, a pitch angle list does not change the layout
+    assert panel_shapes(synthetic_dataset, ["B_Eq"], pitch_angle=angles) == [(1, 1)]
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_along_draws_a_grid_with_one_colour_bar_per_energy_row(synthetic_dataset: DataSet) -> None:
+    figure = synthetic_dataset.plot(
+        ["FEDU"], along="L_m", energies=[0.5, 2.0] * u.MeV, pitch_angle=[25.0, 90.0] * u.deg
+    )
+
+    panels = panels_of(figure)
+    # row by row: energies down, pitch angles across; 25° snaps to the 30° channel
+    assert [ax.texts[0].get_text() for ax in panels] == [
+        "0.5 MeV, pitch angle 30°",
+        "0.5 MeV, pitch angle 90°",
+        "2 MeV, pitch angle 30°",
+        "2 MeV, pitch angle 90°",
+    ]
+    flux = np.asarray(synthetic_dataset.get_by_internal_name("FEDU"))
+    for ax, (energy, alpha) in zip(panels, [(0, 1), (0, 3), (2, 1), (2, 3)], strict=True):
+        (points,) = ax.collections
+        assert np.asarray(points.get_array()) == pytest.approx(flux[:, energy, alpha])
+
+    # the panels of a row share their colour limits: the percentiles of both pitch angles together
+    first_row = [panels[0].collections[0], panels[1].collections[0]]
+    expected = tuple(np.percentile(np.concatenate([flux[:, 0, 1], flux[:, 0, 3]]), [5, 95]))
+    assert first_row[0].norm is first_row[1].norm
+    assert (first_row[0].norm.vmin, first_row[0].norm.vmax) == pytest.approx(expected)
+    colorbars = [ax for ax in figure.axes if ax.get_label() == "<colorbar>"]
+    assert len(colorbars) == 2  # one per energy row
+
+    # the columns sit side by side and share the time axis
+    top_left, top_right = panels[0].get_position(), panels[1].get_position()
+    assert top_left.x1 < top_right.x0
+    assert panels[1].get_shared_x_axes().joined(panels[0], panels[3])
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_several_pitch_angles_without_along(synthetic_dataset: DataSet) -> None:
+    angles = [30.0, 90.0] * u.deg
+
+    # a variable of energy and pitch angle is one spectrogram, cut at one pitch angle
+    with pytest.raises(ValueError, match="FEDU: several pitch angles .* need along"):
+        synthetic_dataset.plot(["FEDU"], pitch_angle=angles)
+
+    # one that depends on pitch angle only gets one line per angle
+    figure = synthetic_dataset.plot(["L_m", "B_Eq"], pitch_angle=angles)
+    l_m, b_eq = panels_of(figure)
+    assert [line.get_label() for line in l_m.lines] == ["pitch angle 30°", "pitch angle 90°"]
+    assert l_m.get_legend() is not None
+    assert len(b_eq.lines) == 1  # no pitch-angle dimension
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_create_panel_axes_lays_out_blocks_and_labels_the_bottom_row() -> None:
+    from el_paso.dataset.plot import create_panel_axes, figure_size  # noqa: PLC0415
+    from matplotlib.figure import Figure  # noqa: PLC0415
+
+    shapes = [(1, 1), (2, 3), (1, 2)]
+    figure = Figure(figsize=figure_size(shapes), layout="constrained")
+    blocks = create_panel_axes(figure, shapes)
+
+    assert [len(block) for block in blocks] == [1, 6, 2]
+    assert figure_size(shapes) == (18.0, 2.5 * 4 + 0.8)
+    figure.canvas.draw()
+    single, grid, bottom = blocks
+    # a single panel spans the full width; the bottom block's two panels split it
+    assert single[0].get_position().x0 == pytest.approx(grid[0].get_position().x0)
+    assert single[0].get_position().x1 == pytest.approx(grid[2].get_position().x1)
+    assert bottom[0].get_position().x1 < bottom[1].get_position().x0
+
+    def shows_tick_labels(ax: Any) -> bool:  # noqa: ANN401
+        return any(label.get_visible() for label in ax.get_xticklabels())
+
+    assert all(shows_tick_labels(ax) for ax in bottom)
+    assert not any(shows_tick_labels(ax) for ax in [*single, *grid])
+    assert all(ax.get_shared_x_axes().joined(single[0], ax) for ax in [*grid, *bottom])

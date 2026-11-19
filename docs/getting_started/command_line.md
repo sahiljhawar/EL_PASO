@@ -239,14 +239,16 @@ A recipe can define default panels (`PLOT_DEFAULTS`, as RBSP MagEIS does), in wh
 | --- | --- |
 | `--variable` | Internal name of a variable to plot. Repeat for several panels. Any space-weather index or solar wind parameter can be requested too; these are drawn once at the top of the figure, shared by all satellites. A variable missing from the files is an error. |
 | `--energy` | Energy to show for variables with an energy dimension, e.g. `470` (keV) or `1MeV`. Repeat for several; each is drawn as one line, labelled with the matched energy. |
-| `--pitch-angle` | Pitch angle in degrees at which to cut (default 90). |
+| `--pitch-angle` | Pitch angle in degrees at which to cut, at the nearest channel in the files (default 90). Repeat it with an `--along-*` option for one column of panels per pitch angle; a variable that only depends on pitch angle (`L_star`) gets one line per angle. A spectrogram can only be cut at one. |
 | `--vmin`, `--vmax` | Colour limits of spectrograms and scatter panels, or y-limits of `--energy` line panels. Default: the 5th and 95th percentile of the data. |
-| `--colormap` | A [colorcet](https://colorcet.holoviz.org) or matplotlib colormap name. Default `rainbow4`. |
-| `--along-L-star`, `--along-L-m`, `--along-R-eq` | Draw each variable as a scatter plot over time with that coordinate on the y axis and the value as colour. At most one of them per call. |
+| `--colormap` | A [colorcet](https://colorcet.holoviz.org) or matplotlib colormap name. Default `viridis`. |
+| `--along-L-star`, `--along-L-m`, `--along-R-eq` | Draw each variable as a scatter plot over time with that coordinate on the y axis and the value as colour. A variable becomes a grid: one row per `--energy` (or per channel) and one column per `--pitch-angle`, since both the flux and L* depend on pitch angle. The panels of a row share one colour bar. At most one of them per call. |
 | `--output-dir` | Directory to write the figure to, created if missing. Default: the current directory. |
 | `--filename` | Name of the file; the format follows the suffix (`.png`, `.pdf`, ...). Default: `<recipe>_<satellite>_<start>_<end>.png`. |
 | `--show` | Open the figure in an interactive window instead of only writing a file. |
 | `--export-script` | Write a standalone Python script that makes this figure to the given file, instead of plotting. The script holds every setting as a variable at the top and draws the figure with matplotlib, so it can be edited into a custom figure.|
+| `--serve` | Open the figure in an interactive web app instead of writing it; see [Interactive web app](#interactive-web-app). |
+| `--host`, `--port` | Where the `--serve` app listens. Default `127.0.0.1` and `2718`. |
 
 For example, electron flux at three energies against `L_star`, written as a PDF:
 
@@ -259,9 +261,54 @@ el-paso plot rbsp mageis-electrons \
     --output-dir ~/ep/figures --filename fedu_lstar.pdf
 ```
 
+For the same energies at several pitch angles, one column each:
+
+```bash
+el-paso plot rbsp mageis-electrons \
+    --start-time 2017-10-15 --end-time 2017-10-16T23:59:59 \
+    --processed-data-path ~/ep/processed \
+    --variable FEDU --energy 108 --energy 470 --energy 1575 \
+    --pitch-angle 30 --pitch-angle 60 --pitch-angle 90 \
+    --along-L-star --output-dir ~/ep/figures
+```
+
 With several `--satellite` options the figure holds one block of panels per satellite
 on a shared time axis. The plot runs headless by default (it writes a file, so it works
 on a cluster).
+
+### Interactive web app
+
+`--serve` opens the same figure in the browser, with zoom and pan, and widgets to change
+it without running the command again. It needs an optional dependency:
+
+```bash
+pip install 'el_paso[serve]'      # or: uv sync --extra serve
+
+el-paso plot goes realtime --satellite primary --mag-field T89 \
+    --start-time 2026-10-01 --end-time 2026-10-10 \
+    --processed-data-path ~/ep/processed --serve
+```
+
+The app starts with the panels and settings the command would draw (the recipe's
+`PLOT_DEFAULTS` and the command-line options), and runs until you press Ctrl+C.
+
+| Widget | What it does |
+| --- | --- |
+| Time range | Loads another range of processed files. |
+| Panels | Variables and space-weather indices to draw. |
+| Y axis | `time` for spectrograms and energy lines, or `L_star`, `L_m`, `R_Eq` for the scatter grid. |
+| Energies | Channels of the flux variable, as in the files. None selected: a spectrogram, or every channel along a coordinate. |
+| Pitch angle | A slider over the pitch-angle channels in the files, so it snaps to the angle the figure shows. Along a coordinate it becomes a multiple choice, one column per angle. |
+| Colour limits | The 5th and 95th percentiles, or limits on a log slider. |
+| Colormap, Zoom / pan | The colormap, and whether the figure can be zoomed (off shows a plain image). |
+
+The energy, pitch-angle, colour and y-axis widgets apply to the variables with an energy
+dimension (such as `FEDU`); the other panels keep their settings. Zooming magnifies the
+drawn figure; narrow the time range to redraw at full resolution.
+
+The app has no authentication. It binds to `127.0.0.1` by default, so only your machine
+can reach it. On a remote machine, forward the port instead of changing `--host`:
+`ssh -L 2718:127.0.0.1:2718 <host>`.
 
 ### From Python
 
@@ -286,7 +333,13 @@ ds = ep.DataSet(strategy, start, end)
 
 fig = ds.plot(["FEDU", "L_star"], energies=[470, 1575] * u.keV, pitch_angle=90 * u.deg)
 fig.savefig("quicklook.png")
+
+# along L*: one row per energy, one column per pitch angle
+fig = ds.plot(["FEDU"], along="L_star", energies=[470, 1575] * u.keV, pitch_angle=[30, 90] * u.deg)
 ```
+
+`el_paso.dataset.plot.panel_shapes` gives the rows and columns of each variable, and
+`create_panel_axes` lays them out, for figures that combine `plot` with panels of your own.
 
 Importing `el_paso` does not import matplotlib; it is loaded the first time you plot.
 

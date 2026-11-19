@@ -38,3 +38,8 @@ exclude = ["*.ipynb", "docs/scripts/generate_spec0_gantt.py"]
 
 [lint.pydocstyle]
 convention = "google"
+
+[lint.per-file-ignores]
+# A marimo app: every cell is a function `_` whose parameters and return tuple are the names it shares
+# with other cells, imports live in cells, and a cell's last expression is its output.
+"el_paso/cli/plot_app.py" = ["ANN001", "ANN202", "PLC0415", "PLR1711", "B018"]

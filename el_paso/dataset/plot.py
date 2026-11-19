@@ -14,8 +14,9 @@ then the keyword arguments of `plot`, which the CLI fills from ``--energy``, ``-
 
 With ``along`` (one of `ALONG_COORDINATES`, from ``--along-L-star``, ``--along-L-m`` or
 ``--along-R-eq``), every panel is instead a scatter plot over time with that coordinate on the y axis
-and the variable's value as colour; variables with an energy dimension get one such panel per
-selected energy, or per channel. matplotlib is imported when `plot` is called.
+and the variable's value as colour. A variable is then drawn as a grid of such panels: one row per
+selected energy (or per channel), and one column per selected pitch angle, since the variable and
+L* or Lm both depend on pitch angle. matplotlib is imported when `plot` is called.
 """
 
 from __future__ import annotations
@@ -33,6 +34,7 @@ if TYPE_CHECKING:
     from collections.abc import Mapping, Sequence
 
     from matplotlib.axes import Axes
+    from matplotlib.collections import PathCollection
     from matplotlib.colors import Colormap, Normalize
     from matplotlib.figure import Figure
     from numpy.typing import NDArray
@@ -78,10 +80,11 @@ class PanelSettings:
 
     Attributes:
         energies: Energies to show, for variables with an energy dimension.
-        pitch_angle: Pitch-angle cut, for variables with a pitch-angle dimension. Without it, variables with
-            an energy and a pitch-angle dimension use 90°, and those with only a pitch-angle dimension
-            (e.g. ``L_star``) show all pitch angles.
-            ``None`` is 90°.
+        pitch_angle: Pitch-angle cut, for variables with a pitch-angle dimension, each angle matched to the
+            nearest channel. Without it, variables with an energy and a pitch-angle dimension use 90°, and
+            those with only a pitch-angle dimension (e.g. ``L_star``) show all pitch angles. Several
+            angles (a 1-d quantity) give one column of panels each with `along`, and one line each for
+            variables with only a pitch-angle dimension; a spectrogram can only be cut at one.
         vmin: Lower colour limit of spectrograms and scatter panels (y-limit of energy line panels),
             in the unit of the plotted variable.
         vmax: Upper colour limit of spectrograms and scatter panels (y-limit of energy line panels),
@@ -115,8 +118,9 @@ def _check_setting(key: str, value: object) -> Any:  # noqa: ANN401
         return energies
     if key == "pitch_angle":
         pitch_angle = _as_quantity(value, u.deg, key)
-        if not pitch_angle.isscalar or not 0 <= pitch_angle.to_value(u.deg) <= 180:
-            msg = f"pitch_angle must be a single angle between 0 and 180 degrees, got {pitch_angle}."
+        degrees = np.atleast_1d(pitch_angle.to_value(u.deg))
+        if pitch_angle.ndim > 1 or degrees.size == 0 or not np.all((degrees >= 0) & (degrees <= 180)):
+            msg = f"pitch_angle must be one angle or a 1-d list of angles between 0 and 180 degrees, got {pitch_angle}."
             raise ValueError(msg)
         return pitch_angle
     if key == "along":
@@ -356,18 +360,56 @@ def _cut_pitch_angle(
     return np.where(missing, np.nan, cut), matched[:, 0]
 
 
+def _pitch_angles(settings: PanelSettings) -> list[u.Quantity]:
+    """The pitch angles of a panel's settings as a list, defaulting to `_DEFAULT_PITCH_ANGLE`."""
+    if settings.pitch_angle is None:
+        return [_DEFAULT_PITCH_ANGLE]
+    return list(np.atleast_1d(settings.pitch_angle))
+
+
+def pitch_angle_channels(dataset: DataSet, name: InternalName) -> NDArray[np.float64]:
+    """The pitch-angle channels of a variable in degrees, as `plot` matches them: the median over time.
+
+    A requested pitch angle is cut at the nearest of these channels (per time step, for channels that
+    shift with time), so they are the values a pitch-angle selection can usefully take, e.g. the steps
+    of a slider.
+
+    Args:
+        dataset (DataSet): The dataset that holds the variable.
+        name (InternalName): Internal name of a variable, e.g. ``"FEDU"`` or ``"L_star"``.
+
+    Returns:
+        NDArray[np.float64]: The sorted finite channels, rounded to 1e-6 degrees, empty if the variable has
+        no pitch-angle dimension.
+    """
+    dependencies = dataset.saving_strategy.data_standard.get_dependencies(name)[1:]
+    if not dependencies or not _is_dimension(dependencies[-1], "Alpha"):
+        return np.asarray([], dtype=float)
+    _, channels = _get_median_coordinate(dataset, dependencies[-1])
+    channels = np.asarray(channels, dtype=float).ravel()
+    # angles are stored in radians, so e.g. 30° comes back as 29.999999999999996°
+    return np.unique(np.round(channels[np.isfinite(channels)], 6))
+
+
 def _pitch_angle_note(matched: NDArray[np.float64]) -> str:
     """Panel note naming the median matched pitch angle, e.g. ``pitch angle 90°``."""
     return f"pitch angle {np.nanmedian(matched):.0f}°"
 
 
 def _select_energies(
-    dataset: DataSet, name: InternalName, data: NDArray[np.float64], dependency: Dependency, energies: u.Quantity
+    dataset: DataSet,
+    name: InternalName,
+    data: NDArray[np.float64],
+    dependency: Dependency,
+    energies: u.Quantity,
+    *,
+    warn: bool = True,
 ) -> tuple[NDArray[np.float64], list[str]]:
     """The values of `data` (shape ``(time, energy)``) at each of `energies`, using the nearest channel per time step.
 
     Time steps whose nearest channel is more than `_ENERGY_TOLERANCE` away from the requested energy
-    are NaN, and an energy without any match is reported with a warning.
+    are NaN, and an energy without any match is reported with a warning (unless `warn` is false, for
+    repeated selections of the same channels).
 
     Returns:
         tuple[NDArray[np.float64], list[str]]: Values of shape ``(time, len(energies))`` and one label
@@ -382,7 +424,8 @@ def _select_energies(
     labels: list[str] = []
     for k, target in enumerate(targets):
         if np.all(np.isnan(matched[:, k])):
-            logger.warning(f"{name}: no channel within {_ENERGY_TOLERANCE:.0%} of {target:g} {energy_unit}.")
+            if warn:
+                logger.warning(f"{name}: no channel within {_ENERGY_TOLERANCE:.0%} of {target:g} {energy_unit}.")
             labels.append(f"{target:g} {energy_unit}: no match")
         else:
             labels.append(f"{np.nanmedian(matched[:, k]):.4g} {energy_unit}")
@@ -437,12 +480,17 @@ def _plot_variable(
         selection_note = _pitch_angle_note(matched)
         coordinates = coordinates[:1]
 
-    # (time, pitch angle) -> (time), if a pitch angle is requested explicitly, e.g. L_star
+    # (time, pitch angle) -> (time), if pitch angles are requested explicitly, e.g. L_star: one line each
     if data.ndim == 2 and settings.pitch_angle is not None and coordinates[0][0].startswith("Alpha"):
-        line, matched = _cut_pitch_angle(dataset, data, dependencies[0], settings.pitch_angle)
-        ax.plot(time, line, ".-", markersize=2, linewidth=0.8)
+        pitch_angles = _pitch_angles(settings)
+        for pitch_angle in pitch_angles:
+            line, matched = _cut_pitch_angle(dataset, data, dependencies[0], pitch_angle)
+            ax.plot(time, line, ".-", markersize=2, linewidth=0.8, label=_pitch_angle_note(matched))
         ax.set_ylabel(_label(dataset, name))
-        _add_note(ax, _pitch_angle_note(matched))
+        if len(pitch_angles) == 1:
+            _add_note(ax, _pitch_angle_note(matched))
+        else:
+            ax.legend(loc="upper right", fontsize="x-small", ncols=min(len(pitch_angles), 4))
         return
 
     first_dependency = dependencies[0]
@@ -553,18 +601,87 @@ def _plot_energy_lines(
     _add_note(ax, selection_note)
 
 
-def _count_along_panels(dataset: DataSet, name: InternalName, settings: PanelSettings) -> int:
-    """Number of scatter panels of one variable: one per selected energy or channel if it has an energy dimension."""
+def _has_pitch_angle_dimension(dataset: DataSet, name: InternalName) -> bool:
+    """Whether a variable's last dimension is pitch angle (e.g. FEDU, L_star), in its data standard."""
     standard = dataset.saving_strategy.data_standard
     if name not in standard.variable_infos:
-        return 1
+        return False
+    dependencies = standard.get_dependencies(name)[1:]
+    return bool(dependencies) and _is_dimension(dependencies[-1], "Alpha")
+
+
+def _is_spectral(dataset: DataSet, name: InternalName) -> bool:
+    """Whether a variable has an energy and a pitch-angle dimension (e.g. FEDU): a spectrogram cuts it at one angle."""
+    standard = dataset.saving_strategy.data_standard
+    if name not in standard.variable_infos:
+        return False
+    dependencies = standard.get_dependencies(name)[1:]
+    return len(dependencies) == 2 and _has_pitch_angle_dimension(dataset, name)
+
+
+def _panel_shape(dataset: DataSet, name: InternalName, settings: PanelSettings) -> tuple[int, int]:
+    """Rows and columns of the panels of one variable.
+
+    Without ``along`` a variable has one panel. With it, a variable with an energy dimension has one row
+    per selected energy, or per channel without a selection; and one column per selected pitch angle if
+    the variable or the ``along`` coordinate depends on pitch angle.
+    """
+    if settings.along is None:
+        return 1, 1
+    columns = 1
+    if _has_pitch_angle_dimension(dataset, name) or _has_pitch_angle_dimension(dataset, settings.along):
+        columns = len(_pitch_angles(settings))
+
+    standard = dataset.saving_strategy.data_standard
+    if name not in standard.variable_infos:
+        return 1, columns
     dependencies = standard.get_dependencies(name)[1:]
     if not dependencies or not _is_dimension(dependencies[0], "Energy"):
-        return 1
+        return 1, columns
     if settings.energies is not None:
-        return settings.energies.size
+        return settings.energies.size, columns
     data = dataset.get_by_internal_name(name)
-    return data.shape[1] if data.ndim >= 2 and data.shape[1] > 0 else 1
+    return (data.shape[1] if data.ndim >= 2 and data.shape[1] > 0 else 1), columns
+
+
+def panel_shapes(
+    dataset: DataSet,
+    variables: Sequence[InternalName],
+    *,
+    along: InternalName | None = None,
+    panel_settings: Mapping[str, Mapping[str, object]] | None = None,
+    energies: u.Quantity | None = None,
+    pitch_angle: u.Quantity | None = None,
+) -> list[tuple[int, int]]:
+    """Rows and columns of the panels `plot` draws for each variable, e.g. to lay out ``plot(axes=...)``.
+
+    A variable has one panel, unless it is drawn along a coordinate (`along`, or the ``along`` setting in
+    its `panel_settings`): then it is a grid with one row per selected energy (from `energies`, else from
+    its `panel_settings`), or per energy channel if none are selected, and one column per selected pitch
+    angle (from `pitch_angle`, else from its `panel_settings`; one column at 90° by default). Variables
+    without an energy dimension have one row, and those for which neither the variable nor the coordinate
+    depends on pitch angle (e.g. ``B_Eq`` along ``R_Eq``) one column.
+
+    Args:
+        dataset (DataSet): The dataset to plot.
+        variables (Sequence[InternalName]): Internal names of the variables to plot.
+        along (InternalName | None): The `along` argument of `plot`; overrides the ``along`` setting of every variable.
+        panel_settings (Mapping[str, Mapping[str, object]] | None): The `panel_settings` argument of `plot`.
+        energies (u.Quantity | None): The `energies` argument of `plot`.
+        pitch_angle (u.Quantity | None): The `pitch_angle` argument of `plot`.
+
+    Returns:
+        list[tuple[int, int]]: The rows and columns of each variable, in the order of `variables`. `plot`
+        fills the panels row by row.
+
+    Raises:
+        TypeError: If a setting is unknown or has the wrong type.
+        ValueError: If a setting is out of range.
+    """
+    settings = resolve_panel_settings(
+        variables, panel_settings, {"energies": energies, "pitch_angle": pitch_angle, "along": along}
+    )
+    return [_panel_shape(dataset, name, settings[name]) for name in variables]
 
 
 def count_panels(
@@ -574,13 +691,9 @@ def count_panels(
     along: InternalName | None = None,
     panel_settings: Mapping[str, Mapping[str, object]] | None = None,
     energies: u.Quantity | None = None,
+    pitch_angle: u.Quantity | None = None,
 ) -> list[int]:
-    """Number of panels `plot` draws for each variable, e.g. to lay out a figure for ``plot(axes=...)``.
-
-    A variable has one panel, unless it is drawn along a coordinate (`along`, or the ``along`` setting in
-    its `panel_settings`): then a variable with an energy dimension
-    has one panel per selected energy (from `energies`, else from its `panel_settings`), or one per
-    energy channel in the dataset if no energies are selected.
+    """Number of panels `plot` draws for each variable: the rows times the columns of `panel_shapes`.
 
     Args:
         dataset (DataSet): The dataset to plot.
@@ -588,6 +701,7 @@ def count_panels(
         along (InternalName | None): The `along` argument of `plot`; overrides the ``along`` setting of every variable.
         panel_settings (Mapping[str, Mapping[str, object]] | None): The `panel_settings` argument of `plot`.
         energies (u.Quantity | None): The `energies` argument of `plot`.
+        pitch_angle (u.Quantity | None): The `pitch_angle` argument of `plot`.
 
     Returns:
         list[int]: The number of panels of each variable, in the order of `variables`.
@@ -596,10 +710,63 @@ def count_panels(
         TypeError: If a setting is unknown or has the wrong type.
         ValueError: If a setting is out of range.
     """
-    settings = resolve_panel_settings(variables, panel_settings, {"energies": energies, "along": along})
-    return [
-        1 if settings[name].along is None else _count_along_panels(dataset, name, settings[name]) for name in variables
-    ]
+    shapes = panel_shapes(
+        dataset, variables, along=along, panel_settings=panel_settings, energies=energies, pitch_angle=pitch_angle
+    )
+    return [rows * columns for rows, columns in shapes]
+
+
+def figure_size(shapes: Sequence[tuple[int, int]], panel_height: float = _PANEL_HEIGHT_INCHES) -> tuple[float, float]:
+    """Size in inches of a figure laid out by `create_panel_axes`: 10 inches wide, wider for grids.
+
+    Args:
+        shapes (Sequence[tuple[int, int]]): Rows and columns of each block of panels, top to bottom.
+        panel_height (float): Height of one row of panels in inches.
+
+    Returns:
+        tuple[float, float]: Width and height.
+    """
+    rows = sum(r for r, _ in shapes)
+    columns = max((c for _, c in shapes), default=1)
+    return min(10.0 + 4.0 * (columns - 1), 30.0), panel_height * rows + 0.8
+
+
+def create_panel_axes(figure: Figure, shapes: Sequence[tuple[int, int]]) -> list[list[Axes]]:
+    """Lay out blocks of panels in one column with a shared time axis; a block can be a grid.
+
+    Every block spans the full width of the figure and is split evenly into its columns (the grid
+    has the least common multiple of all column counts as its columns). All panels share the x axis
+    with the first one, and only the bottom row shows tick labels.
+
+    Args:
+        figure (Figure): The empty figure to add the panels to.
+        shapes (Sequence[tuple[int, int]]): Rows and columns of each block, top to bottom, e.g. from
+            `panel_shapes`; a single panel is ``(1, 1)``.
+
+    Returns:
+        list[list[Axes]]: The panels of each block, row by row, as `plot` takes them for one variable.
+    """
+    import math  # noqa: PLC0415
+
+    total_rows = sum(r for r, _ in shapes)
+    total_columns = math.lcm(*(c for _, c in shapes)) if shapes else 1
+    grid = figure.add_gridspec(max(total_rows, 1), total_columns)
+    first: Axes | None = None
+    blocks: list[list[Axes]] = []
+    row = 0
+    for rows, columns in shapes:
+        span = total_columns // columns
+        block: list[Axes] = []
+        for r in range(rows):
+            for c in range(columns):
+                ax = figure.add_subplot(grid[row + r, c * span : (c + 1) * span], sharex=first)
+                first = first or ax
+                if row + r < total_rows - 1:
+                    ax.tick_params(axis="x", labelbottom=False)
+                block.append(ax)
+        row += rows
+        blocks.append(block)
+    return blocks
 
 
 def _along_coordinate(
@@ -626,6 +793,44 @@ def _along_coordinate(
     return coordinate, note
 
 
+def _along_rows(
+    dataset: DataSet,
+    name: InternalName,
+    data: NDArray[np.float64],
+    dependencies: Sequence[Dependency],
+    settings: PanelSettings,
+    along: InternalName,
+    *,
+    warn: bool,
+) -> list[tuple[NDArray[np.float64], str]]:
+    """Split `data` (already cut in pitch angle) into the rows of an along grid: one per energy, or a single row.
+
+    Raises:
+        ValueError: If the variable has a dimension other than energy (e.g. a vector component).
+    """
+    if not dependencies:
+        return [(data, "")]
+    if len(dependencies) == 1 and _is_dimension(dependencies[0], "Energy"):
+        if settings.energies is not None:
+            values, labels = _select_energies(dataset, name, data, dependencies[0], settings.energies, warn=warn)
+        else:
+            coordinate_name, channel_energies = _get_median_coordinate(dataset, dependencies[0])
+            if channel_energies.size != data.shape[1]:
+                msg = (
+                    f"{name} has {data.shape[1]} {coordinate_name} channels, "
+                    f"but the coordinate has {channel_energies.size} values."
+                )
+                raise ValueError(msg)
+            unit = dataset.saving_strategy.data_standard.variable_infos[coordinate_name].unit  # ty:ignore[invalid-argument-type]
+            values, labels = data, [f"{energy:.4g} {unit}" for energy in channel_energies]
+        return [(values[:, k], label) for k, label in enumerate(labels)]
+    msg = (
+        f"{name} depends on {', '.join(map(str, dependencies))}; only variables of time, energy and "
+        f"pitch angle can be drawn along {along}."
+    )
+    raise ValueError(msg)
+
+
 def _plot_along(
     dataset: DataSet,
     axes: Sequence[Axes],
@@ -635,11 +840,12 @@ def _plot_along(
     along: InternalName,
     cmap: Colormap,
 ) -> None:
-    """Draw one variable as scatter panels over time, with `along` on the y axis and the value as colour.
+    """Draw one variable as a grid of scatter panels over time, with `along` on the y axis and the value as colour.
 
-    A pitch-angle dimension is cut at `settings.pitch_angle` (default 90°), as is the coordinate if it
-    depends on pitch angle. A variable with an energy dimension gets one panel per selected energy,
-    or per channel without a selection; `axes` has one entry per panel (see `count_panels`).
+    The grid has one column per pitch angle of `settings.pitch_angle` (default 90°), at which both the
+    variable and the coordinate are cut if they depend on pitch angle, and one row per selected energy,
+    or per channel without a selection. `axes` holds the panels row by row (see `panel_shapes`). The
+    panels of a row share their colour limits and one colour bar.
 
     Raises:
         ValueError: If the variable has a dimension other than energy and pitch angle (e.g. a vector),
@@ -652,45 +858,43 @@ def _plot_along(
         msg = f"{name} has {data.ndim - 1} non-time dimensions, but its data standard lists {len(dependencies)}."
         raise ValueError(msg)
 
-    pitch_angle = _DEFAULT_PITCH_ANGLE if settings.pitch_angle is None else settings.pitch_angle
-    coordinate, coordinate_note = _along_coordinate(dataset, along, pitch_angle, data.shape[0])
+    has_pitch_angle = bool(dependencies) and _is_dimension(dependencies[-1], "Alpha")
+    remaining = dependencies[:-1] if has_pitch_angle else dependencies
+    rows, n_columns = _panel_shape(dataset, name, settings)
+    pitch_angles = _pitch_angles(settings)[:n_columns]
 
-    # the variable and the coordinate share the pitch-angle channels, so one note covers both cuts
-    note = coordinate_note
-    if dependencies and _is_dimension(dependencies[-1], "Alpha"):
-        data, matched = _cut_pitch_angle(dataset, data, dependencies[-1], pitch_angle)
-        dependencies = dependencies[:-1]
-        note = _pitch_angle_note(matched)
+    # columns[c][r] = (coordinate, values, note) of the panel in row r and column c
+    columns: list[list[tuple[NDArray[np.float64], NDArray[np.float64], str]]] = []
+    for column, pitch_angle in enumerate(pitch_angles):
+        coordinate, note = _along_coordinate(dataset, along, pitch_angle, data.shape[0])
+        cut = data
+        if has_pitch_angle:
+            # the variable and the coordinate share the pitch-angle channels, so one note covers both cuts
+            cut, matched = _cut_pitch_angle(dataset, data, dependencies[-1], pitch_angle)
+            note = _pitch_angle_note(matched)
+        cells = _along_rows(dataset, name, cut, remaining, settings, along, warn=column == 0)
+        columns.append([(coordinate, values, ", ".join(filter(None, [label, note]))) for values, label in cells])
 
-    if not dependencies:
-        channels = [(data, "")]
-    elif len(dependencies) == 1 and _is_dimension(dependencies[0], "Energy"):
-        if settings.energies is not None:
-            values, labels = _select_energies(dataset, name, data, dependencies[0], settings.energies)
-        else:
-            coordinate_name, channel_energies = _get_median_coordinate(dataset, dependencies[0])
-            if channel_energies.size != data.shape[1]:
-                msg = (
-                    f"{name} has {data.shape[1]} {coordinate_name} channels, "
-                    f"but the coordinate has {channel_energies.size} values."
-                )
-                raise ValueError(msg)
-            unit = standard.variable_infos[coordinate_name].unit  # ty:ignore[invalid-argument-type]
-            values, labels = data, [f"{energy:.4g} {unit}" for energy in channel_energies]
-        channels = [(values[:, k], label) for k, label in enumerate(labels)]
-    else:
-        msg = (
-            f"{name} depends on {', '.join(map(str, dependencies))}; only variables of time, energy and "
-            f"pitch angle can be drawn along {along}."
-        )
+    if len(axes) != rows * len(columns) or any(len(cells) != rows for cells in columns):
+        msg = f"Got {len(axes)} axes for the {rows * len(columns)} panels of {name}."
         raise ValueError(msg)
 
-    if len(channels) != len(axes):
-        msg = f"Got {len(axes)} axes for the {len(channels)} panels of {name}."
-        raise ValueError(msg)
-    for ax, (values, label) in zip(axes, channels, strict=True):
-        panel_note = ", ".join(filter(None, [label, note]))
-        _plot_scatter(dataset, ax, name, time, coordinate, values, along, settings, panel_note, cmap)
+    use_log = name in _LOG_COLOR_VARIABLES
+    colorbar_label = _label(dataset, name).replace(" [", "\n[", 1)
+    for row in range(rows):
+        row_axes = [axes[row * len(columns) + c] for c in range(len(columns))]
+        cells = [columns[c][row] for c in range(len(columns))]
+        if use_log:
+            cells = [(coordinate, np.where(values > 0, values, np.nan), note) for coordinate, values, note in cells]
+        shown = [values[np.isfinite(values) & np.isfinite(coordinate)] for coordinate, values, _ in cells]
+        norm = _color_norm(np.concatenate(shown), log=use_log, vmin=settings.vmin, vmax=settings.vmax)
+
+        mappable = None
+        for ax, (coordinate, values, note) in zip(row_axes, cells, strict=True):
+            mappable = _plot_scatter(dataset, ax, name, time, coordinate, values, along, note, cmap, norm) or mappable
+        if mappable is not None:
+            target = row_axes[0] if len(row_axes) == 1 else row_axes
+            row_axes[0].figure.colorbar(mappable, ax=target, pad=0.01, extend="both", label=colorbar_label)
 
 
 def _plot_scatter(
@@ -701,40 +905,37 @@ def _plot_scatter(
     coordinate: NDArray[np.float64],
     values: NDArray[np.float64],
     along: InternalName,
-    settings: PanelSettings,
     note: str,
     cmap: Colormap,
-) -> None:
-    """Draw `values` as coloured points at (time, `coordinate`), with a colour bar, as in a spectrogram.
+    norm: Normalize | None,
+) -> PathCollection | None:
+    """Draw `values` as coloured points at (time, `coordinate`) with colour scale `norm`, as in a spectrogram.
 
-    Flux-like variables get a log colour scale; `settings.vmin` and `settings.vmax` set the colour
-    limits. Points with a NaN value or coordinate are left out.
+    Points with a NaN value or coordinate are left out; a panel without any says so.
+
+    Returns:
+        PathCollection | None: The points, for a colour bar, or ``None`` if there are none.
     """
     import matplotlib.dates as mdates  # noqa: PLC0415
 
-    use_log = name in _LOG_COLOR_VARIABLES
-    if use_log:
-        values = np.where(values > 0, values, np.nan)
     shown = np.isfinite(values) & np.isfinite(coordinate)
-
     ax.xaxis_date()
     ax.set_ylabel(_label(dataset, along))
     _add_note(ax, note)
     if not shown.any():
         ax.text(0.5, 0.5, f"{name}: no data", ha="center", va="center", transform=ax.transAxes)
-        return
+        return None
 
-    points = ax.scatter(
+    return ax.scatter(
         mdates.date2num(time[shown]),
         coordinate[shown],
         c=values[shown],
         s=6,
         linewidths=0,
         cmap=cmap,
-        norm=_color_norm(values[shown], log=use_log, vmin=settings.vmin, vmax=settings.vmax),
+        norm=norm,
         rasterized=True,
     )
-    ax.figure.colorbar(points, ax=ax, pad=0.01, extend="both", label=_label(dataset, name).replace(" [", "\n[", 1))
 
 
 def _color_norm(
@@ -818,18 +1019,19 @@ def plot(
 
     With `along` (or the ``along`` setting of a variable, e.g. in a recipe's ``PLOT_DEFAULTS``), each panel
     is a scatter plot over time with that coordinate (``L_star``, ``L_m`` or ``R_Eq``) on the y axis and
-    the variable's value as colour, with a colour scale and limits as in spectrograms. Pitch-angle
-    dimensions of the variable and of the coordinate are cut at `pitch_angle` (default 90°). A variable
-    with an energy dimension gets one panel per selected energy, or one per channel if no energies are
-    selected (see `count_panels`). Variables with other dimensions, such as vectors, cannot be drawn
-    this way.
+    the variable's value as colour, with a colour scale and limits as in spectrograms. A variable is then
+    a grid of panels (see `panel_shapes`): one row per selected energy, or per channel if no energies are
+    selected, and one column per pitch angle of `pitch_angle` (default 90°), at which the pitch-angle
+    dimensions of the variable and of the coordinate are cut. The panels of a row share their colour
+    limits and colour bar. Variables with other dimensions, such as vectors, cannot be drawn this way.
 
     Args:
         self (DataSet): The dataset to plot.
         variables (Sequence[InternalName]): Internal names of the variables to plot, in panel order.
         axes (Sequence[Axes] | None): Axes to draw into, one per panel (e.g. one satellite's block of
             a multi-satellite figure): one per variable, or as many as `count_panels` gives with
-            `along`. If ``None``, a new figure is created.
+            `along`, each variable's grid row by row (`create_panel_axes` lays them out). If ``None``,
+            a new figure is created.
         panel_settings (Mapping[str, Mapping[str, object]] | None): Settings per variable, with keys
             from :data:`PANEL_SETTING_NAMES`, e.g. ``{"FEDU": {"pitch_angle": 90 * u.deg, "vmax": 1e6}}``.
             Entries for variables that are not plotted are ignored.
@@ -837,8 +1039,10 @@ def plot(
             Such a variable is drawn as one line per energy (log y) instead of a spectrogram, using
             the nearest channel at each time step; time steps more than 10% away are left blank.
         pitch_angle (u.Quantity | None): Pitch angle at which variables with an energy and a
-            pitch-angle dimension are cut, defaulting to 90°. If given, variables with only a
-            pitch-angle dimension (e.g. ``L_star``) are cut as well and drawn as a line.
+            pitch-angle dimension are cut, at the nearest channel (see `pitch_angle_channels`),
+            defaulting to 90°. If given, variables with only a pitch-angle dimension (e.g. ``L_star``)
+            are cut as well and drawn as a line, one per angle if several are given (a 1-d quantity).
+            With `along`, each of several angles gets one column of panels.
         vmin (float | None): Lower colour limit of spectrograms and scatter panels, in the unit of
             the plotted variable. Defaults to the 5th percentile of the data.
         vmax (float | None): Upper colour limit of spectrograms and scatter panels, in the unit of
@@ -847,7 +1051,7 @@ def plot(
             scatter panels with this coordinate on the y axis, or ``None`` to leave it to the ``along``
             settings of the variables (by default the plot types above).
         colormap (str): Colormap of spectrograms and scatter panels: a colorcet name or else a matplotlib
-            colormap name. Defaults to colorcet's ``rainbow4``.
+            colormap name. Defaults to ``viridis``.
 
     Returns:
         Figure: The figure that contains the panels.
@@ -856,8 +1060,9 @@ def plot(
         ValueError: If no variables are given, if the number of axes does not match the number of
             panels, if a variable (or the `along` coordinate) is not part of the data standard or has no
             data in the dataset, if a setting is out
-            of range or has a unit of the wrong kind, if `colormap` is unknown, or if a panel's resolved
-            `vmin` is not below its `vmax`.
+            of range or has a unit of the wrong kind, if `colormap` is unknown, if a panel's resolved
+            `vmin` is not below its `vmax`, or if a variable with an energy and a pitch-angle dimension
+            that is not drawn along a coordinate gets several pitch angles.
         TypeError: If a setting is unknown or has the wrong type, e.g. an energy without a unit.
     """
     from matplotlib.figure import Figure  # noqa: PLC0415
@@ -886,11 +1091,20 @@ def plot(
             )
             raise ValueError(msg)
 
-    counts = [1 if settings[n].along is None else _count_along_panels(self, n, settings[n]) for n in variables]
+    for name in variables:
+        if settings[name].along is None and len(_pitch_angles(settings[name])) > 1 and _is_spectral(self, name):
+            msg = (
+                f"{name}: several pitch angles ({settings[name].pitch_angle}) need along (e.g. along='L_star'), "
+                "which draws one column of panels per pitch angle; otherwise give one pitch angle."
+            )
+            raise ValueError(msg)
+
+    shapes = [_panel_shape(self, n, settings[n]) for n in variables]
+    counts = [rows * columns for rows, columns in shapes]
     num_panels = sum(counts)
     if axes is None:
-        figure = Figure(figsize=(10, _PANEL_HEIGHT_INCHES * num_panels + 0.8), layout="constrained")
-        axes = list(figure.subplots(num_panels, 1, sharex=True, squeeze=False)[:, 0])
+        figure = Figure(figsize=figure_size(shapes), layout="constrained")
+        axes = [ax for block in create_panel_axes(figure, shapes) for ax in block]
     else:
         axes = list(axes)
         if len(axes) != num_panels:

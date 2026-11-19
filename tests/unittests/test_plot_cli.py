@@ -1274,7 +1274,7 @@ def test_exported_script_makes_the_same_figure(
     assert result.exit_code == 0, result.output
     assert not figure_path.exists()  # exporting does not plot
     source = script.read_text()
-    assert "plt.subplots(" in source
+    assert "create_panel_axes(fig, shapes)" in source
     assert "build_figure" not in source
     assert 'ENERGIES = u.Quantity([400.0], "keV")' in source
     assert "ALONG = 'L_star'" in source
@@ -1410,3 +1410,227 @@ def test_plot_dry_run_reports_availability_per_satellite(caplog: pytest.LogCaptu
     assert "data 2017-10-01 to 2017-10-31" in text
     assert "availability b" in text
     assert "no data in range (availability table)" in text
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_plot_command_takes_several_pitch_angles(requests: list[PlotRequest]) -> None:
+    from astropy import units as u  # noqa: PLC0415
+
+    result = runner.invoke(stub_app(), [*TIME_ARGS, "--pitch-angle", "30", "--pitch-angle", "90", "--along-L-star"])
+    assert result.exit_code == 0, result.output
+
+    (request,) = requests
+    assert request.pitch_angle is not None
+    assert request.pitch_angle.to_value(u.deg).tolist() == [30.0, 90.0]
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_figure_has_one_column_per_pitch_angle_and_labels_the_bottom_row(mageis_data: Path) -> None:
+    from astropy import units as u  # noqa: PLC0415
+
+    datasets = [mageis_dataset(mageis_data, "a"), mageis_dataset(mageis_data, "b")]
+    figure = plot_cli.build_figure(
+        datasets,
+        ["FEDU", "B_Eq"],
+        PLOT_START,
+        PLOT_END,
+        along="L_star",
+        energies=[400.0] * u.keV,
+        pitch_angle=[30.0, 90.0] * u.deg,
+    )
+
+    panels = [ax for ax in figure.axes if ax.get_label() != "<colorbar>"]
+    assert len(panels) == 2 * (2 + 2)  # per satellite: FEDU and B_Eq, each one row of two pitch angles
+    assert [ax.texts[0].get_text() for ax in panels[:2]] == ["0.4 MeV, pitch angle 30°", "0.4 MeV, pitch angle 90°"]
+    assert figure.get_size_inches()[0] == pytest.approx(14.0)
+    bottom = panels[-2:]
+    assert [ax.get_xlabel() for ax in bottom] == ["Time (UTC)"] * 2
+    assert not any(ax.get_xlabel() for ax in panels[:-2])
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_several_pitch_angles_on_a_spectrogram_fail_cleanly(
+    mageis_data: Path, plot_log: pytest.LogCaptureFixture
+) -> None:
+    result = mageis_plot(
+        mageis_data,
+        "--satellite",
+        "a",
+        "--variable",
+        "FEDU",
+        "--pitch-angle",
+        "30",
+        "--pitch-angle",
+        "90",
+        *output_args(mageis_data / "out.png"),
+    )
+
+    assert result.exit_code == 1, result.output
+    assert "FEDU: several pitch angles" in plot_log.text
+    assert not (mageis_data / "out.png").exists()
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_serve_options_reach_the_request(requests: list[PlotRequest]) -> None:
+    from el_paso.cli import plot_serve  # noqa: PLC0415
+
+    assert runner.invoke(stub_app(), [*TIME_ARGS, "--serve"]).exit_code == 0
+    assert runner.invoke(stub_app(), [*TIME_ARGS, "--serve", "--host", "0.0.0.0", "--port", "9000"]).exit_code == 0  # noqa: S104
+
+    default, custom = requests
+    assert (default.serve, default.host, default.port) == (True, plot_serve.DEFAULT_HOST, plot_serve.DEFAULT_PORT)
+    assert default.host == "127.0.0.1"
+    assert (custom.serve, custom.host, custom.port) == (True, "0.0.0.0", 9000)  # noqa: S104
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+@pytest.mark.parametrize(
+    ("args", "flag"),
+    [
+        (["--show"], "--show"),
+        (["--export-script", "plot.py"], "--export-script"),
+        (["--output-dir", "figures"], "--output-dir"),
+        (["--filename", "plot.png"], "--filename"),
+    ],
+)
+def test_serve_rejects_output_options(requests: list[PlotRequest], args: list[str], flag: str) -> None:
+    result = runner.invoke(stub_app(), [*TIME_ARGS, "--serve", *args])
+
+    assert result.exit_code == 2, result.output
+    output = click.unstyle(result.output)
+    assert "--serve" in output
+    assert flag in output
+    assert not requests
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_serve_hands_the_request_to_the_app(
+    mageis_data: Path, monkeypatch: pytest.MonkeyPatch, plot_log: pytest.LogCaptureFixture
+) -> None:
+    from el_paso.cli import plot_serve  # noqa: PLC0415
+
+    served: list[tuple[PlotRequest, str, int, str | None]] = []
+    monkeypatch.setattr(plot_serve, "marimo_available", lambda: True)
+    monkeypatch.setattr(
+        plot_serve,
+        "serve",
+        lambda request, *, host, port, password: served.append((request, host, port, password)),
+    )
+
+    result = mageis_plot(mageis_data, "--satellite", "a", "--serve", "--port", "2800")
+
+    assert result.exit_code == 0, result.output
+    ((request, host, port, password),) = served
+    assert request.serve
+    assert (host, port, password) == ("127.0.0.1", 2800, None)
+    log = click.unstyle(plot_log.text)
+    assert "web app on http://127.0.0.1:2800" in log
+    assert "none (no login)" in log
+    assert not list(mageis_data.glob("*.png"))  # nothing is written
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_serve_without_marimo_fails_before_loading_data(
+    mageis_data: Path, monkeypatch: pytest.MonkeyPatch, plot_log: pytest.LogCaptureFixture
+) -> None:
+    from el_paso.cli import plot_serve  # noqa: PLC0415
+
+    def fail(*args: object, **kwargs: object) -> None:
+        msg = "must not be reached"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(plot_serve, "marimo_available", lambda: False)
+    monkeypatch.setattr(plot_cli, "_load_datasets", fail)
+    monkeypatch.setattr(plot_serve, "serve", fail)
+
+    result = mageis_plot(mageis_data, "--satellite", "a", "--serve")
+
+    assert result.exit_code == 1, result.output
+    assert "pip install 'el_paso[serve]'" in plot_log.text
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_serve_without_processed_files_does_not_start_the_app(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, plot_log: pytest.LogCaptureFixture
+) -> None:
+    from el_paso.cli import plot_serve  # noqa: PLC0415
+
+    served: list[object] = []
+    monkeypatch.setattr(plot_serve, "marimo_available", lambda: True)
+    monkeypatch.setattr(plot_serve, "serve", lambda *args, **kwargs: served.append(args))
+
+    result = mageis_plot(tmp_path, "--satellite", "a", "--serve")
+
+    assert result.exit_code == 1, result.output
+    assert "No processed files for rbspa mageis (TS04)" in plot_log.text
+    assert not served
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_serve_on_a_taken_port_fails_cleanly(
+    mageis_data: Path, monkeypatch: pytest.MonkeyPatch, plot_log: pytest.LogCaptureFixture
+) -> None:
+    from el_paso.cli import plot_serve  # noqa: PLC0415
+
+    monkeypatch.setattr(plot_serve, "marimo_available", lambda: True)
+    monkeypatch.setattr(plot_serve, "port_in_use", lambda host, port: True)
+
+    result = mageis_plot(mageis_data, "--satellite", "a", "--serve")
+
+    assert result.exit_code == 1, result.output
+    assert "Port 2718 on 127.0.0.1 is already in use" in plot_log.text
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_serve_password_comes_from_the_option_or_the_environment(
+    requests: list[PlotRequest], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from el_paso.cli import plot_serve  # noqa: PLC0415
+
+    assert runner.invoke(stub_app(), [*TIME_ARGS, "--serve", "--password", "s3cret"]).exit_code == 0
+    monkeypatch.setenv(plot_serve.PASSWORD_ENV_VAR, "from-env")
+    assert runner.invoke(stub_app(), [*TIME_ARGS, "--serve"]).exit_code == 0
+
+    option, environment = requests
+    assert option.password == "s3cret"
+    assert environment.password == "from-env"
+    assert "s3cret" not in repr(option)  # kept out of logs and tracebacks
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_serve_rejects_an_empty_password(requests: list[PlotRequest]) -> None:
+    result = runner.invoke(stub_app(), [*TIME_ARGS, "--serve", "--password", ""])
+
+    assert result.exit_code == 2, result.output
+    assert "--password" in click.unstyle(result.output)
+    assert not requests
+
+
+@pytest.mark.minimal
+@pytest.mark.basic
+def test_serve_passes_the_password_to_the_app_without_showing_it(
+    mageis_data: Path, monkeypatch: pytest.MonkeyPatch, plot_log: pytest.LogCaptureFixture
+) -> None:
+    from el_paso.cli import plot_serve  # noqa: PLC0415
+
+    passwords: list[str | None] = []
+    monkeypatch.setattr(plot_serve, "marimo_available", lambda: True)
+    monkeypatch.setattr(plot_serve, "serve", lambda request, *, host, port, password: passwords.append(password))
+
+    result = mageis_plot(mageis_data, "--satellite", "a", "--serve", "--password", "s3cret")
+
+    assert result.exit_code == 0, result.output
+    assert passwords == ["s3cret"]
+    assert "s3cret" not in plot_log.text
+    assert "password" in click.unstyle(plot_log.text)

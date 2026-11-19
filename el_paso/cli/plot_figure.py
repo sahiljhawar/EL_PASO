@@ -45,14 +45,13 @@ _STEP_INDICES = frozenset({"Kp", "Dst"})
 """Indices that are averages over fixed intervals (3 h, 1 h) and are drawn as steps."""
 
 
-def _new_figure(num_panels: int, *, show: bool) -> Figure:
-    """Create the figure for `num_panels` stacked panels.
+def _new_figure(size: tuple[float, float], *, show: bool) -> Figure:
+    """Create a figure of `size` inches.
 
     Only a figure that is shown is created through pyplot (and so with its backend); otherwise
     the figure is not tied to any GUI backend, and saving renders it with the backend that
     matches the file format (Agg for PNG), which also works without a display.
     """
-    size = (10, _PANEL_HEIGHT_INCHES * num_panels + 0.8)
     if show:
         import matplotlib.pyplot as plt  # noqa: PLC0415
 
@@ -116,10 +115,10 @@ def build_figure(
     """Draw the variables of several datasets into one column of panels with a shared time axis.
 
     Panels are stacked in one block of rows per dataset (satellite), one panel per variable, in
-    the given order; nothing is overlaid. With `along`, a variable with an energy dimension has one
-    panel per energy instead (see :func:`el_paso.dataset.plot.count_panels`). Each block is drawn by
-    `DataSet.plot` and titled with its dataset's name. Only the bottom panel shows time tick labels,
-    covering ``[start_time, end_time]``.
+    the given order; nothing is overlaid. With `along`, a variable is a grid instead, with one row per
+    energy and one column per pitch angle (see :func:`el_paso.dataset.plot.panel_shapes`); the figure
+    gets wider with the number of columns. Each block is drawn by `DataSet.plot` and titled with its
+    dataset's name. Only the bottom row shows time tick labels, covering ``[start_time, end_time]``.
 
     Args:
         datasets (Sequence[DataSet]): The datasets to plot, one block of panels each.
@@ -132,7 +131,8 @@ def build_figure(
         panel_settings (Mapping[str, Mapping[str, Any]] | None): Settings per variable, e.g. from the
             recipe's ``PLOT_DEFAULTS``, passed to `DataSet.plot`; the arguments below override them.
         energies (u.Quantity | None): Energies to show, passed to `DataSet.plot`.
-        pitch_angle (u.Quantity | None): Pitch-angle cut, passed to `DataSet.plot`.
+        pitch_angle (u.Quantity | None): Pitch-angle cut, or several (one column each) with `along`,
+            passed to `DataSet.plot`.
         vmin (float | None): Lower colour limit of spectrograms, passed to `DataSet.plot`.
         vmax (float | None): Upper colour limit of spectrograms, passed to `DataSet.plot`.
         along (InternalName | None): Coordinate on the y axis of scatter panels, passed to `DataSet.plot`.
@@ -143,25 +143,32 @@ def build_figure(
     """
     import matplotlib.dates as mdates  # noqa: PLC0415
 
-    from el_paso.dataset.plot import count_panels  # noqa: PLC0415
+    from el_paso.dataset.plot import create_panel_axes, figure_size, panel_shapes  # noqa: PLC0415
 
-    block_sizes = [
-        sum(count_panels(dataset, variables, along=along, panel_settings=panel_settings, energies=energies))
+    dataset_shapes = [
+        panel_shapes(
+            dataset,
+            variables,
+            along=along,
+            panel_settings=panel_settings,
+            energies=energies,
+            pitch_angle=pitch_angle,
+        )
         for dataset in datasets
     ]
-    num_panels = len(indices) + sum(block_sizes)
-    figure = _new_figure(num_panels, show=show)
-    axes = list(figure.subplots(num_panels, 1, sharex=True, squeeze=False)[:, 0])
+    shapes = [(1, 1)] * len(indices) + [shape for block in dataset_shapes for shape in block]
+    figure = _new_figure(figure_size(shapes, _PANEL_HEIGHT_INCHES), show=show)
+    panel_blocks = create_panel_axes(figure, shapes)
 
-    for ax, name in zip(axes, indices, strict=False):
+    for (ax,), name in zip(panel_blocks, indices, strict=False):
         _plot_index(ax, name, start_time, end_time)
     if indices:
-        axes[0].set_title("Space weather", fontsize="medium")
+        panel_blocks[0][0].set_title("Space weather", fontsize="medium")
 
     first = len(indices)
-    for dataset, block_size in zip(datasets, block_sizes, strict=True):
-        block = axes[first : first + block_size]
-        first += block_size
+    for dataset, block_shapes in zip(datasets, dataset_shapes, strict=True):
+        block = [ax for axes in panel_blocks[first : first + len(block_shapes)] for ax in axes]
+        first += len(block_shapes)
         dataset.plot(
             variables,
             axes=block,
@@ -174,11 +181,15 @@ def build_figure(
             colormap=colormap,
         )
 
-    bottom = axes[-1]
+    # all panels share the time axis (and so its locator and formatter); the bottom row is labelled
+    bottom_rows, bottom_columns = shapes[-1]
+    bottom_row = panel_blocks[-1][(bottom_rows - 1) * bottom_columns :]
+    bottom = bottom_row[0]
     bottom.xaxis_date()
     locator = mdates.AutoDateLocator()
     bottom.xaxis.set_major_locator(locator)
     bottom.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
-    bottom.set_xlim(start_time, end_time)
-    bottom.set_xlabel("Time (UTC)")
+    bottom.set_xlim(float(mdates.date2num(start_time)), float(mdates.date2num(end_time)))
+    for ax in bottom_row:
+        ax.set_xlabel("Time (UTC)")
     return figure

@@ -101,7 +101,8 @@ def write_plot_script(request: PlotRequest) -> str:
         "VARIABLES": "One panel per variable and satellite.",
         "PANEL_SETTINGS": "Settings per variable, from the recipe's plot defaults.",
         "ENERGIES": "The settings below override PANEL_SETTINGS for every variable; None keeps them.",
-        "ALONG": "Coordinate on the y axis of scatter panels, e.g. 'L_star', or None.",
+        "ALONG": "Coordinate on the y axis of scatter panels, e.g. 'L_star', or None. With it, a variable is a grid: "
+        "one row per energy, one column per pitch angle.",
         "COLORMAP": "Colormap of spectrograms and scatter panels.",
         "OUTPUT_PATH": "File to write the figure to, or None to not save it.",
         "SHOW": "Open the figure in an interactive window.",
@@ -123,7 +124,7 @@ def write_plot_script(request: PlotRequest) -> str:
         "import matplotlib",
         "import numpy as np",
         "import el_paso as ep",
-        "from el_paso.dataset.plot import count_panels",
+        "from el_paso.dataset.plot import create_panel_axes, figure_size, panel_shapes",
         _factory_import(request.factory),
     ]
 
@@ -144,21 +145,22 @@ if not SHOW:
 import matplotlib.dates as mdates  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
 
-# One dataset per satellite, and the number of panels each one needs.
+# One dataset per satellite, and the rows and columns of panels each variable needs.
 datasets = [ep.DataSet({factory}(**kwargs), START_TIME, END_TIME) for kwargs in STRATEGY_KWARGS]
 if not VARIABLES:
     datasets = []
-panel_counts = [
-    sum(count_panels(dataset, VARIABLES, along=ALONG, panel_settings=PANEL_SETTINGS, energies=ENERGIES))
+dataset_shapes = [
+    panel_shapes(
+        dataset, VARIABLES, along=ALONG, panel_settings=PANEL_SETTINGS, energies=ENERGIES, pitch_angle=PITCH_ANGLE
+    )
     for dataset in datasets
 ]
-num_panels = len(INDICES) + sum(panel_counts)
+shapes = [(1, 1)] * len(INDICES) + [shape for block in dataset_shapes for shape in block]
 
-# One column of panels with a shared time axis: the indices first, then one block per satellite.
-fig, axes = plt.subplots(
-    num_panels, 1, sharex=True, squeeze=False, figsize=(10, 2.0 * num_panels + 0.8), layout="constrained"
-)
-axes = list(axes[:, 0])
+# One column of blocks with a shared time axis: the indices first, then one block per variable and satellite.
+fig = plt.figure(figsize=figure_size(shapes, 2.0), layout="constrained")
+blocks = create_panel_axes(fig, shapes)
+axes = [ax for block in blocks for ax in block]
 
 for ax, name in zip(axes, INDICES):
     try:
@@ -185,10 +187,12 @@ if INDICES:
     axes[0].set_title("Space weather", fontsize="medium")
 
 first = len(INDICES)
-for dataset, count in zip(datasets, panel_counts):
+for dataset, block_shapes in zip(datasets, dataset_shapes):
+    dataset_axes = [ax for block in blocks[first : first + len(block_shapes)] for ax in block]
+    first += len(block_shapes)
     dataset.plot(
         VARIABLES,
-        axes=axes[first : first + count],
+        axes=dataset_axes,
         panel_settings=PANEL_SETTINGS,
         energies=ENERGIES,
         pitch_angle=PITCH_ANGLE,
@@ -197,16 +201,17 @@ for dataset, count in zip(datasets, panel_counts):
         along=ALONG,
         colormap=COLORMAP,
     )
-    first += count
 
-# Time axis, shown on the bottom panel only.
-bottom = axes[-1]
+# Time axis, shared by all panels and labelled on the bottom row only.
+bottom_rows, bottom_columns = shapes[-1]
+bottom_row = blocks[-1][(bottom_rows - 1) * bottom_columns :]
 locator = mdates.AutoDateLocator()
-bottom.xaxis_date()
-bottom.xaxis.set_major_locator(locator)
-bottom.xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
-bottom.set_xlim(START_TIME, END_TIME)
-bottom.set_xlabel("Time (UTC)")
+bottom_row[0].xaxis_date()
+bottom_row[0].xaxis.set_major_locator(locator)
+bottom_row[0].xaxis.set_major_formatter(mdates.ConciseDateFormatter(locator))
+bottom_row[0].set_xlim(START_TIME, END_TIME)
+for ax in bottom_row:
+    ax.set_xlabel("Time (UTC)")
 
 if OUTPUT_PATH is not None:
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)

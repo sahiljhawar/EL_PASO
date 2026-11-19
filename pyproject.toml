@@ -57,6 +57,10 @@ classifiers = [
 ]
 
 
+[project.optional-dependencies]
+# `el-paso plot --serve`: the interactive web app (el_paso/cli/plot_app.py)
+serve = ["marimo>=0.25.2"]
+
 [project.scripts]
 el-paso = "el_paso.cli.app:main"
 ep = "el_paso.cli.app:main"
@@ -115,3 +119,8 @@ docs = [
     "termynal",
     "mkdocs-asciinema-player>=1.2.0",
 ]
+
+[tool.uv]
+# marimo (the `serve` extra) caps pymdown-extensions below 12, while the docs use a newer one;
+# resolve them separately instead of downgrading the docs.
+conflicts = [[{ extra = "serve" }, { group = "docs" }]]

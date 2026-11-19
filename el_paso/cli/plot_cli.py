@@ -18,7 +18,8 @@ three sources:
   files a processing run wrote;
 - plot-only options: ``--variable``, ``--energy``, ``--pitch-angle``, ``--vmin``, ``--vmax``,
   ``--along-L-star``/``--along-L-m``/``--along-R-eq`` (at most one), ``--output-dir``, ``--filename``,
-  ``--show`` and ``--export-script``.
+  ``--show``, ``--export-script`` and ``--serve`` (with ``--host`` and ``--port``), which opens the
+  figure in an interactive web app (see `el_paso.cli.plot_serve`).
 
 Processing-only options such as ``--num-cores`` or ``--raw-data-path`` are not part of the
 factory's signature and so are rejected.
@@ -57,6 +58,7 @@ from el_paso.cli._parsing import _expand_loops, _format_value, _func_name, parse
 from el_paso.cli.availability import AVAILABILITY_PARAMETER, load_availability_table
 from el_paso.cli.plot_figure import DEFAULT_COLORMAP, INDEX_PANELS, build_figure
 from el_paso.cli.plot_script import write_plot_script
+from el_paso.cli.plot_serve import DEFAULT_HOST, DEFAULT_PORT, PASSWORD_ENV_VAR
 from el_paso.cli.recipe_cli import (
     FACTORY_ONLY_PARAMETERS,
     _apply_availability,
@@ -113,6 +115,10 @@ _PLOT_PARAMETER_NAMES = (
     "filename",
     "show",
     "export_script",
+    "serve",
+    "host",
+    "port",
+    "password",
 )
 """Options defined here: ``--dry-run`` is shared with processing in name only, the rest are plot-only."""
 
@@ -141,7 +147,8 @@ class PlotRequest:
         energies: Energies to show for variables with an energy dimension (``--energy``), or
             ``None`` for the defaults.
         pitch_angle: Pitch angle at which variables with an energy and a pitch-angle dimension are
-            cut (``--pitch-angle``), or ``None`` for the defaults.
+            cut (``--pitch-angle``), or several (a 1-d quantity, one grid column each) with ``along``,
+            or ``None`` for the defaults.
         vmin: Lower colour limit of spectrograms (``--vmin``), in the plotted variable's unit.
         vmax: Upper colour limit of spectrograms (``--vmax``), in the plotted variable's unit.
         along: Coordinate on the y axis of scatter panels (``--along-L-star``, ``--along-L-m`` or
@@ -151,6 +158,11 @@ class PlotRequest:
             plotting (``--export-script``), or ``None`` to plot.
         availability: The satellites the recipe's availability table has data for in the time range,
             with their overlapping intervals, or ``None`` if the recipe has no table.
+        serve: Open the figure in an interactive web app instead of writing or showing it (``--serve``).
+        host: Host the web app binds to (``--host``).
+        port: Port the web app listens on (``--port``).
+        password: Password the web app asks for (``--password``), or ``None`` for no login. It is
+            never written to the request file the app reads, nor shown in the settings table.
     """
 
     recipe: Recipe
@@ -174,6 +186,10 @@ class PlotRequest:
     colormap: str = DEFAULT_COLORMAP
     export_script: Path | None = None
     availability: dict[str, list[DateInterval]] | None = None
+    serve: bool = False
+    host: str = DEFAULT_HOST
+    port: int = DEFAULT_PORT
+    password: str | None = dataclasses.field(default=None, repr=False)
 
 
 def _plot_parameters() -> list[inspect.Parameter]:
@@ -220,15 +236,17 @@ def _plot_parameters() -> list[inspect.Parameter]:
         (
             "pitch_angle",
             Annotated[
-                float | None,
+                list[float] | None,
                 typer.Option(
                     "--pitch-angle",
                     metavar="DEG",
                     min=0.0,
                     max=180.0,
                     help="Pitch angle in degrees at which variables with an energy and a pitch-angle "
-                    "dimension (e.g. FEDU) are shown, defaulting to 90. If given, variables that only depend on "
-                    "pitch angle (e.g. L_star) are drawn as a line at this pitch angle.",
+                    "dimension (e.g. FEDU) are shown, at the nearest channel, defaulting to 90. If given, "
+                    "variables that only depend on pitch angle (e.g. L_star) are drawn as a line at this pitch "
+                    "angle. With an --along-* option, repeat it for one column of panels per pitch angle: "
+                    "--pitch-angle 30 --pitch-angle 90.",
                 ),
             ],
             None,
@@ -269,8 +287,8 @@ def _plot_parameters() -> list[inspect.Parameter]:
                     typer.Option(
                         flag,
                         help=f"Draw every variable as a scatter plot over time with {coordinate} on the y axis "
-                        "and the value as colour. Variables with an energy dimension get one panel per --energy, "
-                        "or per channel without --energy; pitch angles are cut at --pitch-angle (default 90). "
+                        "and the value as colour. A variable is a grid of panels: one row per --energy (or per "
+                        "channel without --energy) and one column per --pitch-angle (default 90). "
                         "At most one --along-* option.",
                     ),
                 ],
@@ -315,6 +333,51 @@ def _plot_parameters() -> list[inspect.Parameter]:
                     "--export-script",
                     help="Write a standalone Python script that makes this figure to this file, instead of "
                     "plotting. Edit the script to customise the figure.",
+                ),
+            ],
+            None,
+        ),
+        (
+            "serve",
+            Annotated[
+                bool,
+                typer.Option(
+                    "--serve",
+                    help="Open the figure in an interactive web app (zoom, pan, and widgets for the time range, "
+                    "panels, energies, pitch angles and colour limits) instead of writing it. Needs "
+                    "pip install 'el_paso[serve]'. Stop it with Ctrl+C.",
+                ),
+            ],
+            False,
+        ),
+        (
+            "host",
+            Annotated[
+                str,
+                typer.Option(
+                    "--host",
+                    help="Host the --serve app binds to. The app has no authentication: anything but the "
+                    "default makes it reachable from other machines.",
+                ),
+            ],
+            DEFAULT_HOST,
+        ),
+        (
+            "port",
+            Annotated[int, typer.Option("--port", min=1, max=65535, help="Port the --serve app listens on.")],
+            DEFAULT_PORT,
+        ),
+        (
+            "password",
+            Annotated[
+                str | None,
+                typer.Option(
+                    "--password",
+                    envvar=PASSWORD_ENV_VAR,
+                    show_envvar=True,
+                    help="Password the --serve app asks for before showing anything. Use it whenever someone "
+                    "else can reach the app (another --host, or a tunnel). Prefer the environment variable, "
+                    "which keeps the password out of the shell history.",
                 ),
             ],
             None,
@@ -568,8 +631,8 @@ def _parse_plot_options(plot_options: dict[str, Any]) -> dict[str, Any]:
             with the ``--along-*`` flags themselves removed.
 
     Raises:
-        typer.BadParameter: If an energy is not positive, ``--vmin`` is not below ``--vmax``, or more
-            than one ``--along-*`` option is given.
+        typer.BadParameter: If an energy is not positive, ``--vmin`` is not below ``--vmax``, more
+            than one ``--along-*`` option is given, or ``--serve`` is combined with an output option.
     """
     from astropy import units as u  # noqa: PLC0415
 
@@ -592,12 +655,36 @@ def _parse_plot_options(plot_options: dict[str, Any]) -> dict[str, Any]:
         msg = f"only one of {', '.join(flags)} can be given."
         raise typer.BadParameter(msg, param_hint=" / ".join(f"'{flag}'" for flag in flags))
 
+    if plot_options["serve"]:
+        clashing = [
+            flag
+            for name, flag in (
+                ("show", "--show"),
+                ("export_script", "--export-script"),
+                ("output_dir", "--output-dir"),
+                ("filename", "--filename"),
+            )
+            if plot_options[name]
+        ]
+        if clashing:
+            msg = f"cannot be combined with {', '.join(clashing)}: the app shows the figure in the browser."
+            raise typer.BadParameter(msg, param_hint="'--serve'")
+    if plot_options["password"] is not None and not plot_options["password"]:
+        msg = "must not be empty."
+        raise typer.BadParameter(msg, param_hint="'--password'")
+
     filename = plot_options["filename"]
     if filename is not None and Path(filename).name != filename:
         msg = f"must be a file name without a directory, got {filename!r}. Use --output-dir for the directory."
         raise typer.BadParameter(msg, param_hint="'--filename'")
 
-    pitch_angle = None if plot_options["pitch_angle"] is None else plot_options["pitch_angle"] * u.deg
+    pitch_angles = list(plot_options["pitch_angle"] or [])
+    if not pitch_angles:
+        pitch_angle = None
+    elif len(pitch_angles) == 1:
+        pitch_angle = pitch_angles[0] * u.deg
+    else:
+        pitch_angle = u.Quantity(pitch_angles, u.deg)
     return {
         **{name: value for name, value in plot_options.items() if name not in ALONG_OPTIONS},
         "variables": list(plot_options["variables"]) if plot_options["variables"] else None,
@@ -711,6 +798,11 @@ def _report_settings(request: PlotRequest) -> None:
     else:
         along_text = "none (plot types by dimensions)"
     table.add_row("along", along_text)
+    if request.serve:
+        table.add_row("output", f"web app on http://{request.host}:{request.port}")
+        table.add_row("password", "set" if request.password else "none (no login)")
+        _log_table(table)
+        return
     output_path = _output_path(request)
     if request.export_script:
         table.add_row("export script", str(request.export_script))
@@ -978,6 +1070,28 @@ def _load_datasets(request: PlotRequest) -> list[DataSet]:
     return datasets
 
 
+def _serve(request: PlotRequest, variables: Sequence[InternalName]) -> None:
+    """Open the request in the interactive web app, after checking that marimo is installed and files exist.
+
+    Raises:
+        typer.Exit: With code 1 if marimo is missing, no satellite has any processed files, or the app
+            cannot start (e.g. the port is taken).
+    """
+    from el_paso.cli import plot_serve  # noqa: PLC0415
+
+    if not plot_serve.marimo_available():
+        logger.error(f"--serve needs marimo, an optional dependency: {plot_serve.INSTALL_HINT}")
+        raise typer.Exit(code=1)
+    # reports missing files exactly as a plot run does; the app loads the data itself
+    if variables and not _load_datasets(request):
+        raise typer.Exit(code=1)
+    try:
+        plot_serve.serve(request, host=request.host, port=request.port, password=request.password)
+    except plot_serve.ServeError as error:
+        logger.error(str(error))  # noqa: TRY400
+        raise typer.Exit(code=1) from error
+
+
 def _run_plot(request: PlotRequest) -> None:
     """Plot the processed data a request describes.
 
@@ -988,12 +1102,14 @@ def _run_plot(request: PlotRequest) -> None:
     any are left out (see `_check_coverage`).
 
     With ``--export-script``, a script that makes the figure is written instead, and nothing is loaded.
+    With ``--serve``, the figure is opened in the interactive web app instead (see `el_paso.cli.plot_serve`).
 
     Raises:
         typer.BadParameter: If no variables are given and the recipe has no default panels, or if
             the command-line settings clash with the recipe's.
         typer.Exit: With code 1 if the expected files cannot be determined, if ``--show`` is
-            given without an interactive backend, or if no satellite has any processed files.
+            given without an interactive backend, if ``--serve`` is given without marimo, or if no
+            satellite has any processed files.
     """
     _report_settings(request)
     panels = resolve_panels(request)
@@ -1014,6 +1130,10 @@ def _run_plot(request: PlotRequest) -> None:
         request.export_script.parent.mkdir(parents=True, exist_ok=True)
         request.export_script.write_text(write_plot_script(request), encoding="utf-8")
         logger.info(f"Wrote the plot script to {request.export_script}. Run it with python.")
+        return
+
+    if request.serve:
+        _serve(request, variables)
         return
 
     if request.show and (error := _interactive_backend_error()):
